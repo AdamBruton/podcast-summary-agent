@@ -219,3 +219,10 @@ export function recordCost({ run_id, video_id, stage, model, input_tokens, cache
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run(run_id, video_id, stage, model, input_tokens, cached_tokens, output_tokens, usd_cost);
 }
+
+export function totalCostForRun(run_id) {
+  const row = db()
+    .prepare(`SELECT COALESCE(SUM(usd_cost), 0) AS total FROM cost_ledger WHERE run_id = ?`)
+    .get(run_id);
+  return row.total || 0;
+}

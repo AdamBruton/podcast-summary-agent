@@ -5,7 +5,8 @@
 // Both wrap each stage with timing logs and accumulate Claude cost in the
 // runs table, so we can see end-of-run "$X total" telemetry.
 
-import { startRun, endRun, getEpisode, db } from './lib/db.js';
+import { startRun, endRun, getEpisode, totalCostForRun, db } from './lib/db.js';
+import { setRunBudget, BudgetExceededError } from './lib/claude.js';
 import { ingestEpisode, ingestDaily } from './stages/1-ingest.js';
 import { transcribeEpisode } from './stages/2-transcribe.js';
 import { extractEpisode } from './stages/3-extract.js';
@@ -17,13 +18,6 @@ import { log, stage } from './lib/log.js';
 // Statuses that mean "ingested but not finished" — these get picked back up
 // on subsequent runs for idempotent resume.
 const RESUMABLE = ['new', 'transcribed', 'extracted', 'ranked'];
-
-function totalCostForRun(run_id) {
-  const row = db()
-    .prepare(`SELECT COALESCE(SUM(usd_cost), 0) AS total FROM cost_ledger WHERE run_id = ?`)
-    .get(run_id);
-  return row.total || 0;
-}
 
 function resumableEpisodes() {
   const placeholders = RESUMABLE.map(() => '?').join(',');
@@ -52,9 +46,24 @@ async function processEpisode(episode, run_id) {
   return true;
 }
 
-export async function runEpisode({ url, dryRun }) {
+// Resolve effective budget: CLI flag wins, falls back to MAX_USD_PER_RUN env, then null.
+function resolveMaxUsd(maxUsdArg) {
+  if (maxUsdArg != null) return maxUsdArg;
+  const env = process.env.MAX_USD_PER_RUN;
+  if (env == null || env === '') return null;
+  const n = Number(env);
+  if (!Number.isFinite(n) || n < 0) {
+    throw new Error(`MAX_USD_PER_RUN must be a non-negative number, got: ${env}`);
+  }
+  return n;
+}
+
+export async function runEpisode({ url, dryRun, maxUsd } = {}) {
   const mode = dryRun ? 'dry-run-episode' : 'episode';
   const run_id = startRun(mode);
+  const budget = resolveMaxUsd(maxUsd);
+  setRunBudget(run_id, budget);
+  if (budget != null) log.info(`budget: $${budget.toFixed(2)} per run`);
   let processed = 0, ok = false, briefResult = null;
   try {
     const [ep] = await stage('ingest', () => ingestEpisode(url));
@@ -68,6 +77,7 @@ export async function runEpisode({ url, dryRun }) {
     );
     ok = true;
   } finally {
+    setRunBudget(null, null);
     const usd = totalCostForRun(run_id);
     endRun(run_id, { ok, episodes_processed: processed, total_usd: usd });
     log.ok('run complete', { run_id, processed, total_usd: usd.toFixed(4) });
@@ -75,10 +85,14 @@ export async function runEpisode({ url, dryRun }) {
   return briefResult;
 }
 
-export async function runDaily({ dryRun, lookbackDays = 2 } = {}) {
+export async function runDaily({ dryRun, lookbackDays = 2, maxUsd } = {}) {
   const mode = dryRun ? 'dry-run-daily' : 'daily';
   const run_id = startRun(mode);
+  const budget = resolveMaxUsd(maxUsd);
+  setRunBudget(run_id, budget);
+  if (budget != null) log.info(`budget: $${budget.toFixed(2)} per run`);
   let processed = 0, ok = false, briefResult = null;
+  let budgetTripped = false;
   try {
     await stage('ingest', () => ingestDaily({ lookbackDays }));
 
@@ -88,9 +102,20 @@ export async function runDaily({ dryRun, lookbackDays = 2 } = {}) {
 
     const ready = [];
     for (const ep of pending) {
-      if (await processEpisode(ep, run_id)) {
-        ready.push(getEpisode(ep.video_id));
-        processed++;
+      try {
+        if (await processEpisode(ep, run_id)) {
+          ready.push(getEpisode(ep.video_id));
+          processed++;
+        }
+      } catch (err) {
+        if (err instanceof BudgetExceededError) {
+          // The just-failed episode is left at its partial status; next run resumes it.
+          // We still compose & deliver a brief from episodes that completed before this.
+          log.warn(err.message, { episodes_completed: processed, episodes_remaining: pending.length - processed - 1 });
+          budgetTripped = true;
+          break;
+        }
+        throw err;
       }
     }
 
@@ -98,11 +123,12 @@ export async function runDaily({ dryRun, lookbackDays = 2 } = {}) {
     briefResult = await stage('deliver', () =>
       deliver(html, { dryRun, episodes: ready, date: new Date() })
     );
-    ok = true;
+    ok = !budgetTripped;
   } finally {
+    setRunBudget(null, null);
     const usd = totalCostForRun(run_id);
     endRun(run_id, { ok, episodes_processed: processed, total_usd: usd });
-    log.ok('run complete', { run_id, processed, total_usd: usd.toFixed(4) });
+    log.ok('run complete', { run_id, processed, total_usd: usd.toFixed(4), budget_tripped: budgetTripped });
   }
   return briefResult;
 }

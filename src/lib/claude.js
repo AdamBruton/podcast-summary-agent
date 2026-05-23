@@ -7,8 +7,34 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { requireEnv } from './config.js';
-import { recordCost } from './db.js';
+import { recordCost, totalCostForRun } from './db.js';
 import { log } from './log.js';
+
+export class BudgetExceededError extends Error {
+  constructor(total_usd, max_usd) {
+    super(`run cost $${total_usd.toFixed(4)} exceeded budget $${max_usd.toFixed(2)}`);
+    this.name = 'BudgetExceededError';
+    this.total_usd = total_usd;
+    this.max_usd = max_usd;
+  }
+}
+
+// Run-scoped budget. Pipeline sets this once at run start (or to null to
+// disable). Module-level state is acceptable here — only one pipeline runs
+// per process — and beats threading max_usd through every stage's signature.
+let _budget = null;
+
+export function setRunBudget(run_id, max_usd) {
+  _budget = (max_usd != null && Number.isFinite(max_usd)) ? { run_id, max_usd } : null;
+}
+
+export function checkBudget() {
+  if (!_budget) return;
+  const total = totalCostForRun(_budget.run_id);
+  if (total > _budget.max_usd) {
+    throw new BudgetExceededError(total, _budget.max_usd);
+  }
+}
 
 export const MODELS = {
   SONNET: 'claude-sonnet-4-6',
@@ -103,6 +129,8 @@ export async function complete({
     out: resp.usage.output_tokens,
     usd: cost_usd.toFixed(4),
   });
+
+  checkBudget();
 
   return { text, usage: resp.usage, cost_usd, raw: resp };
 }

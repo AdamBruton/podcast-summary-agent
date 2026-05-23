@@ -58,6 +58,8 @@ ingest → transcribe → extract → rank → compose → deliver
 
 **YouTube 403 on cloud / CI IPs**: YouTube blocks anonymous requests from non-residential IP ranges. Set `YT_COOKIES_FILE` (Netscape-format cookies.txt exported from a logged-in browser) and every yt-dlp call (`src/lib/youtube.js` `cookieArgs()`) threads `--cookies` through. Unset is the right default on a laptop. `cookies.txt` is gitignored.
 
+**Cost guardrail**: `--max-usd <amount>` (or `MAX_USD_PER_RUN` env) sets a per-run budget. Implementation is a single `checkBudget()` call at the end of every `claude.complete()` — queries `SUM(cost_ledger.usd_cost)` for the active run, throws `BudgetExceededError` when over. In daily mode, `runDaily()` catches the error from the per-episode loop and composes a brief from episodes already ranked; the partially-processed episode resumes on next run. Test logic without paying for real Claude calls: `node scripts/test-budget.js` populates `cost_ledger` directly and asserts threshold behavior.
+
 ## Foreign-key gotcha when re-extracting
 
 `rankings.candidate_id` has a FK to `candidates.id`. To re-run extract on an already-extracted episode you must delete rankings *first*, then candidates — `saveCandidates()` already does this in the right order, but any future code that touches these tables must respect the same order or sqlite will reject the delete.
