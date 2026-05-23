@@ -15,6 +15,34 @@ function esc(s) {
     .replaceAll('"', '&quot;');
 }
 
+// YouTube auto-captions reliably mangle domain terms. We canonicalize them
+// in supporting_quote (the verbatim-from-captions field) only — claims are
+// model-generated and usually already clean.
+// Add new entries as you spot them. Keep regexes word-boundaried.
+const CANONICAL_TERMS = [
+  [/\bcloud code\b/gi,  'Claude Code'],
+  [/\btranium\b/gi,     'Trainium'],
+  [/\btr[ai]nium\b/gi,  'Trainium'],
+  [/\bgawatt\b/gi,      'gigawatt'],
+  [/\bgawatts\b/gi,     'gigawatts'],
+  [/\bgigwatt(s)?\b/gi, 'gigawatt$1'],
+  [/\bmythos\b/g,       'Mythos'],
+  [/\banthropic\b/g,    'Anthropic'],
+  [/\bnvidia\b/g,       'NVIDIA'],
+  [/\bcuda\b/g,         'CUDA'],
+  [/\btsmc\b/g,         'TSMC'],
+  [/\bopenai\b/gi,      'OpenAI'],
+  [/\btpu(s)?\b/g,      'TPU$1'],
+  [/\bgpu(s)?\b/g,      'GPU$1'],
+  [/\bcve(s)?\b/g,      'CVE$1'],
+];
+
+function canonicalize(s) {
+  let out = String(s ?? '');
+  for (const [re, sub] of CANONICAL_TERMS) out = out.replace(re, sub);
+  return out;
+}
+
 function fmtTime(sec) {
   const s = Math.floor(sec || 0);
   const h = Math.floor(s / 3600);
@@ -60,7 +88,7 @@ export function composeBrief(episodes, { date = new Date() } = {}) {
         <span class="claim">${esc(it.claim)}</span>
         ${it.speaker ? `<div class="speaker">${esc(it.speaker)}</div>` : ''}
         <div class="why">${esc(it.why_matters)}</div>
-        ${it.supporting_quote ? `<div class="quote">${esc(it.supporting_quote)}</div>` : ''}
+        ${it.supporting_quote ? `<div class="quote">${esc(canonicalize(it.supporting_quote))}</div>` : ''}
       </div>
     `).join('');
 

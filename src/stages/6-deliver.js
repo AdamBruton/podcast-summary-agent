@@ -14,7 +14,12 @@ export async function deliver(html, { dryRun, episodes, date = new Date() }) {
   const dateStr = date.toISOString().slice(0, 10);
 
   if (dryRun) {
-    const file = path.join(BRIEF_DIR, `${dateStr}.html`);
+    // Single-episode runs (i.e. --episode <url>) get a video-id-suffixed
+    // filename so back-to-back test runs don't overwrite each other.
+    // Multi-episode daily runs use just the date, since the brief is the
+    // aggregate for the day.
+    const suffix = episodes.length === 1 ? `-${episodes[0].video_id}` : '';
+    const file = path.join(BRIEF_DIR, `${dateStr}${suffix}.html`);
     fs.writeFileSync(file, html, 'utf8');
     log.ok('dry-run brief written', { path: file });
     return { delivered: false, path: file };
