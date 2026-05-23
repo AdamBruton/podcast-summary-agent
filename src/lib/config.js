@@ -28,14 +28,13 @@ for (const d of [DATA_DIR, TRANSCRIPT_DIR, BRIEF_DIR]) {
 export function loadSources() {
   const raw = fs.readFileSync(path.join(CONFIG_DIR, 'sources.yaml'), 'utf8');
   const parsed = YAML.parse(raw);
-  // Flatten channels + companies (both are YouTube channels). individuals are
-  // a separate concept used by the ranker.
-  const channels = [...(parsed.channels || []), ...(parsed.companies || [])]
-    .filter(c => c.enabled !== false);
+  const channels = (parsed.channels || []).filter(c => c.enabled !== false);
   return {
     channels,
+    // individuals is a list of names (people OR companies) that Discovery
+    // searches for daily. See src/stages/1b-discover.js.
     individuals: parsed.individuals || [],
-    discovery:   parsed.discovery   || null,   // see src/stages/1b-discover.js DEFAULTS
+    discovery:   parsed.discovery   || null,
   };
 }
 

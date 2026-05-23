@@ -43,44 +43,30 @@ export function listAll() {
     : [];
   return {
     channels:    listFor(doc.get('channels')),
-    companies:   listFor(doc.get('companies')),
     individuals,
   };
 }
 
-// --- Channels / companies ---------------------------------------------------
-
-function validateCategory(cat) {
-  if (cat !== 'channels' && cat !== 'companies') {
-    throw new Error(`bad category: ${cat} (expected 'channels' or 'companies')`);
-  }
-}
+// --- Channels ---------------------------------------------------------------
 
 function findItemByHandle(node, handle) {
   if (!node || !Array.isArray(node.items)) return -1;
   return node.items.findIndex(i => i.get('handle') === handle);
 }
 
-export function addChannel(category, { name, handle, channel_id = '', enabled = true }) {
-  validateCategory(category);
+export function addChannel({ name, handle, channel_id = '', enabled = true }) {
   if (!name?.trim()) throw new Error('name is required');
   if (!handle?.trim()) throw new Error('handle is required');
   if (!handle.startsWith('@')) throw new Error('handle must start with "@"');
 
   const doc = readDoc();
-  let node = doc.get(category);
+  let node = doc.get('channels');
   if (!node) {
-    // Create the section if it doesn't exist.
-    doc.set(category, []);
-    node = doc.get(category);
+    doc.set('channels', []);
+    node = doc.get('channels');
   }
   if (findItemByHandle(node, handle) !== -1) {
-    throw new Error(`handle ${handle} already exists in ${category}`);
-  }
-  // Check duplicate across categories too — a channel can't be both.
-  const otherCat = category === 'channels' ? 'companies' : 'channels';
-  if (findItemByHandle(doc.get(otherCat), handle) !== -1) {
-    throw new Error(`handle ${handle} already exists in ${otherCat}`);
+    throw new Error(`handle ${handle} already exists`);
   }
 
   const itemObj = {
@@ -91,13 +77,12 @@ export function addChannel(category, { name, handle, channel_id = '', enabled = 
   };
   node.items.push(doc.createNode(itemObj));
   writeDoc(doc);
-  return { ...itemObj, channel_id: itemObj.channel_id, enabled: enabled !== false };
+  return { ...itemObj, enabled: enabled !== false };
 }
 
-export function removeChannel(category, handle) {
-  validateCategory(category);
+export function removeChannel(handle) {
   const doc = readDoc();
-  const node = doc.get(category);
+  const node = doc.get('channels');
   const idx = findItemByHandle(node, handle);
   if (idx === -1) return false;
   node.items.splice(idx, 1);
@@ -105,10 +90,9 @@ export function removeChannel(category, handle) {
   return true;
 }
 
-export function patchChannel(category, handle, patch) {
-  validateCategory(category);
+export function patchChannel(handle, patch) {
   const doc = readDoc();
-  const node = doc.get(category);
+  const node = doc.get('channels');
   const idx = findItemByHandle(node, handle);
   if (idx === -1) return null;
   const item = node.items[idx];

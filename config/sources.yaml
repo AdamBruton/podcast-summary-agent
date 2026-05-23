@@ -1,14 +1,15 @@
 # Source configuration for the podcast intelligence agent.
 #
-# Three buckets:
-#   - channels:    YouTube channels we poll for new uploads
-#   - individuals: People we want appearances of (cross-channel search)
-#   - companies:   Company-owned channels (talks, keynotes, dev relations)
+# Two buckets:
+#   - channels:    YouTube channels we poll for new uploads (subscribed feed)
+#   - individuals: People AND companies we want to discover appearances of
+#                  via daily YouTube search (LLM-curated, see src/stages/1b-discover.js)
 #
 # channel_id is the canonical YouTube ID (starts with "UC..."). If left blank,
 # the `npm run resolve-channels` helper will look it up from the handle and
 # write it back into this file. handles must start with "@".
 #
+# Edit via `npm run web` (single-page UI) or by hand.
 # To add a new source: just append to the list. The pipeline picks it up on
 # next run. To temporarily mute one, set `enabled: false`.
 
@@ -47,10 +48,6 @@ channels:
   - name: Sequoia Capital
     handle: "@sequoiacapital"
     channel_id: "UCWrF0oN6unbXrWsTN7RctTw"
-  - name: The Logan Bartlett Show
-    handle: "@LoganBartlettShow"
-    channel_id: ""
-    enabled: false # TODO: handle 404s — find correct YouTube handle
   - name: Patrick Boyle
     handle: "@PBoyle"
     channel_id: "UCASM0cgfkJxQ1ICmRilfHLw"
@@ -64,8 +61,9 @@ discovery:
   min_duration_sec: 1200 # 20 minutes — drops clips, reactions, news cuts
   results_per_name: 20 # YouTube search results per name per run
 
-# Watched individuals. Discovery searches YouTube for each name daily and
-# routes auto-approved interview/podcast appearances into the brief.
+# Watched individuals & companies. Discovery searches YouTube for each name
+# daily and routes auto-approved interview/podcast/talk appearances into the
+# brief. Names can be people OR companies — the pipeline doesn't distinguish.
 individuals:
   - Jensen Huang
   - Elon Musk
@@ -78,38 +76,5 @@ individuals:
   - Aravind Srinivas
   - Aidan Gomez
   - Matthew Prince
-  - Frank Slootman
   - Marc Benioff
-
-companies:
-  - name: OpenAI
-    handle: "@OpenAI"
-    channel_id: "UCXZCJLdBC09xxGZ6gcdrc6A"
-  - name: Anthropic
-    handle: "@anthropic-ai"
-    channel_id: "UCrDwWp7EBBv4NwvScIpBDOA"
-  - name: Google DeepMind
-    handle: "@Google_DeepMind"
-    channel_id: ""
-    enabled: false # TODO: handle 404s — likely @GoogleDeepMind (no underscore)
-  - name: NVIDIA
-    handle: "@NVIDIA"
-    channel_id: "UCHuiy8bXnmK5nisYHUd1J5g"
-  - name: xAI
-    handle: "@xai"
-    channel_id: "UCo2ri0cvAs8Lxbp18UHZsgg"
-  - name: Cursor
-    handle: "@cursor_ai"
-    channel_id: "UC6YYHJzM6PhZ2Yey9BQiUaw"
-  - name: Fireworks AI
-    handle: "@FireworksAI-yc4bb"
-    channel_id: ""
-    enabled: false # TODO: handle 404s — confirm Fireworks has meaningful YouTube content
-  - name: Baseten
-    handle: "@basetenlabs"
-    channel_id: ""
-    enabled: false # TODO: handle 404s — find correct handle
-  - name: Cloudflare
-    handle: "@CloudflareTV"
-    channel_id: ""
-    enabled: false # TODO: handle 404s — likely @cloudflare
+  - Andrej Karpathy

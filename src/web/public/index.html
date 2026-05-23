@@ -96,26 +96,15 @@
   </section>
 
   <section>
-    <h2>Companies <span id="companies-count" style="color:#999"></span></h2>
-    <div id="companies-list"></div>
-    <div class="add-form">
-      <input type="text" id="companies-name"   placeholder="Display name (e.g. Anthropic)" />
-      <input type="text" id="companies-handle" placeholder="@handle" />
-      <button class="primary" data-add="companies">+ Add company</button>
-    </div>
-    <div class="err" id="companies-err"></div>
-  </section>
-
-  <section>
-    <h2>Individuals <span id="individuals-count" style="color:#999"></span></h2>
+    <h2>Individuals &amp; companies <span id="individuals-count" style="color:#999"></span></h2>
     <p class="lede" style="margin: 4px 0 0;">
-      Discovery searches YouTube daily for each of these names, curates results via Claude,
-      and routes approvals into the brief pipeline.
+      Discovery searches YouTube daily for each of these names — people or companies —
+      curates results via Claude, and routes approvals into the brief pipeline.
     </p>
     <ul class="chips" id="individuals-list"></ul>
     <div class="add-form">
-      <input type="text" id="individuals-name" placeholder="Full name (e.g. Jensen Huang)" />
-      <button class="primary" id="individuals-add">+ Add individual</button>
+      <input type="text" id="individuals-name" placeholder="Name (e.g. Jensen Huang or Anthropic)" />
+      <button class="primary" id="individuals-add">+ Add</button>
     </div>
     <div class="err" id="individuals-err"></div>
   </section>

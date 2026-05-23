@@ -48,19 +48,14 @@ function decodeParam(s) {
 
 app.get('/api/sources', wrap(() => listAll()));
 
-app.post('/api/sources/channels',  wrap(req => addChannel('channels',  req.body)));
-app.post('/api/sources/companies', wrap(req => addChannel('companies', req.body)));
+app.post('/api/sources/channels', wrap(req => addChannel(req.body)));
 
-app.delete('/api/sources/channels/:handle',  wrap(req => ({ removed: removeChannel('channels',  decodeParam(req.params.handle)) })));
-app.delete('/api/sources/companies/:handle', wrap(req => ({ removed: removeChannel('companies', decodeParam(req.params.handle)) })));
+app.delete('/api/sources/channels/:handle', wrap(req => ({
+  removed: removeChannel(decodeParam(req.params.handle)),
+})));
 
-app.patch('/api/sources/channels/:handle',  wrap(req => {
-  const r = patchChannel('channels',  decodeParam(req.params.handle), req.body);
-  if (!r) throw new Error('not found');
-  return r;
-}));
-app.patch('/api/sources/companies/:handle', wrap(req => {
-  const r = patchChannel('companies', decodeParam(req.params.handle), req.body);
+app.patch('/api/sources/channels/:handle', wrap(req => {
+  const r = patchChannel(decodeParam(req.params.handle), req.body);
   if (!r) throw new Error('not found');
   return r;
 }));
