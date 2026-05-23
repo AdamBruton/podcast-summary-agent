@@ -47,8 +47,15 @@ async function processEpisode(episode, run_id) {
   const transcript = await stage(`transcribe ${episode.video_id}`, () => transcribeEpisode(episode));
   if (!transcript) return false; // skipped (no captions + no Groq, or oversize)
 
-  await stage(`extract ${episode.video_id}`,    () => extractEpisode(episode, { run_id }));
-  await stage(`rank ${episode.video_id}`,       () => rankEpisode(episode,    { run_id }));
+  // Skip extract if candidates already exist — extraction is profile-independent
+  // and deterministic-ish, so re-running just burns tokens. Rank is cheap and
+  // profile-dependent, so we always re-run it (lets profile.md edits propagate).
+  if (episode.status === 'new' || episode.status === 'transcribed') {
+    await stage(`extract ${episode.video_id}`, () => extractEpisode(episode, { run_id }));
+  } else {
+    log.info('extract cached, reusing candidates', { video_id: episode.video_id, status: episode.status });
+  }
+  await stage(`rank ${episode.video_id}`, () => rankEpisode(episode, { run_id }));
   return true;
 }
 
