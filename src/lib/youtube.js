@@ -45,11 +45,15 @@ export function youtubeUrl(video_id, t = null) {
 }
 
 // Resolve an @handle to a canonical channel_id (UC...).
+// We grab metadata for the first video on the channel's videos tab — that's
+// the cheapest way to coax yt-dlp to populate the channel_id field reliably.
+// `--flat-playlist` is NOT used because it leaves channel_id blank.
 export async function resolveHandle(handle) {
-  const url = `https://www.youtube.com/${handle}`;
+  const url = `https://www.youtube.com/${handle}/videos`;
   const out = await run([
+    '--playlist-end', '1',
+    '--skip-download',
     '--print', '%(channel_id)s',
-    '--playlist-items', '0',
     '--no-warnings',
     url,
   ]);

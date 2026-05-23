@@ -15,43 +15,45 @@
 channels:
   - name: All-In
     handle: "@AllInPodcast"
-    channel_id: ""
+    channel_id: "UChJM-mF-4w_61Z6eCyl0eKQ"
   - name: BG2
     handle: "@bg2pod"
-    channel_id: ""
+    channel_id: "UC-yRDvpR99LUc5l7i7jLzew"
   - name: Sharp Tech (Stratechery)
     handle: "@SharpTech"
     channel_id: ""
+    enabled: false   # TODO: channel has no /videos tab on YouTube (audio-only via playlists)
   - name: Acquired
     handle: "@AcquiredFM"
-    channel_id: ""
+    channel_id: "UCyFqFYfTW2VoIQKylJ04Rtw"
   - name: Dwarkesh Patel
     handle: "@DwarkeshPatel"
-    channel_id: ""
+    channel_id: "UCXl4i9dYBrFOabk0xGmbkRA"
   - name: No Priors
     handle: "@NoPriorsPodcast"
-    channel_id: ""
+    channel_id: "UCSI7h9hydQ40K5MJHnCrQvw"
   - name: Invest Like the Best
     handle: "@JoinColossus"
-    channel_id: ""
+    channel_id: "UCfnHKTFEryHWyqr4Xjsjb3w"
   - name: Lenny's Podcast
     handle: "@LennysPodcast"
-    channel_id: ""
+    channel_id: "UC6t1O76G0jYXOAoYCm153dA"
   - name: Latent Space
     handle: "@LatentSpaceTV"
-    channel_id: ""
+    channel_id: "UCvi5jNRoRVm436TVAXet1kQ"
   - name: a16z
     handle: "@a16z"
-    channel_id: ""
+    channel_id: "UC9cn0TuPq4dnbTY-CBsm8XA"
   - name: Sequoia Capital
     handle: "@sequoiacapital"
-    channel_id: ""
+    channel_id: "UCWrF0oN6unbXrWsTN7RctTw"
   - name: The Logan Bartlett Show
     handle: "@LoganBartlettShow"
     channel_id: ""
+    enabled: false   # TODO: handle 404s — find correct YouTube handle
   - name: Patrick Boyle
     handle: "@PBoyle"
-    channel_id: ""
+    channel_id: "UCASM0cgfkJxQ1ICmRilfHLw"
 
 # Watched individuals. The ingest stage cross-references each new episode's
 # title/description against this list to boost ranking, and (later) can run
@@ -74,28 +76,32 @@ individuals:
 companies:
   - name: OpenAI
     handle: "@OpenAI"
-    channel_id: ""
+    channel_id: "UCXZCJLdBC09xxGZ6gcdrc6A"
   - name: Anthropic
     handle: "@anthropic-ai"
-    channel_id: ""
+    channel_id: "UCrDwWp7EBBv4NwvScIpBDOA"
   - name: Google DeepMind
     handle: "@Google_DeepMind"
     channel_id: ""
+    enabled: false   # TODO: handle 404s — likely @GoogleDeepMind (no underscore)
   - name: NVIDIA
     handle: "@NVIDIA"
-    channel_id: ""
+    channel_id: "UCHuiy8bXnmK5nisYHUd1J5g"
   - name: xAI
     handle: "@xai"
-    channel_id: ""
+    channel_id: "UCo2ri0cvAs8Lxbp18UHZsgg"
   - name: Cursor
     handle: "@cursor_ai"
-    channel_id: ""
+    channel_id: "UC6YYHJzM6PhZ2Yey9BQiUaw"
   - name: Fireworks AI
     handle: "@FireworksAI-yc4bb"
     channel_id: ""
+    enabled: false   # TODO: handle 404s — confirm Fireworks has meaningful YouTube content
   - name: Baseten
     handle: "@basetenlabs"
     channel_id: ""
+    enabled: false   # TODO: handle 404s — find correct handle
   - name: Cloudflare
     handle: "@CloudflareTV"
     channel_id: ""
+    enabled: false   # TODO: handle 404s — likely @cloudflare
