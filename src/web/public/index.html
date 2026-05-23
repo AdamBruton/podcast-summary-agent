@@ -71,7 +71,17 @@
 
   .err {
     color: var(--danger); font-size: 12px; margin-top: 8px; min-height: 16px;
+    display: flex; align-items: center; gap: 8px;
+    transition: opacity 0.5s ease;
   }
+  .err.fade-out { opacity: 0; }
+  .err:empty { display: none; }
+  .err-x {
+    background: none; border: 1px solid transparent; color: inherit;
+    opacity: 0.55; cursor: pointer; padding: 0 6px; font-size: 14px;
+    line-height: 1; border-radius: 3px; margin-left: auto;
+  }
+  .err-x:hover { opacity: 1; background: rgba(192, 57, 43, 0.08); }
   .empty { color: var(--muted); font-style: italic; font-size: 13px; padding: 12px 0; }
 
   .footer { margin-top: 48px; color: var(--muted); font-size: 11px; text-align: center; }
@@ -117,6 +127,31 @@
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => (
   { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]
 ));
+
+// Centralized error display. Auto-fades after 6s; clicking the × dismisses
+// immediately. Re-calling with a new message resets the timer. Pass empty
+// string / null to clear.
+const ERR_FADE_MS  = 6000;
+const ERR_FADE_DUR = 500;
+const errTimers = {};
+
+function setErr(elemId, message) {
+  const el = document.getElementById(elemId);
+  if (!el) return;
+  if (errTimers[elemId]) {
+    clearTimeout(errTimers[elemId].fadeStart);
+    clearTimeout(errTimers[elemId].clear);
+    delete errTimers[elemId];
+  }
+  el.classList.remove('fade-out');
+  if (!message) { el.innerHTML = ''; return; }
+  el.innerHTML = `<span>${esc(message)}</span>` +
+                 `<button class="err-x" data-clear-err="${esc(elemId)}" title="dismiss">×</button>`;
+  errTimers[elemId] = {
+    fadeStart: setTimeout(() => el.classList.add('fade-out'), ERR_FADE_MS),
+    clear:     setTimeout(() => setErr(elemId, ''), ERR_FADE_MS + ERR_FADE_DUR),
+  };
+}
 
 async function api(method, url, body) {
   const opts = { method, headers: {} };
@@ -208,18 +243,23 @@ function renderIndividuals(list) {
 document.addEventListener('click', async (ev) => {
   const t = ev.target;
 
+  // Manual dismiss button on error messages.
+  if (t.matches('[data-clear-err]')) {
+    setErr(t.dataset.clearErr, '');
+    return;
+  }
+
   if (t.matches('[data-add]')) {
     const cat = t.dataset.add;
     const name = document.getElementById(`${cat}-name`).value.trim();
     const handle = document.getElementById(`${cat}-handle`).value.trim();
-    const err = document.getElementById(`${cat}-err`);
-    err.textContent = '';
+    setErr(`${cat}-err`, '');
     try {
       await api('POST', `/api/sources/${cat}`, { name, handle });
       document.getElementById(`${cat}-name`).value = '';
       document.getElementById(`${cat}-handle`).value = '';
       await load();
-    } catch (e) { err.textContent = e.message; }
+    } catch (e) { setErr(`${cat}-err`, e.message); }
     return;
   }
 
@@ -227,7 +267,7 @@ document.addEventListener('click', async (ev) => {
     const [cat, handle] = t.dataset.remove.split('|');
     if (!confirm(`Remove ${cat.slice(0, -1)} ${handle}?`)) return;
     try { await api('DELETE', `/api/sources/${cat}/${encodeURIComponent(handle)}`); await load(); }
-    catch (e) { document.getElementById(`${cat}-err`).textContent = e.message; }
+    catch (e) { setErr(`${cat}-err`, e.message); }
     return;
   }
 
@@ -239,7 +279,7 @@ document.addEventListener('click', async (ev) => {
       await api('PATCH', `/api/sources/${cat}/${encodeURIComponent(handle)}`, { channel_id });
       await load();
     } catch (e) {
-      document.getElementById(`${cat}-err`).textContent = `Resolve failed for ${handle}: ${e.message}`;
+      setErr(`${cat}-err`, `Resolve failed for ${handle}: ${e.message}`);
       t.disabled = false; t.textContent = 'resolve';
     }
     return;
@@ -249,19 +289,18 @@ document.addEventListener('click', async (ev) => {
     const name = t.dataset.removeIndividual;
     if (!confirm(`Remove individual "${name}"?`)) return;
     try { await api('DELETE', `/api/sources/individuals/${encodeURIComponent(name)}`); await load(); }
-    catch (e) { document.getElementById('individuals-err').textContent = e.message; }
+    catch (e) { setErr('individuals-err', e.message); }
     return;
   }
 
   if (t.id === 'individuals-add') {
     const name = document.getElementById('individuals-name').value.trim();
-    const err = document.getElementById('individuals-err');
-    err.textContent = '';
+    setErr('individuals-err', '');
     try {
       await api('POST', '/api/sources/individuals', { name });
       document.getElementById('individuals-name').value = '';
       await load();
-    } catch (e) { err.textContent = e.message; }
+    } catch (e) { setErr('individuals-err', e.message); }
     return;
   }
 });
@@ -275,7 +314,7 @@ document.addEventListener('change', async (ev) => {
     await api('PATCH', `/api/sources/${cat}/${encodeURIComponent(handle)}`, { enabled: t.checked });
     await load();
   } catch (e) {
-    document.getElementById(`${cat}-err`).textContent = e.message;
+    setErr(`${cat}-err`, e.message);
     t.checked = !t.checked;   // revert visual state
   }
 });
