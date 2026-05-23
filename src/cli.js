@@ -26,6 +26,8 @@ Options:
 Env vars (see .env.example):
   ANTHROPIC_API_KEY   required
   GROQ_API_KEY        optional, for Whisper fallback when YouTube has no captions
+  YT_COOKIES_FILE     optional, path to cookies.txt — needed on CI/cloud IPs
+                      where YouTube 403s anonymous requests
   SENDGRID_API_KEY    required when not --dry-run
   SENDGRID_FROM       required when not --dry-run
   SENDGRID_TO         required when not --dry-run

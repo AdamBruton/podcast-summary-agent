@@ -5,12 +5,27 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { TRANSCRIPT_DIR } from './config.js';
+import { ROOT, TRANSCRIPT_DIR } from './config.js';
 import { log } from './log.js';
+
+// If YT_COOKIES_FILE is set, every yt-dlp invocation gets --cookies prepended.
+// YouTube 403s non-residential IPs (CI runners, cloud sandboxes) unless the
+// request carries logged-in browser cookies. Export from your browser as
+// Netscape format (e.g. "Get cookies.txt LOCALLY" extension), drop into the
+// repo root as cookies.txt, and point YT_COOKIES_FILE at it.
+function cookieArgs() {
+  const raw = process.env.YT_COOKIES_FILE;
+  if (!raw) return [];
+  const resolved = path.isAbsolute(raw) ? raw : path.join(ROOT, raw);
+  if (!fs.existsSync(resolved)) {
+    throw new Error(`YT_COOKIES_FILE=${raw} but file not found at ${resolved}`);
+  }
+  return ['--cookies', resolved];
+}
 
 function run(args, { timeout = 120_000 } = {}) {
   return new Promise((resolve, reject) => {
-    const proc = spawn('yt-dlp', args, { windowsHide: true });
+    const proc = spawn('yt-dlp', [...cookieArgs(), ...args], { windowsHide: true });
     let stdout = '', stderr = '';
     proc.stdout.on('data', d => { stdout += d; });
     proc.stderr.on('data', d => { stderr += d; });
