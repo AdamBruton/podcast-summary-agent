@@ -55,9 +55,17 @@ channels:
     handle: "@PBoyle"
     channel_id: "UCASM0cgfkJxQ1ICmRilfHLw"
 
-# Watched individuals. The ingest stage cross-references each new episode's
-# title/description against this list to boost ranking, and (later) can run
-# YouTube search queries for "<name>" against the channel set.
+# Discovery: search YouTube broadly for the named individuals below and
+# auto-curate via Claude before promoting into the daily pipeline.
+# See src/stages/1b-discover.js. Set enabled: false to skip.
+discovery:
+  enabled:          true
+  lookback_days:    7
+  min_duration_sec: 1200     # 20 minutes — drops clips, reactions, news cuts
+  results_per_name: 20       # YouTube search results per name per run
+
+# Watched individuals. Discovery searches YouTube for each name daily and
+# routes auto-approved interview/podcast appearances into the brief.
 individuals:
   - Jensen Huang
   - Elon Musk

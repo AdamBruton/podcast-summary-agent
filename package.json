@@ -11,7 +11,9 @@
     "brief": "node src/cli.js",
     "brief:dry": "node src/cli.js --dry-run",
     "brief:episode": "node src/cli.js --episode",
-    "resolve-channels": "node scripts/resolve-channels.js"
+    "resolve-channels": "node scripts/resolve-channels.js",
+    "discover": "node scripts/discover.js",
+    "discovery:audit": "node scripts/discovery-audit.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",

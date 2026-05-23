@@ -15,6 +15,14 @@ export function db() {
   return _db;
 }
 
+// SQLite CREATE TABLE IF NOT EXISTS doesn't add columns to existing tables,
+// so for DBs created before a column was added (episodes pre-discovery feature),
+// we add columns idempotently. Duplicate-column errors are swallowed.
+function safeAlter(d, sql) {
+  try { d.exec(sql); }
+  catch (err) { if (!/duplicate column/i.test(err.message)) throw err; }
+}
+
 function migrate(d) {
   d.exec(`
     CREATE TABLE IF NOT EXISTS episodes (
@@ -28,8 +36,26 @@ function migrate(d) {
       url           TEXT,
       status        TEXT DEFAULT 'new',  -- new|transcribed|extracted|ranked|delivered|skipped
       skip_reason   TEXT,
+      source        TEXT DEFAULT 'subscribed',  -- subscribed|discovery
+      discovered_for TEXT,                       -- if source='discovery', the individual we searched for
       ingested_at   TEXT DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS discoveries (
+      video_id         TEXT PRIMARY KEY,
+      searched_for     TEXT,                    -- the individual name we ran the search for
+      title            TEXT,
+      channel_name     TEXT,
+      duration_sec     INTEGER,
+      upload_date      TEXT,                    -- ISO date 'YYYY-MM-DD'
+      url              TEXT,
+      decision         TEXT,                    -- 'approve' | 'reject' | 'filtered' (pre-LLM cut)
+      decision_reason  TEXT,
+      promoted         INTEGER DEFAULT 0,       -- 1 if approved AND inserted into episodes
+      discovered_at    TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_discoveries_decision ON discoveries(decision);
+    CREATE INDEX IF NOT EXISTS idx_discoveries_searched ON discoveries(searched_for);
 
     CREATE TABLE IF NOT EXISTS transcripts (
       video_id      TEXT PRIMARY KEY REFERENCES episodes(video_id),
@@ -86,6 +112,10 @@ function migrate(d) {
       created_at      TEXT DEFAULT (datetime('now'))
     );
   `);
+
+  // Idempotent column additions for DBs that predate the discovery feature.
+  safeAlter(d, `ALTER TABLE episodes ADD COLUMN source TEXT DEFAULT 'subscribed'`);
+  safeAlter(d, `ALTER TABLE episodes ADD COLUMN discovered_for TEXT`);
 }
 
 // --- Episode helpers --------------------------------------------------------
@@ -93,11 +123,17 @@ function migrate(d) {
 export function upsertEpisode(ep) {
   const d = db();
   const stmt = d.prepare(`
-    INSERT INTO episodes (video_id, channel_id, channel_name, title, description, published_at, duration_sec, url)
-    VALUES (@video_id, @channel_id, @channel_name, @title, @description, @published_at, @duration_sec, @url)
+    INSERT INTO episodes (video_id, channel_id, channel_name, title, description, published_at,
+                          duration_sec, url, source, discovered_for)
+    VALUES (@video_id, @channel_id, @channel_name, @title, @description, @published_at,
+            @duration_sec, @url, @source, @discovered_for)
     ON CONFLICT(video_id) DO NOTHING
   `);
-  const info = stmt.run(ep);
+  const info = stmt.run({
+    source:         'subscribed',
+    discovered_for: null,
+    ...ep,
+  });
   return info.changes > 0; // true if newly inserted
 }
 
@@ -218,4 +254,42 @@ export function recordCost({ run_id, video_id, stage, model, input_tokens, cache
     INSERT INTO cost_ledger (run_id, video_id, stage, model, input_tokens, cached_tokens, output_tokens, usd_cost)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run(run_id, video_id, stage, model, input_tokens, cached_tokens, output_tokens, usd_cost);
+}
+
+// --- Discoveries ------------------------------------------------------------
+
+export function hasDiscovery(video_id) {
+  return !!db().prepare(`SELECT 1 FROM discoveries WHERE video_id = ?`).get(video_id);
+}
+
+export function hasEpisode(video_id) {
+  return !!db().prepare(`SELECT 1 FROM episodes WHERE video_id = ?`).get(video_id);
+}
+
+export function saveDiscovery(rec) {
+  db().prepare(`
+    INSERT INTO discoveries (video_id, searched_for, title, channel_name, duration_sec,
+                             upload_date, url, decision, decision_reason, promoted)
+    VALUES (@video_id, @searched_for, @title, @channel_name, @duration_sec,
+            @upload_date, @url, @decision, @decision_reason, @promoted)
+    ON CONFLICT(video_id) DO UPDATE SET
+      decision        = excluded.decision,
+      decision_reason = excluded.decision_reason,
+      promoted        = excluded.promoted
+  `).run({ promoted: 0, decision_reason: null, ...rec });
+}
+
+export function markDiscoveryPromoted(video_id) {
+  db().prepare(`UPDATE discoveries SET promoted = 1 WHERE video_id = ?`).run(video_id);
+}
+
+export function listRecentDiscoveries({ days = 7, decision = null } = {}) {
+  const params = [`-${days} days`];
+  let sql = `SELECT * FROM discoveries WHERE discovered_at >= datetime('now', ?)`;
+  if (decision) {
+    sql += ` AND decision = ?`;
+    params.push(decision);
+  }
+  sql += ` ORDER BY discovered_at DESC, searched_for ASC`;
+  return db().prepare(sql).all(...params);
 }

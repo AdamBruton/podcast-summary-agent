@@ -7,6 +7,7 @@
 
 import { startRun, endRun, getEpisode, db } from './lib/db.js';
 import { ingestEpisode, ingestDaily } from './stages/1-ingest.js';
+import { discoverIndividuals } from './stages/1b-discover.js';
 import { transcribeEpisode } from './stages/2-transcribe.js';
 import { extractEpisode } from './stages/3-extract.js';
 import { rankEpisode } from './stages/4-rank.js';
@@ -88,6 +89,10 @@ export async function runDaily({ dryRun, lookbackDays = 2 } = {}) {
   let processed = 0, ok = false, briefResult = null;
   try {
     await stage('ingest', () => ingestDaily({ lookbackDays }));
+    // Discovery: searches YouTube for watched individuals and promotes
+    // LLM-approved finds into episodes (status='new'). Skipped silently if
+    // disabled in config or no individuals are listed.
+    await discoverIndividuals({ run_id });
 
     // Pick up everything ingested-but-not-finished (handles resume of prior partials).
     const pending = resumableEpisodes();

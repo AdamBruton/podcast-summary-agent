@@ -35,6 +35,7 @@ export function loadSources() {
   return {
     channels,
     individuals: parsed.individuals || [],
+    discovery:   parsed.discovery   || null,   // see src/stages/1b-discover.js DEFAULTS
   };
 }
 
