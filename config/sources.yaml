@@ -1,0 +1,101 @@
+# Source configuration for the podcast intelligence agent.
+#
+# Three buckets:
+#   - channels:    YouTube channels we poll for new uploads
+#   - individuals: People we want appearances of (cross-channel search)
+#   - companies:   Company-owned channels (talks, keynotes, dev relations)
+#
+# channel_id is the canonical YouTube ID (starts with "UC..."). If left blank,
+# the `npm run resolve-channels` helper will look it up from the handle and
+# write it back into this file. handles must start with "@".
+#
+# To add a new source: just append to the list. The pipeline picks it up on
+# next run. To temporarily mute one, set `enabled: false`.
+
+channels:
+  - name: All-In
+    handle: "@AllInPodcast"
+    channel_id: ""
+  - name: BG2
+    handle: "@bg2pod"
+    channel_id: ""
+  - name: Sharp Tech (Stratechery)
+    handle: "@SharpTech"
+    channel_id: ""
+  - name: Acquired
+    handle: "@AcquiredFM"
+    channel_id: ""
+  - name: Dwarkesh Patel
+    handle: "@DwarkeshPatel"
+    channel_id: ""
+  - name: No Priors
+    handle: "@NoPriorsPodcast"
+    channel_id: ""
+  - name: Invest Like the Best
+    handle: "@JoinColossus"
+    channel_id: ""
+  - name: Lenny's Podcast
+    handle: "@LennysPodcast"
+    channel_id: ""
+  - name: Latent Space
+    handle: "@LatentSpaceTV"
+    channel_id: ""
+  - name: a16z
+    handle: "@a16z"
+    channel_id: ""
+  - name: Sequoia Capital
+    handle: "@sequoiacapital"
+    channel_id: ""
+  - name: The Logan Bartlett Show
+    handle: "@LoganBartlettShow"
+    channel_id: ""
+  - name: Patrick Boyle
+    handle: "@PBoyle"
+    channel_id: ""
+
+# Watched individuals. The ingest stage cross-references each new episode's
+# title/description against this list to boost ranking, and (later) can run
+# YouTube search queries for "<name>" against the channel set.
+individuals:
+  - Jensen Huang
+  - Elon Musk
+  - Dario Amodei
+  - Sam Altman
+  - Sundar Pichai
+  - Demis Hassabis
+  - Mark Zuckerberg
+  - Satya Nadella
+  - Aravind Srinivas
+  - Aidan Gomez
+  - Matthew Prince
+  - Frank Slootman
+  - Marc Benioff
+
+companies:
+  - name: OpenAI
+    handle: "@OpenAI"
+    channel_id: ""
+  - name: Anthropic
+    handle: "@anthropic-ai"
+    channel_id: ""
+  - name: Google DeepMind
+    handle: "@Google_DeepMind"
+    channel_id: ""
+  - name: NVIDIA
+    handle: "@NVIDIA"
+    channel_id: ""
+  - name: xAI
+    handle: "@xai"
+    channel_id: ""
+  - name: Cursor
+    handle: "@cursor_ai"
+    channel_id: ""
+  - name: Fireworks AI
+    handle: "@FireworksAI-yc4bb"
+    channel_id: ""
+  - name: Baseten
+    handle: "@basetenlabs"
+    channel_id: ""
+  - name: Cloudflare
+    handle: "@CloudflareTV"
+    channel_id: ""

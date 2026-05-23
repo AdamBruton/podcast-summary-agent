@@ -1,0 +1,22 @@
+{
+  "name": "podcast-summary-agent",
+  "version": "0.1.0",
+  "description": "Daily intelligence brief surfacing high-signal moments from tech/AI podcasts, biased by an editable interest profile.",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "brief": "node src/cli.js",
+    "brief:dry": "node src/cli.js --dry-run",
+    "brief:episode": "node src/cli.js --episode"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.30.0",
+    "@sendgrid/mail": "^8.1.0",
+    "dotenv": "^16.4.5",
+    "groq-sdk": "^0.7.0",
+    "yaml": "^2.5.0"
+  }
+}
