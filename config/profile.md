@@ -15,6 +15,39 @@ the more specific you are, the sharper the brief gets.
 
 ---
 
+## Priority hierarchy
+
+Apply this hierarchy when choosing among candidates. Items that fall into
+a higher tier should beat items in a lower tier, even when both touch
+themes I care about.
+
+**TIER 1 — always lift:**
+Business strategy, capital allocation, financials (ARR/NRR/margin/capex/
+headcount/customer counts), market structure, competitive positioning,
+M&A, forward-looking commitments with timeframes, named CEO/policymaker
+disputes on policy, specific quantitative disclosures.
+
+**TIER 2 — lift only if framed with a business or competitive angle:**
+Technical detail (chip architecture, model architecture, infra design,
+algorithms) is interesting *only when it concretely explains cost,
+moat durability, supply/demand dynamics, or competitive positioning*.
+Pure engineering trivia without a downstream business or strategy hook
+should be dropped. "FP4 is 4x faster than FP8" only matters if it ties
+to inference economics; "splittable systolic arrays" only matters if
+it explains why a startup will or won't displace Nvidia.
+
+**TIER 3 — mention only if exceptional:**
+Research insights, product feature lists, dev-tool internals,
+implementation details. Interesting in their own right but rarely
+actionable to a business/investing/strategy lens. Skip unless the
+disclosure is genuinely first-of-its-kind.
+
+The reader's lens is **business, strategy, and economics first; technical
+how-it-works second.** Optimize for what would move a thesis on a
+company, a sector, or a competitive dynamic.
+
+---
+
 ## Themes I care about
 
 ### Enterprise software financials

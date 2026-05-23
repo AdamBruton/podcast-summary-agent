@@ -78,7 +78,7 @@ const STYLE = `
 // episodes: rank-1 from each ep, then rank-2 from each ep, etc., until we
 // hit the cap. Guarantees each episode contributes its top pick before any
 // episode's lower-ranked items appear. Single-episode runs are not capped.
-const MAX_BRIEF_ITEMS = 10;
+const MAX_BRIEF_ITEMS = 15;
 
 function selectItemsAcrossEpisodes(episodes, cap) {
   const byEp = episodes
