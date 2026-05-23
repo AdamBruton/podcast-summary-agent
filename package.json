@@ -13,12 +13,14 @@
     "brief:episode": "node src/cli.js --episode",
     "resolve-channels": "node scripts/resolve-channels.js",
     "discover": "node scripts/discover.js",
-    "discovery:audit": "node scripts/discovery-audit.js"
+    "discovery:audit": "node scripts/discovery-audit.js",
+    "web": "node src/web/server.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",
     "@sendgrid/mail": "^8.1.0",
     "dotenv": "^16.4.5",
+    "express": "^5.2.1",
     "groq-sdk": "^0.7.0",
     "yaml": "^2.5.0"
   }
