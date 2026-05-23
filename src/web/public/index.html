@@ -141,13 +141,14 @@ async function load() {
       `<div class="err">Failed to load sources: ${esc(e.message)}</div>`);
     return;
   }
-  renderTable('channels',  data.channels);
-  renderTable('companies', data.companies);
+  renderTable('channels', data.channels);
   renderIndividuals(data.individuals);
 }
 
 function renderTable(cat, list) {
   const el = document.getElementById(cat + '-list');
+  if (!el) return;  // section doesn't exist in this build; ignore gracefully
+  list = list || [];
   document.getElementById(cat + '-count').textContent = `(${list.length})`;
   if (!list.length) { el.innerHTML = '<div class="empty">None yet — add one below.</div>'; return; }
 
