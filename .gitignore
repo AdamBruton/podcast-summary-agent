@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+package-lock.json.bak
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Runtime data (transcripts, sqlite, briefs)
+data/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+*~
+
+# Build / test output
+dist/
+coverage/
+.nyc_output/
