@@ -59,16 +59,21 @@ function fmtTime(sec) {
     : `${m}:${String(r).padStart(2,'0')}`;
 }
 
+// Email-safe styling. We avoid CSS Grid / Flexbox (Gmail mobile and some
+// clients strip them inconsistently) and use a per-item <table> for the
+// rank+content layout — that renders identically everywhere, including
+// Gmail mobile and Outlook desktop.
 const STYLE = `
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
          max-width: 720px; margin: 24px auto; padding: 0 16px; color: #111; line-height: 1.55; }
   h1 { font-size: 22px; margin: 0 0 4px; }
   .date { color: #666; font-size: 13px; margin-bottom: 24px; }
-  .item { display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: start;
-          padding: 16px 0; border-top: 1px solid #eee; }
-  .item:first-of-type { border-top: 1px solid #ddd; }
-  .rank { color: #999; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums;
-          text-align: right; padding-top: 2px; }
+  table.item { width: 100%; border-collapse: collapse; border-top: 1px solid #eee; }
+  table.item.first { border-top: 1px solid #ddd; }
+  td.rank-cell { width: 40px; vertical-align: top; text-align: right; padding: 18px 12px 0 0;
+                 color: #999; font-size: 22px; font-weight: 700;
+                 font-variant-numeric: tabular-nums; }
+  td.body-cell { vertical-align: top; padding: 16px 0; }
   .head { font-size: 12px; color: #666; margin-bottom: 4px; }
   .head a { color: #666; text-decoration: none; }
   .head .show { font-weight: 500; }
@@ -105,20 +110,22 @@ function gatherAllItems(episodes) {
   return out;
 }
 
-function renderItem(it, rank) {
+function renderItem(it, rank, isFirst) {
   const ts = `<a class="ts" href="${esc(youtubeUrl(it.video_id, it.timestamp_sec))}">${fmtTime(it.timestamp_sec)}</a>`;
   const show = `<a href="${esc(youtubeUrl(it.video_id))}"><span class="show">${esc(it.channel_name)}</span> — ${esc(it.episode_title)}</a>`;
   return `
-    <div class="item">
-      <div class="rank">${rank}</div>
-      <div>
-        <div class="head">${ts}${show}</div>
-        <div class="claim">${esc(it.claim)}</div>
-        ${it.speaker ? `<div class="speaker">${esc(it.speaker)}</div>` : ''}
-        <div class="why">${esc(it.why_matters)}</div>
-        ${it.supporting_quote ? `<div class="quote">${esc(canonicalize(it.supporting_quote))}</div>` : ''}
-      </div>
-    </div>`;
+    <table class="item${isFirst ? ' first' : ''}" cellpadding="0" cellspacing="0" border="0">
+      <tr>
+        <td class="rank-cell">${rank}</td>
+        <td class="body-cell">
+          <div class="head">${ts}${show}</div>
+          <div class="claim">${esc(it.claim)}</div>
+          ${it.speaker ? `<div class="speaker">${esc(it.speaker)}</div>` : ''}
+          <div class="why">${esc(it.why_matters)}</div>
+          ${it.supporting_quote ? `<div class="quote">${esc(canonicalize(it.supporting_quote))}</div>` : ''}
+        </td>
+      </tr>
+    </table>`;
 }
 
 export async function composeBrief(episodes, { date = new Date(), telemetry = {} } = {}) {
@@ -140,7 +147,7 @@ export async function composeBrief(episodes, { date = new Date(), telemetry = {}
     ordered = await globalRank(items, { telemetry });
   }
 
-  const itemsHtml = ordered.map((it, i) => renderItem(it, i + 1)).join('');
+  const itemsHtml = ordered.map((it, i) => renderItem(it, i + 1, i === 0)).join('');
   const headerLine = `${dateStr} · ${ordered.length} items across ${episodeCount} episode${episodeCount === 1 ? '' : 's'} · ranked top-down`;
   return wrapHtml(dateStr, headerLine, itemsHtml);
 }
