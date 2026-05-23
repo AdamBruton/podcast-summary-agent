@@ -12,6 +12,7 @@
 import { loadPrompt } from '../lib/config.js';
 import { complete, parseJsonResponse, MODELS } from '../lib/claude.js';
 import { getTranscript, saveCandidates, setEpisodeStatus } from '../lib/db.js';
+import { verifyNumericFidelity } from '../lib/number-check.js';
 import { log } from '../lib/log.js';
 
 const SYSTEM = loadPrompt('extract');
@@ -72,11 +73,33 @@ export async function extractEpisode(episode, { run_id }) {
     if (Array.isArray(candidates)) allCandidates.push(...candidates);
   }
 
-  const deduped = dedupeCandidates(allCandidates);
+  // Defense-in-depth: drop any candidate whose claim contains a number not
+  // present in its own supporting_quote. Catches paraphrase-hallucinations
+  // like the Krishna $75B → $7.5B regression regardless of prompt wording.
+  const numberOk = [];
+  let droppedForNumbers = 0;
+  for (const c of allCandidates) {
+    const v = verifyNumericFidelity(c.claim, c.supporting_quote);
+    if (!v.ok) {
+      droppedForNumbers++;
+      log.warn('extract: dropping candidate (number not in supporting_quote)', {
+        video_id: episode.video_id,
+        missing: v.missing,
+        claim: (c.claim || '').slice(0, 80),
+      });
+      continue;
+    }
+    numberOk.push(c);
+  }
+
+  const deduped = dedupeCandidates(numberOk);
   const ids = saveCandidates(episode.video_id, deduped);
   setEpisodeStatus(episode.video_id, 'extracted');
   log.ok('extracted', {
-    video_id: episode.video_id, n: deduped.length, raw: allCandidates.length,
+    video_id:        episode.video_id,
+    n:               deduped.length,
+    raw:             allCandidates.length,
+    dropped_numeric: droppedForNumbers,
   });
   return ids;
 }
