@@ -1,11 +1,17 @@
 // Stage 5: Compose HTML brief.
 //
-// Pure function — takes episodes + their ranked items and returns one HTML
-// string. The brief is one section per episode, items as bullets with
+// Async — takes episodes + their per-episode rankings, calls the global-rank
+// stage for multi-episode briefs to produce a single cross-episode ordering,
+// and renders the brief as one flat ordinally-numbered list. Items have
 // clickable YouTube deep-links (?v=X&t=NNNs format).
+//
+// No item cap — the reader scans top-down and stops when they're done. The
+// global rank ensures the highest-signal items are first regardless of which
+// episode they came from.
 
 import { getRankedBriefItems } from '../lib/db.js';
 import { youtubeUrl } from '../lib/youtube.js';
+import { globalRank } from '../lib/global-rank.js';
 
 function esc(s) {
   return String(s ?? '')
@@ -55,110 +61,98 @@ function fmtTime(sec) {
 
 const STYLE = `
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-         max-width: 720px; margin: 24px auto; padding: 0 16px; color: #111; line-height: 1.5; }
+         max-width: 720px; margin: 24px auto; padding: 0 16px; color: #111; line-height: 1.55; }
   h1 { font-size: 22px; margin: 0 0 4px; }
   .date { color: #666; font-size: 13px; margin-bottom: 24px; }
-  .episode { border-top: 1px solid #ddd; padding: 18px 0; }
-  .episode h2 { font-size: 17px; margin: 0 0 4px; }
-  .meta { color: #666; font-size: 12px; margin-bottom: 10px; }
-  .meta a { color: #666; text-decoration: underline; }
-  .item { margin: 10px 0 14px; }
+  .item { display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: start;
+          padding: 16px 0; border-top: 1px solid #eee; }
+  .item:first-of-type { border-top: 1px solid #ddd; }
+  .rank { color: #999; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums;
+          text-align: right; padding-top: 2px; }
+  .head { font-size: 12px; color: #666; margin-bottom: 4px; }
+  .head a { color: #666; text-decoration: none; }
+  .head .show { font-weight: 500; }
   .ts { display: inline-block; background: #f3f3f3; color: #333; font-size: 11px;
-        padding: 1px 6px; border-radius: 3px; text-decoration: none; font-family: ui-monospace, monospace; }
+        padding: 1px 6px; border-radius: 3px; text-decoration: none;
+        font-family: ui-monospace, "SF Mono", Consolas, monospace; margin-right: 6px; }
   .ts:hover { background: #e0e0e0; }
-  .claim { font-weight: 600; margin-left: 6px; }
-  .why { color: #555; font-size: 13px; margin: 2px 0 4px 0; font-style: italic; }
-  .quote { color: #444; font-size: 13px; border-left: 3px solid #ddd; padding: 2px 0 2px 10px; margin: 4px 0; }
-  .speaker { color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .claim { font-weight: 600; font-size: 15px; margin: 2px 0; }
+  .speaker { color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+             margin-top: 2px; }
+  .why { color: #555; font-size: 13px; margin: 4px 0 6px 0; font-style: italic; }
+  .quote { color: #444; font-size: 13px; border-left: 3px solid #ddd;
+           padding: 2px 0 2px 10px; margin: 4px 0 0 0; }
   .empty { color: #888; font-style: italic; }
-  footer { color: #999; font-size: 11px; margin-top: 32px; border-top: 1px solid #eee; padding-top: 12px; }
+  footer { color: #999; font-size: 11px; margin-top: 32px; border-top: 1px solid #eee;
+           padding-top: 12px; text-align: center; }
 `;
 
-// Per-day cap on total items in the brief, applied via round-robin across
-// episodes: rank-1 from each ep, then rank-2 from each ep, etc., until we
-// hit the cap. Guarantees each episode contributes its top pick before any
-// episode's lower-ranked items appear. Single-episode runs are not capped.
-const MAX_BRIEF_ITEMS = 15;
-
-function selectItemsAcrossEpisodes(episodes, cap) {
-  const byEp = episodes
-    .map(ep => ({
-      ep,
-      items: getRankedBriefItems(ep.video_id).sort((a, b) => a.rank - b.rank),
-    }))
-    .filter(x => x.items.length > 0);
-
-  // Single-episode runs: return everything (no cross-episode tension to resolve)
-  if (byEp.length <= 1) return byEp;
-
-  const keepIds = new Set();
-  let level = 0, total = 0;
-  while (total < cap) {
-    let addedThisRound = 0;
-    for (const { items } of byEp) {
-      if (total >= cap) break;
-      if (level < items.length) {
-        keepIds.add(items[level].id);
-        addedThisRound++;
-        total++;
-      }
+// Gather every per-episode-ranked item, tagged with the episode context the
+// flat renderer needs.
+function gatherAllItems(episodes) {
+  const out = [];
+  for (const ep of episodes) {
+    for (const it of getRankedBriefItems(ep.video_id)) {
+      out.push({
+        ...it,
+        video_id:      ep.video_id,
+        episode_title: ep.title,
+        channel_name:  ep.channel_name,
+        published_at:  ep.published_at,
+      });
     }
-    if (addedThisRound === 0) break;
-    level++;
   }
-
-  return byEp
-    .map(x => ({ ep: x.ep, items: x.items.filter(i => keepIds.has(i.id)) }))
-    .filter(x => x.items.length > 0);
+  return out;
 }
 
-export function composeBrief(episodes, { date = new Date() } = {}) {
-  const dateStr = date.toISOString().slice(0, 10);
-  const selected = selectItemsAcrossEpisodes(episodes, MAX_BRIEF_ITEMS);
-  const totalItems = selected.reduce((n, x) => n + x.items.length, 0);
-  const totalCandidates = episodes.reduce(
-    (n, ep) => n + getRankedBriefItems(ep.video_id).length, 0,
-  );
-
-  const sections = selected.map(({ ep, items }) => {
-    const itemsHtml = items.map(it => `
-      <div class="item">
-        <a class="ts" href="${esc(youtubeUrl(ep.video_id, it.timestamp_sec))}">${fmtTime(it.timestamp_sec)}</a>
-        <span class="claim">${esc(it.claim)}</span>
+function renderItem(it, rank) {
+  const ts = `<a class="ts" href="${esc(youtubeUrl(it.video_id, it.timestamp_sec))}">${fmtTime(it.timestamp_sec)}</a>`;
+  const show = `<a href="${esc(youtubeUrl(it.video_id))}"><span class="show">${esc(it.channel_name)}</span> — ${esc(it.episode_title)}</a>`;
+  return `
+    <div class="item">
+      <div class="rank">${rank}</div>
+      <div>
+        <div class="head">${ts}${show}</div>
+        <div class="claim">${esc(it.claim)}</div>
         ${it.speaker ? `<div class="speaker">${esc(it.speaker)}</div>` : ''}
         <div class="why">${esc(it.why_matters)}</div>
         ${it.supporting_quote ? `<div class="quote">${esc(canonicalize(it.supporting_quote))}</div>` : ''}
       </div>
-    `).join('');
+    </div>`;
+}
 
-    return `
-      <section class="episode">
-        <h2>${esc(ep.title)}</h2>
-        <div class="meta">
-          ${esc(ep.channel_name)} · ${esc(ep.published_at || '')} ·
-          <a href="${esc(youtubeUrl(ep.video_id))}">Watch on YouTube</a>
-        </div>
-        ${itemsHtml}
-      </section>`;
-  });
+export async function composeBrief(episodes, { date = new Date(), telemetry = {} } = {}) {
+  const dateStr = date.toISOString().slice(0, 10);
+  const items = gatherAllItems(episodes);
 
-  const body = sections.length
-    ? sections.join('')
-    : `<div class="empty">No episodes produced ranked items today.</div>`;
+  if (items.length === 0) {
+    return wrapHtml(dateStr, `${dateStr} · no items to brief today`,
+      `<div class="empty">No episodes produced ranked items today.</div>`);
+  }
 
-  // Show the cap in the header when we actually dropped items, so it's clear
-  // the brief is a curated subset of a larger ranked pool.
-  const countLine = totalCandidates > totalItems
-    ? `${dateStr} · top ${totalItems} of ${totalCandidates} ranked across ${selected.length} episodes`
-    : `${dateStr} · ${totalItems} items across ${selected.length} episode${selected.length === 1 ? '' : 's'}`;
+  // For a single episode the per-episode rank is already the optimal order;
+  // for multi-episode we run the cross-episode global rank.
+  const episodeCount = new Set(items.map(i => i.video_id)).size;
+  let ordered;
+  if (episodeCount === 1) {
+    ordered = [...items].sort((a, b) => a.rank - b.rank);
+  } else {
+    ordered = await globalRank(items, { telemetry });
+  }
 
+  const itemsHtml = ordered.map((it, i) => renderItem(it, i + 1)).join('');
+  const headerLine = `${dateStr} · ${ordered.length} items across ${episodeCount} episode${episodeCount === 1 ? '' : 's'} · ranked top-down`;
+  return wrapHtml(dateStr, headerLine, itemsHtml);
+}
+
+function wrapHtml(dateStr, headerLine, body) {
   return `<!doctype html>
 <html><head><meta charset="utf-8"><title>Podcast Intel — ${dateStr}</title>
 <style>${STYLE}</style></head>
 <body>
   <h1>Podcast Intelligence Brief</h1>
-  <div class="date">${countLine}</div>
+  <div class="date">${headerLine}</div>
   ${body}
-  <footer>Generated by podcast-summary-agent. Edit config/profile.md to retune what surfaces here.</footer>
+  <footer>Generated by podcast-summary-agent. Edit config/profile.md to retune ranking.</footer>
 </body></html>`;
 }

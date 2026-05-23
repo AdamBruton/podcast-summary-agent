@@ -24,17 +24,22 @@ themes I care about.
 **TIER 1 — always lift:**
 Business strategy, capital allocation, financials (ARR/NRR/margin/capex/
 headcount/customer counts), market structure, competitive positioning,
-M&A, forward-looking commitments with timeframes, named CEO/policymaker
-disputes on policy, specific quantitative disclosures.
+M&A, forward-looking commitments with timeframes, specific quantitative
+disclosures. **Pure business beats everything else.**
 
-**TIER 2 — lift only if framed with a business or competitive angle:**
+**TIER 2a — secondary lift (regulatory and geopolitical):**
+Export controls, US-China policy, named CEO/policymaker disputes on
+policy, regulatory developments. Important context but should not
+displace Tier 1 financial/strategic items.
+
+**TIER 2b — secondary lift (technical with business angle):**
 Technical detail (chip architecture, model architecture, infra design,
 algorithms) is interesting *only when it concretely explains cost,
 moat durability, supply/demand dynamics, or competitive positioning*.
-Pure engineering trivia without a downstream business or strategy hook
-should be dropped. "FP4 is 4x faster than FP8" only matters if it ties
-to inference economics; "splittable systolic arrays" only matters if
-it explains why a startup will or won't displace Nvidia.
+"FP4 is 4x faster than FP8" only matters if it ties to inference
+economics; "splittable systolic arrays" only matters if it explains
+why a startup will or won't displace Nvidia. Pure engineering trivia
+without a downstream business hook → drop.
 
 **TIER 3 — mention only if exceptional:**
 Research insights, product feature lists, dev-tool internals,

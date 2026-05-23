@@ -31,7 +31,7 @@ if (eps.length === 0) {
 console.error(`composing brief from ${eps.length} ranked episode(s):`);
 for (const e of eps) console.error(`  - ${e.channel_name}: ${e.title}`);
 
-const html = composeBrief(eps);
+const html = await composeBrief(eps);
 const result = await deliver(html, {
   dryRun: !values.send,
   episodes: eps,
