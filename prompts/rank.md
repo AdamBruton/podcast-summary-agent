@@ -13,23 +13,41 @@ The reader's profile is provided in the system context. Use it as your sole rubr
 3. **Quantitative or testable** — Numbers, dates, and falsifiable predictions beat vibes.
 4. **Hard to find elsewhere** — Would the reader have to listen to the full episode to encounter this? If it's already in 10 other places, skip.
 
+## Bundling (when 2-3 candidates together tell a richer story)
+
+Sometimes two or three candidates separated by only seconds or minutes — or scattered across an episode — combine to mean something none of them means alone. Example: a CFO mentions they built 70 internal Claude skills (one specific number), and 30 seconds later says they use the model to produce financial statements (one product detail). Individually they read as routine disclosures. Together they are the **first major lab publicly committing to using its own AI for material finance operations** — a category-superlative claim and a Tier 1 disruption signal.
+
+When you see this kind of synergy, emit a **bundle** instead of multiple separate items. A bundle is one ranked entry whose `candidate_ids` list contains all the candidates that compose the story (2–4 items typical), with a `label` that headlines the synthesis and a `why_matters` that explains why the combination is more interesting than the sum.
+
+Be conservative — most episodes warrant **0 or 1 bundles**; rarely 2. Don't bundle unrelated items just because they share a theme. The test: would the reader, seeing only one of these candidates without the others, miss the headline?
+
 ## Output format
 
-Return a **JSON array** (only — no prose) of selections, ranked best-first:
+Return a **JSON array** (only — no prose), ranked best-first. Each entry is either a SINGLE or a BUNDLE:
 
 ```
 [
+  // single — one candidate
   {
     "candidate_id": 17,                   // the `id` field from the input candidates
-    "rank": 1,                            // 1 = top
+    "rank": 1,
     "why_matters": "Concrete capex ..."   // ONE sentence, max ~25 words, framed to the reader's themes
+  },
+
+  // bundle — multiple candidates that together form one story
+  {
+    "candidate_ids": [42, 47],            // first id is the "primary" / strongest standalone
+    "rank": 2,
+    "label": "Anthropic is operationalizing internal AI agentically",   // short bolded headline shown in the brief
+    "why_matters": "Together these two adjacent disclosures …"          // explains the synthesis
   }
 ]
 ```
 
 ## Rules
 
-- **3 to 7 items**. If the episode genuinely has fewer than 3 items worth this reader's time, return fewer (or `[]`). Do not pad.
-- **why_matters is the value-add** — don't restate the claim; explain why it matters TO THIS READER given their profile. Reference a specific theme when natural.
-- Prefer one strong item over three medium ones. The reader's trust depends on the floor, not the ceiling.
+- **3 to 7 entries total** (singles + bundles combined). If the episode genuinely has fewer worth this reader's time, return fewer (or `[]`). Do not pad.
+- **why_matters is the value-add** — don't restate the claim; explain why it matters TO THIS READER given their profile. For bundles, explain why the *combination* is more than its parts.
+- **label is bundle-only** — a 5-12 word bolded headline for the bundle. Omit on singles.
+- Prefer one strong entry over three medium ones. The reader's trust depends on the floor, not the ceiling.
 - Output ONLY the JSON array. No preamble, no explanation, no markdown.

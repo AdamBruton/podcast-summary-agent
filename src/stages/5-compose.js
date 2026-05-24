@@ -96,6 +96,17 @@ const STYLE = `
   .quote { color: #444; font-size: 13px; border-left: 3px solid #ddd;
            padding: 2px 0 2px 10px; margin: 4px 0 0 0; }
   .empty { color: #888; font-style: italic; }
+  .bundle-tag {
+    display: inline-block; background: #eef; color: #336; font-size: 10px;
+    font-weight: 700; padding: 1px 6px; border-radius: 3px; margin-right: 8px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .bundle-list { margin-top: 6px; padding-left: 4px;
+                 border-left: 2px solid #e5e5e5; }
+  .bundle-row  { padding: 4px 0 4px 10px; }
+  .bundle-row .ts { margin-right: 4px; }
+  .bundle-claim { font-size: 12px; color: #333; font-weight: 500; margin: 2px 0; }
+  .bundle-quote { font-size: 12px; margin: 2px 0 0; padding-left: 8px; }
   footer { color: #999; font-size: 11px; margin-top: 32px; border-top: 1px solid #eee;
            padding-top: 12px; text-align: center; }
 `;
@@ -119,18 +130,54 @@ function gatherAllItems(episodes) {
 }
 
 function renderItem(it, rank, isFirst) {
-  const ts = `<a class="ts" href="${esc(youtubeUrl(it.video_id, it.timestamp_sec))}">${fmtTime(it.timestamp_sec)}</a>`;
-  const show = `<a href="${esc(youtubeUrl(it.video_id))}"><span class="show">${esc(it.channel_name)}</span> — ${esc(it.episode_title)}</a>`;
+  const showLink = `<a href="${esc(youtubeUrl(it.video_id))}"><span class="show">${esc(it.channel_name)}</span> — ${esc(it.episode_title)}</a>`;
+  const isBundle = Array.isArray(it.bundle_members) && it.bundle_members.length > 0;
+
+  if (!isBundle) {
+    // Single — original layout.
+    const ts = `<a class="ts" href="${esc(youtubeUrl(it.video_id, it.timestamp_sec))}">${fmtTime(it.timestamp_sec)}</a>`;
+    return `
+      <table class="item${isFirst ? ' first' : ''}" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td class="rank-cell">${rank}</td>
+          <td class="body-cell">
+            <div class="head">${ts}${showLink}</div>
+            <div class="claim">${esc(it.claim)}</div>
+            ${it.speaker ? `<div class="speaker">${esc(it.speaker)}</div>` : ''}
+            <div class="why">${esc(it.why_matters)}</div>
+            ${it.supporting_quote ? `<div class="quote">${esc(canonicalize(it.supporting_quote))}</div>` : ''}
+          </td>
+        </tr>
+      </table>`;
+  }
+
+  // Bundle — render label as the headline, then a stacked list of supporting
+  // moments (one timestamp + quote per member, primary first), then why_matters.
+  const headline = it.label || it.claim;
+  const members = [
+    { timestamp_sec: it.timestamp_sec, supporting_quote: it.supporting_quote, claim: it.claim, speaker: it.speaker },
+    ...it.bundle_members,
+  ];
+  const speakers = Array.from(new Set(members.map(m => m.speaker).filter(Boolean)));
+  const memberRows = members.map(m => {
+    const ts = `<a class="ts" href="${esc(youtubeUrl(it.video_id, m.timestamp_sec))}">${fmtTime(m.timestamp_sec)}</a>`;
+    const claimLine = m.claim && m.claim !== headline
+      ? `<div class="bundle-claim">${esc(m.claim)}</div>` : '';
+    const quote = m.supporting_quote
+      ? `<div class="quote bundle-quote">${esc(canonicalize(m.supporting_quote))}</div>` : '';
+    return `<div class="bundle-row">${ts}${claimLine}${quote}</div>`;
+  }).join('');
+
   return `
     <table class="item${isFirst ? ' first' : ''}" cellpadding="0" cellspacing="0" border="0">
       <tr>
         <td class="rank-cell">${rank}</td>
         <td class="body-cell">
-          <div class="head">${ts}${show}</div>
-          <div class="claim">${esc(it.claim)}</div>
-          ${it.speaker ? `<div class="speaker">${esc(it.speaker)}</div>` : ''}
+          <div class="head"><span class="bundle-tag">BUNDLE · ${members.length} moments</span>${showLink}</div>
+          <div class="claim">${esc(headline)}</div>
+          ${speakers.length ? `<div class="speaker">${esc(speakers.join(', '))}</div>` : ''}
           <div class="why">${esc(it.why_matters)}</div>
-          ${it.supporting_quote ? `<div class="quote">${esc(canonicalize(it.supporting_quote))}</div>` : ''}
+          <div class="bundle-list">${memberRows}</div>
         </td>
       </tr>
     </table>`;

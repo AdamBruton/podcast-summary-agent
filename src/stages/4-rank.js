@@ -57,8 +57,30 @@ export async function rankEpisode(episode, { run_id }) {
     return [];
   }
 
+  // Validate ids for both shapes (single: candidate_id; bundle:
+  // candidate_ids[]). Bundles with any unknown ids keep only the known ones;
+  // a bundle reduced to fewer than 2 valid ids gets demoted to a single.
+  const validIds = new Set(candidates.map(c => c.id));
+  rankings = rankings
+    .map(r => {
+      if (Array.isArray(r.candidate_ids) && r.candidate_ids.length) {
+        const filtered = r.candidate_ids.filter(id => validIds.has(id));
+        if (filtered.length === 0) return null;
+        if (filtered.length === 1) {
+          const { candidate_ids, label, ...rest } = r;
+          return { ...rest, candidate_id: filtered[0] };
+        }
+        return { ...r, candidate_ids: filtered };
+      }
+      return validIds.has(r.candidate_id) ? r : null;
+    })
+    .filter(Boolean);
+
+  const bundleCount = rankings.filter(r => Array.isArray(r.candidate_ids)).length;
   saveRankings(episode.video_id, rankings);
   setEpisodeStatus(episode.video_id, 'ranked');
-  log.ok('ranked', { video_id: episode.video_id, picked: rankings.length });
+  log.ok('ranked', {
+    video_id: episode.video_id, picked: rankings.length, bundles: bundleCount,
+  });
   return rankings;
 }

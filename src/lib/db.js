@@ -106,6 +106,18 @@ function migrate(d) {
       updated_at      TEXT DEFAULT (datetime('now'))
     );
 
+    -- Bundle members: extra candidates that belong to the same ranking as
+    -- rankings.candidate_id (the "primary"). Singles have no rows here.
+    -- Lets one brief item present 2-3 timestamped moments together when
+    -- they form a richer story than any one alone.
+    CREATE TABLE IF NOT EXISTS ranking_bundle_members (
+      ranking_id      INTEGER NOT NULL REFERENCES rankings(id)   ON DELETE CASCADE,
+      candidate_id    INTEGER NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+      display_order   INTEGER DEFAULT 0,
+      PRIMARY KEY (ranking_id, candidate_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_rbm_candidate ON ranking_bundle_members(candidate_id);
+
     CREATE TABLE IF NOT EXISTS cost_ledger (
       id              INTEGER PRIMARY KEY AUTOINCREMENT,
       run_id          INTEGER REFERENCES runs(id),
@@ -120,9 +132,10 @@ function migrate(d) {
     );
   `);
 
-  // Idempotent column additions for DBs that predate the discovery feature.
+  // Idempotent column additions for DBs that predate later features.
   safeAlter(d, `ALTER TABLE episodes ADD COLUMN source TEXT DEFAULT 'subscribed'`);
   safeAlter(d, `ALTER TABLE episodes ADD COLUMN discovered_for TEXT`);
+  safeAlter(d, `ALTER TABLE rankings ADD COLUMN label TEXT`);
 }
 
 // --- Episode helpers --------------------------------------------------------
@@ -215,26 +228,57 @@ export function getCandidates(video_id) {
              .all(video_id);
 }
 
+// Accepts two ranking shapes from the rank pass:
+//   single:  { candidate_id, rank, why_matters }
+//   bundle:  { candidate_ids: [primary, …extras], rank, why_matters, label? }
+// In both cases the FIRST id becomes rankings.candidate_id (the "primary").
+// Extras are inserted into ranking_bundle_members. Singles get no junction rows.
 export function saveRankings(video_id, rankings) {
   const d = db();
   d.prepare(`DELETE FROM rankings WHERE video_id = ?`).run(video_id);
-  const stmt = d.prepare(`
-    INSERT INTO rankings (video_id, candidate_id, rank, why_matters)
-    VALUES (?, ?, ?, ?)
+  const insertRanking = d.prepare(`
+    INSERT INTO rankings (video_id, candidate_id, rank, why_matters, label)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  const insertMember = d.prepare(`
+    INSERT INTO ranking_bundle_members (ranking_id, candidate_id, display_order)
+    VALUES (?, ?, ?)
   `);
   for (const r of rankings) {
-    stmt.run(video_id, r.candidate_id, r.rank, r.why_matters);
+    const ids = Array.isArray(r.candidate_ids) && r.candidate_ids.length
+      ? r.candidate_ids
+      : [r.candidate_id];
+    if (ids.length === 0 || ids[0] == null) continue;   // malformed entry, skip
+    const info = insertRanking.run(video_id, ids[0], r.rank, r.why_matters, r.label || null);
+    const ranking_id = Number(info.lastInsertRowid);
+    for (let i = 1; i < ids.length; i++) {
+      insertMember.run(ranking_id, ids[i], i);
+    }
   }
 }
 
+// Each ranking returned is one brief item. Singles have an empty bundle_members
+// array. Bundles list their extra candidates in bundle_members ordered by
+// display_order (the order the rank pass listed them).
 export function getRankedBriefItems(video_id) {
-  return db().prepare(`
-    SELECT r.rank, r.why_matters, c.*
+  const rankings = db().prepare(`
+    SELECT r.id AS ranking_id, r.rank, r.why_matters, r.label, c.*
     FROM rankings r
     JOIN candidates c ON c.id = r.candidate_id
     WHERE r.video_id = ?
     ORDER BY r.rank
   `).all(video_id);
+  const memberStmt = db().prepare(`
+    SELECT c.*
+    FROM ranking_bundle_members rbm
+    JOIN candidates c ON c.id = rbm.candidate_id
+    WHERE rbm.ranking_id = ?
+    ORDER BY rbm.display_order, c.timestamp_sec
+  `);
+  for (const r of rankings) {
+    r.bundle_members = memberStmt.all(r.ranking_id);
+  }
+  return rankings;
 }
 
 export function markDelivered(video_id) {
@@ -321,6 +365,11 @@ export function listEpisodesWithCounts({ limit = 25 } = {}) {
 // Dropped candidates have rank=null, why_matters=null. Selected items are
 // returned in rank order (1, 2, 3, ...); dropped items are ordered by
 // novelty_score desc as a secondary signal.
+// A candidate is "selected" if it's either:
+//   - the primary of a ranking (rankings.candidate_id = c.id), OR
+//   - a bundle member of a ranking (via ranking_bundle_members).
+// In either case we surface the parent ranking's rank + why_matters so the
+// inspector shows the candidate alongside the rest of its bundle.
 export function getEpisodeDetail(video_id) {
   const ep = db().prepare(`SELECT * FROM episodes WHERE video_id = ?`).get(video_id);
   if (!ep) return null;
@@ -333,18 +382,23 @@ export function getEpisodeDetail(video_id) {
       c.category,
       c.novelty_score,
       c.supporting_quote,
-      r.rank,
-      r.why_matters,
-      f.rating AS feedback,
-      CASE WHEN r.rank IS NULL THEN 0 ELSE 1 END AS selected
+      COALESCE(r_pri.rank,         r_bun.rank)         AS rank,
+      COALESCE(r_pri.why_matters,  r_bun.why_matters)  AS why_matters,
+      COALESCE(r_pri.label,        r_bun.label)        AS label,
+      COALESCE(r_pri.id,           r_bun.id)           AS ranking_id,
+      CASE WHEN r_pri.id IS NULL AND rbm.ranking_id IS NULL THEN 0 ELSE 1 END AS selected,
+      CASE WHEN rbm.ranking_id IS NULL THEN 0 ELSE 1 END AS is_bundle_member,
+      f.rating AS feedback
     FROM candidates c
-    LEFT JOIN rankings r ON r.candidate_id = c.id AND r.video_id = c.video_id
-    LEFT JOIN feedback f ON f.candidate_id = c.id
+    LEFT JOIN rankings r_pri              ON r_pri.candidate_id = c.id AND r_pri.video_id = c.video_id
+    LEFT JOIN ranking_bundle_members rbm  ON rbm.candidate_id   = c.id
+    LEFT JOIN rankings r_bun              ON r_bun.id           = rbm.ranking_id AND r_bun.video_id = c.video_id
+    LEFT JOIN feedback f                  ON f.candidate_id     = c.id
     WHERE c.video_id = ?
     ORDER BY
-      CASE WHEN r.rank IS NULL THEN 1 ELSE 0 END,   -- selected first
-      COALESCE(r.rank, 0),                          -- then by rank asc
-      c.novelty_score DESC,                         -- then dropped by novelty desc
+      CASE WHEN r_pri.rank IS NULL AND r_bun.rank IS NULL THEN 1 ELSE 0 END,
+      COALESCE(r_pri.rank, r_bun.rank, 0),
+      c.novelty_score DESC,
       c.timestamp_sec ASC
   `).all(video_id);
   return { episode: ep, candidates };
