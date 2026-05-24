@@ -14,6 +14,8 @@ import {
   listAll, addChannel, removeChannel, patchChannel,
   addIndividual, removeIndividual,
 } from '../lib/sources-store.js';
+import { readProfile, writeProfile } from '../lib/profile-store.js';
+import { listEpisodesWithCounts, getEpisodeDetail } from '../lib/db.js';
 import { resolveHandle, videoIdFromUrl } from '../lib/youtube.js';
 import { runEpisode } from '../pipeline.js';
 
@@ -72,6 +74,28 @@ app.post('/api/resolve', wrap(async req => {
     throw new Error(`resolution returned unexpected value: ${channel_id || '(empty)'}`);
   }
   return { handle, channel_id };
+}));
+
+// --- Profile (interest tuning) ---------------------------------------------
+
+app.get('/api/profile', wrap(() => ({ content: readProfile() })));
+
+app.put('/api/profile', wrap(req => {
+  if (typeof req.body?.content !== 'string') throw new Error('content (string) is required');
+  return writeProfile(req.body.content);
+}));
+
+// --- Episode inspector -----------------------------------------------------
+
+app.get('/api/episodes', wrap(() => {
+  const limit = 25;   // hardcoded for now; UI doesn't paginate yet
+  return { episodes: listEpisodesWithCounts({ limit }) };
+}));
+
+app.get('/api/episodes/:video_id', wrap(req => {
+  const detail = getEpisodeDetail(req.params.video_id);
+  if (!detail) throw new Error('not found');
+  return detail;
 }));
 
 // Ad-hoc: process a single YouTube URL right now, email the brief immediately,

@@ -69,6 +69,56 @@
   }
   ul.chips li button:hover { color: var(--danger); }
 
+  /* Profile editor */
+  textarea.profile {
+    width: 100%; min-height: 320px; font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 12px; line-height: 1.5; padding: 12px; border: 1px solid var(--line-strong);
+    border-radius: 4px; resize: vertical;
+  }
+  .row-actions { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  .ok-msg { color: #1a8800; font-size: 12px; }
+
+  /* Episode inspector */
+  .ep-row {
+    border-bottom: 1px solid var(--line); padding: 12px 4px; cursor: pointer;
+    display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center;
+  }
+  .ep-row:hover { background: var(--bg-soft); }
+  .ep-row .meta { color: var(--muted); font-size: 12px; }
+  .ep-row .counts { font-family: ui-monospace, monospace; font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .ep-row .status-tag {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;
+    padding: 2px 6px; border-radius: 3px; background: #eef; color: #336;
+  }
+  .ep-row .status-tag.delivered { background: #dfd; color: #050; }
+  .ep-row .status-tag.ranked    { background: #fed; color: #530; }
+  .ep-row .status-tag.extracted { background: #eee; color: #555; }
+  .ep-detail { padding: 16px; background: var(--bg-soft); border-bottom: 1px solid var(--line); }
+  .ep-detail h3 { font-size: 13px; margin: 16px 0 8px;
+                  text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  .ep-detail h3:first-child { margin-top: 0; }
+  .cand {
+    padding: 12px; margin-bottom: 8px; background: #fff; border-left: 3px solid var(--line-strong);
+    border-radius: 0 4px 4px 0;
+  }
+  .cand.selected { border-left-color: var(--accent); }
+  .cand .cand-head {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 4px;
+    font-size: 11px; color: var(--muted);
+  }
+  .cand .rank-badge {
+    background: var(--accent); color: #fff; font-weight: 700; font-size: 11px;
+    padding: 1px 6px; border-radius: 10px;
+  }
+  .cand .cat-badge {
+    background: #f0e8ff; color: #5530a0; padding: 1px 6px; border-radius: 3px;
+  }
+  .cand .nov-badge { font-family: ui-monospace, monospace; }
+  .cand .claim-text { font-weight: 600; font-size: 13px; margin: 4px 0; }
+  .cand .why-text { color: #555; font-size: 12px; font-style: italic; margin: 4px 0; }
+  .cand .quote-text { color: #444; font-size: 12px; border-left: 2px solid var(--line-strong);
+                      padding: 2px 0 2px 8px; margin: 4px 0 0; }
+
   .err {
     color: var(--danger); font-size: 12px; margin-top: 8px; min-height: 16px;
     display: flex; align-items: center; gap: 8px;
@@ -134,6 +184,33 @@
     <div class="err" id="individuals-err"></div>
   </section>
 
+  <section>
+    <h2>Interest profile</h2>
+    <p class="lede" style="margin: 4px 0 8px;">
+      The bias function the ranker uses. Edit and save — changes take effect
+      on the next rank pass (next daily run, next ad-hoc URL summary, or
+      <code>npm run rerank</code> to re-rank existing episodes).
+    </p>
+    <textarea class="profile" id="profile-content" spellcheck="false"></textarea>
+    <div class="row-actions">
+      <button class="primary" id="profile-save">Save profile</button>
+      <button id="profile-revert">Revert from disk</button>
+      <span class="ok-msg" id="profile-status"></span>
+    </div>
+    <div class="err" id="profile-err"></div>
+  </section>
+
+  <section>
+    <h2>Episode rankings <span id="episodes-count" style="color:#999"></span></h2>
+    <p class="lede" style="margin: 4px 0 8px;">
+      Recent episodes that have been ranked. Click one to see all extracted
+      candidates: which made the brief (with the ranker's reasoning), and
+      which were dropped (with their extract-time category and novelty score).
+    </p>
+    <div id="episodes-list"></div>
+    <div class="err" id="episodes-err"></div>
+  </section>
+
   <div class="footer">
     podcast-summary-agent · serving <code>config/sources.yaml</code>
   </div>
@@ -193,6 +270,92 @@ async function load() {
   }
   renderTable('channels', data.channels);
   renderIndividuals(data.individuals);
+  // Profile + episodes are loaded independently; failures don't block sources.
+  loadProfile().catch(e => setErr('profile-err', e.message));
+  loadEpisodes().catch(e => setErr('episodes-err', e.message));
+}
+
+async function loadProfile() {
+  const { content } = await api('GET', '/api/profile');
+  const el = document.getElementById('profile-content');
+  el.value = content;
+  el.dataset.original = content;   // baseline for revert
+}
+
+let _episodesCache = null;     // for re-rendering after detail expand/collapse
+
+async function loadEpisodes() {
+  const { episodes } = await api('GET', '/api/episodes');
+  _episodesCache = episodes;
+  renderEpisodes(episodes);
+}
+
+function renderEpisodes(list) {
+  const el = document.getElementById('episodes-list');
+  document.getElementById('episodes-count').textContent = `(${list.length})`;
+  if (!list.length) { el.innerHTML = '<div class="empty">No ranked episodes yet.</div>'; return; }
+  el.innerHTML = list.map(ep => {
+    const tag = `<span class="status-tag ${esc(ep.status)}">${esc(ep.status)}</span>`;
+    const counts = `${ep.ranking_count}/${ep.candidate_count}`;
+    const date = ep.published_at || '—';
+    return `
+      <div class="ep-row" data-ep="${esc(ep.video_id)}">
+        <div>
+          <div><strong>${esc(ep.title)}</strong></div>
+          <div class="meta">${esc(ep.channel_name)} · ${esc(date)}${ep.discovered_for ? ` · via discovery (${esc(ep.discovered_for)})` : ''}</div>
+        </div>
+        <div class="counts" title="ranked / extracted candidates">${esc(counts)}</div>
+        ${tag}
+      </div>
+      <div id="ep-detail-${esc(ep.video_id)}"></div>`;
+  }).join('');
+}
+
+async function toggleEpisodeDetail(video_id) {
+  const wrap = document.getElementById(`ep-detail-${video_id}`);
+  if (!wrap) return;
+  if (wrap.firstChild) { wrap.innerHTML = ''; return; }   // collapse
+  wrap.innerHTML = '<div class="ep-detail"><span class="empty">Loading…</span></div>';
+  let detail;
+  try { detail = await api('GET', `/api/episodes/${encodeURIComponent(video_id)}`); }
+  catch (e) { wrap.innerHTML = `<div class="ep-detail err">${esc(e.message)}</div>`; return; }
+  wrap.innerHTML = renderEpisodeDetail(detail);
+}
+
+function renderEpisodeDetail({ episode, candidates }) {
+  const selected = candidates.filter(c => c.selected);
+  const dropped  = candidates.filter(c => !c.selected);
+  const ytUrl = (sec) => `https://www.youtube.com/watch?v=${episode.video_id}&t=${Math.floor(sec || 0)}s`;
+  const fmt = (sec) => {
+    const s = Math.floor(sec || 0), h = Math.floor(s/3600), m = Math.floor((s%3600)/60), r = s%60;
+    return h > 0 ? `${h}:${String(m).padStart(2,'0')}:${String(r).padStart(2,'0')}` : `${m}:${String(r).padStart(2,'0')}`;
+  };
+  const renderCand = (c, asSelected) => `
+    <div class="cand${asSelected ? ' selected' : ''}">
+      <div class="cand-head">
+        ${asSelected ? `<span class="rank-badge">#${c.rank}</span>` : ''}
+        <a class="ts" href="${esc(ytUrl(c.timestamp_sec))}" target="_blank">${fmt(c.timestamp_sec)}</a>
+        ${c.speaker ? `<span>${esc(c.speaker)}</span>` : ''}
+        ${c.category ? `<span class="cat-badge">${esc(c.category)}</span>` : ''}
+        ${c.novelty_score != null ? `<span class="nov-badge">novelty ${esc(c.novelty_score)}/10</span>` : ''}
+      </div>
+      <div class="claim-text">${esc(c.claim)}</div>
+      ${c.why_matters ? `<div class="why-text">${esc(c.why_matters)}</div>` : ''}
+      ${c.supporting_quote ? `<div class="quote-text">${esc(c.supporting_quote)}</div>` : ''}
+    </div>`;
+  const selBlock = selected.length
+    ? selected.map(c => renderCand(c, true)).join('')
+    : '<div class="empty">No items selected by the ranker.</div>';
+  const dropBlock = dropped.length
+    ? dropped.map(c => renderCand(c, false)).join('')
+    : '<div class="empty">No dropped candidates (all extracted items made the cut).</div>';
+  return `
+    <div class="ep-detail">
+      <h3>✓ Selected by ranker (${selected.length})</h3>
+      ${selBlock}
+      <h3>○ Dropped — extracted but didn't make the brief (${dropped.length})</h3>
+      ${dropBlock}
+    </div>`;
 }
 
 function renderTable(cat, list) {
@@ -261,6 +424,39 @@ document.addEventListener('click', async (ev) => {
   // Manual dismiss button on error messages.
   if (t.matches('[data-clear-err]')) {
     setErr(t.dataset.clearErr, '');
+    return;
+  }
+
+  // Profile editor — save
+  if (t.id === 'profile-save') {
+    const el = document.getElementById('profile-content');
+    const status = document.getElementById('profile-status');
+    setErr('profile-err', '');
+    status.textContent = '';
+    t.disabled = true;
+    try {
+      const r = await api('PUT', '/api/profile', { content: el.value });
+      el.dataset.original = el.value;
+      status.textContent = `✓ Saved (${r.bytes} bytes). Effective on next rank pass.`;
+      setTimeout(() => { status.textContent = ''; }, 5000);
+    } catch (e) {
+      setErr('profile-err', e.message);
+    } finally { t.disabled = false; }
+    return;
+  }
+
+  // Profile editor — revert
+  if (t.id === 'profile-revert') {
+    setErr('profile-err', '');
+    try { await loadProfile(); }
+    catch (e) { setErr('profile-err', e.message); }
+    return;
+  }
+
+  // Episode row click → expand/collapse detail panel
+  const row = t.closest('.ep-row');
+  if (row) {
+    toggleEpisodeDetail(row.dataset.ep);
     return;
   }
 

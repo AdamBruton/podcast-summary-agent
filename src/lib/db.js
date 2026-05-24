@@ -283,6 +283,63 @@ export function markDiscoveryPromoted(video_id) {
   db().prepare(`UPDATE discoveries SET promoted = 1 WHERE video_id = ?`).run(video_id);
 }
 
+// --- Episode inspector (for web UI) ----------------------------------------
+
+// Recent episodes with candidate + ranking counts, newest-first.
+// Excludes episodes still in 'new' state (nothing to inspect yet) and those
+// 'skipped' (no transcript). Limit defaults to 25 to keep payloads small.
+export function listEpisodesWithCounts({ limit = 25 } = {}) {
+  return db().prepare(`
+    SELECT
+      e.video_id,
+      e.title,
+      e.channel_name,
+      e.published_at,
+      e.status,
+      e.source,
+      e.discovered_for,
+      e.url,
+      e.duration_sec,
+      (SELECT COUNT(*) FROM candidates c WHERE c.video_id = e.video_id) AS candidate_count,
+      (SELECT COUNT(*) FROM rankings   r WHERE r.video_id = e.video_id) AS ranking_count
+    FROM episodes e
+    WHERE e.status IN ('extracted', 'ranked', 'delivered')
+    ORDER BY e.published_at DESC, e.ingested_at DESC
+    LIMIT ?
+  `).all(limit);
+}
+
+// All candidates for one episode, with selected/rank/why_matters joined from
+// rankings via LEFT JOIN. Dropped candidates have rank=null, why_matters=null.
+// Selected items are returned in rank order (1, 2, 3, ...); dropped items are
+// ordered by novelty_score desc as a secondary signal.
+export function getEpisodeDetail(video_id) {
+  const ep = db().prepare(`SELECT * FROM episodes WHERE video_id = ?`).get(video_id);
+  if (!ep) return null;
+  const candidates = db().prepare(`
+    SELECT
+      c.id,
+      c.timestamp_sec,
+      c.speaker,
+      c.claim,
+      c.category,
+      c.novelty_score,
+      c.supporting_quote,
+      r.rank,
+      r.why_matters,
+      CASE WHEN r.rank IS NULL THEN 0 ELSE 1 END AS selected
+    FROM candidates c
+    LEFT JOIN rankings r ON r.candidate_id = c.id AND r.video_id = c.video_id
+    WHERE c.video_id = ?
+    ORDER BY
+      CASE WHEN r.rank IS NULL THEN 1 ELSE 0 END,   -- selected first
+      COALESCE(r.rank, 0),                          -- then by rank asc
+      c.novelty_score DESC,                         -- then dropped by novelty desc
+      c.timestamp_sec ASC
+  `).all(video_id);
+  return { episode: ep, candidates };
+}
+
 export function listRecentDiscoveries({ days = 7, decision = null } = {}) {
   const params = [`-${days} days`];
   let sql = `SELECT * FROM discoveries WHERE discovered_at >= datetime('now', ?)`;
