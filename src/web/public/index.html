@@ -118,6 +118,37 @@
   .cand .why-text { color: #555; font-size: 12px; font-style: italic; margin: 4px 0; }
   .cand .quote-text { color: #444; font-size: 12px; border-left: 2px solid var(--line-strong);
                       padding: 2px 0 2px 8px; margin: 4px 0 0; }
+  .cand .thumbs { display: inline-flex; gap: 4px; margin-left: auto; }
+  .thumb {
+    background: #fff; border: 1px solid var(--line-strong);
+    padding: 2px 8px; border-radius: 4px; cursor: pointer;
+    font-size: 13px; line-height: 1.2;
+  }
+  .thumb:hover { background: var(--bg-soft); }
+  .thumb.active.up   { background: #d6f5d6; border-color: #4caf50; }
+  .thumb.active.down { background: #fadcdc; border-color: #c0392b; }
+
+  /* Profile refinement panel */
+  details.profile-raw { margin-top: 16px; }
+  details.profile-raw summary {
+    cursor: pointer; font-size: 12px; color: var(--muted);
+    padding: 4px 0; user-select: none;
+  }
+  details.profile-raw[open] summary { margin-bottom: 8px; }
+  #refine-panel {
+    margin-top: 12px; padding: 16px; background: var(--bg-soft);
+    border-radius: 6px; border: 1px solid var(--line);
+  }
+  #refine-panel h3 { font-size: 13px; margin: 0 0 8px;
+                     text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  #refine-summary {
+    font-size: 13px; color: var(--fg); margin-bottom: 10px;
+    padding: 8px 12px; background: #fff; border-left: 3px solid var(--accent);
+    border-radius: 0 4px 4px 0;
+  }
+  .feedback-counts {
+    font-size: 12px; color: var(--muted); margin-top: 4px;
+  }
 
   .err {
     color: var(--danger); font-size: 12px; margin-top: 8px; min-height: 16px;
@@ -185,19 +216,42 @@
   </section>
 
   <section>
-    <h2>Interest profile</h2>
+    <h2>Tune the interest profile</h2>
     <p class="lede" style="margin: 4px 0 8px;">
-      The bias function the ranker uses. Edit and save — changes take effect
-      on the next rank pass (next daily run, next ad-hoc URL summary, or
-      <code>npm run rerank</code> to re-rank existing episodes).
+      Give thumbs ratings on candidates in the Episode rankings section below.
+      Then click <strong>Suggest refinements</strong> — Claude reads your feedback,
+      identifies false positives (selected but shouldn't have been) and false
+      negatives (dropped but should have been included), and proposes profile
+      edits. You review the suggestion and apply or discard.
     </p>
-    <textarea class="profile" id="profile-content" spellcheck="false"></textarea>
     <div class="row-actions">
-      <button class="primary" id="profile-save">Save profile</button>
-      <button id="profile-revert">Revert from disk</button>
-      <span class="ok-msg" id="profile-status"></span>
+      <button class="primary" id="refine-run">Suggest refinements from feedback</button>
+      <span class="feedback-counts" id="feedback-counts"></span>
     </div>
-    <div class="err" id="profile-err"></div>
+    <div class="err" id="refine-err"></div>
+
+    <div id="refine-panel" hidden>
+      <h3>Suggested revision</h3>
+      <div id="refine-summary"></div>
+      <textarea class="profile" id="refine-revised" spellcheck="false"
+                style="min-height: 240px;"></textarea>
+      <div class="row-actions">
+        <button class="primary" id="refine-apply">Apply this revision</button>
+        <button id="refine-discard">Discard</button>
+        <span class="ok-msg" id="refine-status"></span>
+      </div>
+    </div>
+
+    <details class="profile-raw">
+      <summary>Advanced: edit raw profile.md</summary>
+      <textarea class="profile" id="profile-content" spellcheck="false"></textarea>
+      <div class="row-actions">
+        <button class="primary" id="profile-save">Save raw profile</button>
+        <button id="profile-revert">Revert from disk</button>
+        <span class="ok-msg" id="profile-status"></span>
+      </div>
+      <div class="err" id="profile-err"></div>
+    </details>
   </section>
 
   <section>
@@ -331,13 +385,21 @@ function renderEpisodeDetail({ episode, candidates }) {
     return h > 0 ? `${h}:${String(m).padStart(2,'0')}:${String(r).padStart(2,'0')}` : `${m}:${String(r).padStart(2,'0')}`;
   };
   const renderCand = (c, asSelected) => `
-    <div class="cand${asSelected ? ' selected' : ''}">
+    <div class="cand${asSelected ? ' selected' : ''}" data-cand-id="${c.id}">
       <div class="cand-head">
         ${asSelected ? `<span class="rank-badge">#${c.rank}</span>` : ''}
         <a class="ts" href="${esc(ytUrl(c.timestamp_sec))}" target="_blank">${fmt(c.timestamp_sec)}</a>
         ${c.speaker ? `<span>${esc(c.speaker)}</span>` : ''}
         ${c.category ? `<span class="cat-badge">${esc(c.category)}</span>` : ''}
         ${c.novelty_score != null ? `<span class="nov-badge">novelty ${esc(c.novelty_score)}/10</span>` : ''}
+        <span class="thumbs">
+          <button class="thumb up${c.feedback === 'up' ? ' active' : ''}"
+                  data-feedback="up" data-candidate="${c.id}"
+                  title="${asSelected ? 'Correctly included' : 'Should have been included'}">👍</button>
+          <button class="thumb down${c.feedback === 'down' ? ' active' : ''}"
+                  data-feedback="down" data-candidate="${c.id}"
+                  title="${asSelected ? 'Shouldn&#39;t have been included' : 'Correctly dropped'}">👎</button>
+        </span>
       </div>
       <div class="claim-text">${esc(c.claim)}</div>
       ${c.why_matters ? `<div class="why-text">${esc(c.why_matters)}</div>` : ''}
@@ -450,6 +512,74 @@ document.addEventListener('click', async (ev) => {
     setErr('profile-err', '');
     try { await loadProfile(); }
     catch (e) { setErr('profile-err', e.message); }
+    return;
+  }
+
+  // Thumbs on a candidate (inside expanded episode detail).
+  if (t.matches('.thumb')) {
+    ev.stopPropagation();   // don't bubble to .ep-row collapse handler
+    const candId = Number(t.dataset.candidate);
+    const requested = t.dataset.feedback;   // 'up' or 'down'
+    // Toggle off if clicking the already-active button.
+    const newRating = t.classList.contains('active') ? null : requested;
+    try {
+      await api('POST', '/api/feedback', { candidate_id: candId, rating: newRating });
+      // Mutate this candidate's button states in place — cheap, no refetch.
+      const card = t.closest('.cand');
+      card.querySelectorAll('.thumb').forEach(b => b.classList.remove('active'));
+      if (newRating) {
+        card.querySelector(`.thumb.${newRating}`).classList.add('active');
+      }
+    } catch (e) {
+      alert(`Feedback failed: ${e.message}`);
+    }
+    return;
+  }
+
+  // Refine profile from feedback (LLM call)
+  if (t.id === 'refine-run') {
+    setErr('refine-err', '');
+    t.disabled = true;
+    const orig = t.textContent;
+    t.textContent = 'Thinking…';
+    try {
+      const r = await api('POST', '/api/profile/suggest');
+      document.getElementById('refine-summary').textContent = r.summary;
+      document.getElementById('refine-revised').value = r.revised_profile;
+      document.getElementById('refine-panel').hidden = false;
+      document.getElementById('refine-status').textContent = '';
+      document.getElementById('refine-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } catch (e) {
+      setErr('refine-err', e.message);
+    } finally {
+      t.disabled = false; t.textContent = orig;
+    }
+    return;
+  }
+
+  if (t.id === 'refine-apply') {
+    const content = document.getElementById('refine-revised').value;
+    t.disabled = true;
+    try {
+      const r = await api('PUT', '/api/profile', { content });
+      document.getElementById('refine-status').textContent =
+        `✓ Applied (${r.bytes} bytes). Effective on next rank pass.`;
+      // Sync the raw textarea too.
+      const raw = document.getElementById('profile-content');
+      raw.value = content;
+      raw.dataset.original = content;
+      setTimeout(() => {
+        document.getElementById('refine-panel').hidden = true;
+        document.getElementById('refine-status').textContent = '';
+      }, 3000);
+    } catch (e) {
+      setErr('refine-err', e.message);
+    } finally { t.disabled = false; }
+    return;
+  }
+
+  if (t.id === 'refine-discard') {
+    document.getElementById('refine-panel').hidden = true;
     return;
   }
 

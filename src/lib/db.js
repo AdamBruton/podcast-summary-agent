@@ -99,6 +99,13 @@ function migrate(d) {
       ok                   INTEGER DEFAULT 0
     );
 
+    CREATE TABLE IF NOT EXISTS feedback (
+      candidate_id    INTEGER PRIMARY KEY REFERENCES candidates(id) ON DELETE CASCADE,
+      rating          TEXT NOT NULL CHECK (rating IN ('up', 'down')),
+      created_at      TEXT DEFAULT (datetime('now')),
+      updated_at      TEXT DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS cost_ledger (
       id              INTEGER PRIMARY KEY AUTOINCREMENT,
       run_id          INTEGER REFERENCES runs(id),
@@ -310,9 +317,10 @@ export function listEpisodesWithCounts({ limit = 25 } = {}) {
 }
 
 // All candidates for one episode, with selected/rank/why_matters joined from
-// rankings via LEFT JOIN. Dropped candidates have rank=null, why_matters=null.
-// Selected items are returned in rank order (1, 2, 3, ...); dropped items are
-// ordered by novelty_score desc as a secondary signal.
+// rankings via LEFT JOIN, plus the user's current feedback rating (up/down/null).
+// Dropped candidates have rank=null, why_matters=null. Selected items are
+// returned in rank order (1, 2, 3, ...); dropped items are ordered by
+// novelty_score desc as a secondary signal.
 export function getEpisodeDetail(video_id) {
   const ep = db().prepare(`SELECT * FROM episodes WHERE video_id = ?`).get(video_id);
   if (!ep) return null;
@@ -327,9 +335,11 @@ export function getEpisodeDetail(video_id) {
       c.supporting_quote,
       r.rank,
       r.why_matters,
+      f.rating AS feedback,
       CASE WHEN r.rank IS NULL THEN 0 ELSE 1 END AS selected
     FROM candidates c
     LEFT JOIN rankings r ON r.candidate_id = c.id AND r.video_id = c.video_id
+    LEFT JOIN feedback f ON f.candidate_id = c.id
     WHERE c.video_id = ?
     ORDER BY
       CASE WHEN r.rank IS NULL THEN 1 ELSE 0 END,   -- selected first
@@ -338,6 +348,59 @@ export function getEpisodeDetail(video_id) {
       c.timestamp_sec ASC
   `).all(video_id);
   return { episode: ep, candidates };
+}
+
+// --- Feedback ---------------------------------------------------------------
+
+// Set, change, or clear a candidate's rating. rating=null deletes the row.
+export function setFeedback(candidate_id, rating) {
+  if (rating == null) {
+    db().prepare(`DELETE FROM feedback WHERE candidate_id = ?`).run(candidate_id);
+    return { candidate_id, rating: null };
+  }
+  if (rating !== 'up' && rating !== 'down') throw new Error(`bad rating: ${rating}`);
+  db().prepare(`
+    INSERT INTO feedback (candidate_id, rating)
+    VALUES (?, ?)
+    ON CONFLICT(candidate_id) DO UPDATE SET
+      rating     = excluded.rating,
+      updated_at = datetime('now')
+  `).run(candidate_id, rating);
+  return { candidate_id, rating };
+}
+
+// All feedback with the context an LLM needs to suggest profile refinements:
+// the candidate's claim/quote/category/novelty + whether it was selected by
+// the ranker + the ranker's why_matters (if selected) + episode/channel.
+//
+// Returns rows with the 4-quadrant outcome computed:
+//   ✓ correct:           (selected=1 + rating=up)  OR  (selected=0 + rating=down)
+//   ✗ false_positive:    selected=1 + rating=down  (shouldn't have been included)
+//   ✗ false_negative:    selected=0 + rating=up    (should have been included)
+export function getAllFeedbackWithContext() {
+  return db().prepare(`
+    SELECT
+      f.candidate_id,
+      f.rating,
+      f.updated_at,
+      c.video_id,
+      c.timestamp_sec,
+      c.speaker,
+      c.claim,
+      c.category,
+      c.novelty_score,
+      c.supporting_quote,
+      r.rank,
+      r.why_matters,
+      CASE WHEN r.rank IS NULL THEN 0 ELSE 1 END AS selected,
+      e.title         AS episode_title,
+      e.channel_name
+    FROM feedback f
+    JOIN candidates c ON c.id = f.candidate_id
+    LEFT JOIN rankings r ON r.candidate_id = c.id AND r.video_id = c.video_id
+    JOIN episodes e ON e.video_id = c.video_id
+    ORDER BY f.updated_at DESC
+  `).all();
 }
 
 export function listRecentDiscoveries({ days = 7, decision = null } = {}) {

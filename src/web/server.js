@@ -15,9 +15,14 @@ import {
   addIndividual, removeIndividual,
 } from '../lib/sources-store.js';
 import { readProfile, writeProfile } from '../lib/profile-store.js';
-import { listEpisodesWithCounts, getEpisodeDetail } from '../lib/db.js';
+import {
+  listEpisodesWithCounts, getEpisodeDetail,
+  setFeedback, getAllFeedbackWithContext,
+} from '../lib/db.js';
 import { resolveHandle, videoIdFromUrl } from '../lib/youtube.js';
 import { runEpisode } from '../pipeline.js';
+import { complete, parseJsonResponse, MODELS } from '../lib/claude.js';
+import { loadPrompt } from '../lib/config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.WEB_PORT) || 3000;
@@ -96,6 +101,85 @@ app.get('/api/episodes/:video_id', wrap(req => {
   const detail = getEpisodeDetail(req.params.video_id);
   if (!detail) throw new Error('not found');
   return detail;
+}));
+
+// --- Feedback (per-candidate thumbs) ---------------------------------------
+
+app.post('/api/feedback', wrap(req => {
+  const { candidate_id } = req.body || {};
+  const rating = req.body?.rating ?? null;   // 'up' | 'down' | null
+  if (typeof candidate_id !== 'number') throw new Error('candidate_id (number) is required');
+  return setFeedback(candidate_id, rating);
+}));
+
+// --- LLM profile refinement -------------------------------------------------
+// Aggregates all feedback + current profile, asks Claude to suggest a revised
+// profile. Returns { summary, revised_profile }. User reviews + applies (or
+// edits) via the regular PUT /api/profile.
+
+app.post('/api/profile/suggest', wrap(async () => {
+  const feedback = getAllFeedbackWithContext();
+  if (feedback.length === 0) {
+    return {
+      summary: 'No feedback to learn from yet — go give some thumbs ratings on the episode inspector and try again.',
+      revised_profile: readProfile(),
+    };
+  }
+
+  const profile = readProfile();
+  const system = `${loadPrompt('profile-refine')}\n\n---\n\n# Current profile.md (to revise)\n\n${profile}`;
+
+  // Sort feedback so false positives/negatives come first — they're the
+  // training signal that drives changes.
+  const labeled = feedback.map(f => ({
+    ...f,
+    outcome:
+      f.selected === 1 && f.rating === 'up'   ? 'correct (selected, kept)' :
+      f.selected === 1 && f.rating === 'down' ? "FALSE POSITIVE (selected, shouldn't have been)" :
+      f.selected === 0 && f.rating === 'up'   ? 'FALSE NEGATIVE (dropped, should have been included)' :
+                                                'correct (dropped, kept dropped)',
+  })).sort((a, b) => {
+    const errA = a.outcome.startsWith('FALSE') ? 0 : 1;
+    const errB = b.outcome.startsWith('FALSE') ? 0 : 1;
+    return errA - errB;
+  });
+
+  const compact = labeled.map(f => ({
+    outcome:          f.outcome,
+    episode:          `${f.channel_name}: ${f.episode_title}`,
+    speaker:          f.speaker,
+    category:         f.category,
+    novelty_score:    f.novelty_score,
+    claim:            f.claim,
+    why_matters_when_selected: f.why_matters || null,
+    quote:            f.supporting_quote,
+  }));
+
+  const userMsg = [
+    `You have ${feedback.length} labeled outcomes. False positives and false negatives appear first; they're your training signal.`,
+    '',
+    '```json',
+    JSON.stringify(compact, null, 2),
+    '```',
+    '',
+    'Propose a revised profile.md and explain the change. Return the JSON object specified in the system prompt.',
+  ].join('\n');
+
+  const { text } = await complete({
+    model: MODELS.SONNET,
+    system,
+    messages: [{ role: 'user', content: userMsg }],
+    max_tokens: 8192,
+    telemetry: { stage: 'profile-refine' },
+  });
+
+  let parsed;
+  try { parsed = parseJsonResponse(text); }
+  catch (err) { throw new Error(`could not parse model response: ${err.message}`); }
+  if (!parsed?.summary || !parsed?.revised_profile) {
+    throw new Error('model returned malformed suggestion (missing summary or revised_profile)');
+  }
+  return parsed;
 }));
 
 // Ad-hoc: process a single YouTube URL right now, email the brief immediately,
