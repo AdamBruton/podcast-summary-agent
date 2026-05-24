@@ -5,12 +5,27 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { TRANSCRIPT_DIR } from './config.js';
+import { TRANSCRIPT_DIR, DATA_DIR } from './config.js';
 import { log } from './log.js';
 
+// YouTube increasingly blocks unauthenticated requests from datacenter IPs
+// (Railway, AWS, etc.) with "Sign in to confirm you're not a bot". The fix
+// is to pass a Netscape-format cookies.txt exported from a logged-in browser.
+// We look for it at <DATA_DIR>/cookies.txt — locally that's ./data/cookies.txt
+// (gitignored), on Railway it's /data/cookies.txt (volume-mounted).
+// When the file isn't present, we run without cookies (fine for residential
+// IPs like a home machine).
+const COOKIES_PATH = path.join(DATA_DIR, 'cookies.txt');
+function cookieArgs() {
+  return fs.existsSync(COOKIES_PATH) ? ['--cookies', COOKIES_PATH] : [];
+}
+
 function run(args, { timeout = 120_000 } = {}) {
+  // Prepend --cookies <file> if cookies.txt is present. Checked per-call so a
+  // freshly-uploaded cookies file is picked up without a restart.
+  const finalArgs = [...cookieArgs(), ...args];
   return new Promise((resolve, reject) => {
-    const proc = spawn('yt-dlp', args, { windowsHide: true });
+    const proc = spawn('yt-dlp', finalArgs, { windowsHide: true });
     let stdout = '', stderr = '';
     proc.stdout.on('data', d => { stdout += d; });
     proc.stderr.on('data', d => { stderr += d; });

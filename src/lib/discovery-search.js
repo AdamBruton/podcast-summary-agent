@@ -5,8 +5,19 @@
 // curation pass, to keep that pass cheap and high-signal.
 
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 import { hasEpisode, hasDiscovery } from './db.js';
+import { DATA_DIR } from './config.js';
 import { log } from './log.js';
+
+// Same cookies handling as youtube.js — see comment there. Duplicated
+// rather than importing because runYtDlp() here has different timeout
+// defaults and we'd rather not factor out a shared utility for two callers.
+const COOKIES_PATH = path.join(DATA_DIR, 'cookies.txt');
+function cookieArgs() {
+  return fs.existsSync(COOKIES_PATH) ? ['--cookies', COOKIES_PATH] : [];
+}
 
 // Title patterns that almost always indicate non-substantive content.
 // Case-insensitive, word-boundaried.
@@ -23,8 +34,9 @@ const NOISE_TITLE_PATTERNS = [
 ];
 
 function runYtDlp(args, { timeout = 60_000 } = {}) {
+  const finalArgs = [...cookieArgs(), ...args];
   return new Promise((resolve, reject) => {
-    const proc = spawn('yt-dlp', args, { windowsHide: true });
+    const proc = spawn('yt-dlp', finalArgs, { windowsHide: true });
     let stdout = '', stderr = '';
     proc.stdout.on('data', d => { stdout += d; });
     proc.stderr.on('data', d => { stderr += d; });
