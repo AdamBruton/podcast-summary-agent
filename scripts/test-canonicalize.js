@@ -20,6 +20,12 @@ const cases = [
   'they have TPUs and tpus and Tpus',
   'Anthropic uses CUDA and NVIDIA',                // already correct, should not change
   'cloudy weather in the cloud',                   // false positive check
+  // FDE caption-truncation cases
+  'we hired an FD engineer last week',             // → "FDE"
+  'a few FD engineers showed up',                  // → "FDEs"
+  'their FD engineering team is small',            // → "FDE team"
+  'on a fully diluted basis, FD shares',           // bare FD untouched (ambiguous)
+  'we have many FDEs at the company',              // already correct
 ];
 
 for (const s of cases) {

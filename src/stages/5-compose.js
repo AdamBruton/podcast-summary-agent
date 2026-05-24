@@ -41,6 +41,14 @@ const CANONICAL_TERMS = [
   [/\btpu(s)?\b/g,      'TPU$1'],
   [/\bgpu(s)?\b/g,      'GPU$1'],
   [/\bcve(s)?\b/g,      'CVE$1'],
+  // FDE = Forward Deployed Engineer (Palantir term, now standard at OpenAI
+  // and Anthropic). Captions sometimes drop the trailing "E" sound, leaving
+  // "FD engineer(s)". Only replace when followed by an engineering-context
+  // word — bare "FD" is too ambiguous (also means "fully diluted" in finance
+  // and "field day" elsewhere).
+  [/\bFD\s+engineers\b/g,   'FDEs'],
+  [/\bFD\s+engineer\b/g,    'FDE'],
+  [/\bFD\s+engineering\b/g, 'FDE'],
 ];
 
 function canonicalize(s) {
