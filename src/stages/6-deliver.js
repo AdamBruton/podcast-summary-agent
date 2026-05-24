@@ -10,14 +10,14 @@ import { BRIEF_DIR, requireEnv } from '../lib/config.js';
 import { markDelivered } from '../lib/db.js';
 import { log } from '../lib/log.js';
 
-export async function deliver(html, { dryRun, episodes, date = new Date() }) {
+// `markDeliveredOnSend` (default true): after a successful send, mark the
+// episodes as 'delivered' so they don't reappear in future daily runs. Set
+// to false for ad-hoc URL sends from the web UI, where the user wants the
+// episode to ALSO be included in tomorrow's daily roundup.
+export async function deliver(html, { dryRun, episodes, date = new Date(), markDeliveredOnSend = true }) {
   const dateStr = date.toISOString().slice(0, 10);
 
   if (dryRun) {
-    // Single-episode runs (i.e. --episode <url>) get a video-id-suffixed
-    // filename so back-to-back test runs don't overwrite each other.
-    // Multi-episode daily runs use just the date, since the brief is the
-    // aggregate for the day.
     const suffix = episodes.length === 1 ? `-${episodes[0].video_id}` : '';
     const file = path.join(BRIEF_DIR, `${dateStr}${suffix}.html`);
     fs.writeFileSync(file, html, 'utf8');
@@ -28,13 +28,22 @@ export async function deliver(html, { dryRun, episodes, date = new Date() }) {
   const { SENDGRID_API_KEY, SENDGRID_FROM, SENDGRID_TO } =
     requireEnv('SENDGRID_API_KEY', 'SENDGRID_FROM', 'SENDGRID_TO');
   sgMail.setApiKey(SENDGRID_API_KEY);
+
+  // Smarter subject when there's exactly one episode — the title shows up
+  // in the inbox preview instead of a generic date.
+  const subject = episodes.length === 1 && episodes[0].title
+    ? `Podcast Intel: ${episodes[0].title}`
+    : `Podcast Intel — ${dateStr}`;
+
   await sgMail.send({
     to: SENDGRID_TO,
     from: SENDGRID_FROM,
-    subject: `Podcast Intel — ${dateStr}`,
+    subject,
     html,
   });
-  for (const ep of episodes) markDelivered(ep.video_id);
-  log.ok('email delivered', { to: SENDGRID_TO });
+  if (markDeliveredOnSend) {
+    for (const ep of episodes) markDelivered(ep.video_id);
+  }
+  log.ok('email delivered', { to: SENDGRID_TO, markedDelivered: markDeliveredOnSend });
   return { delivered: true };
 }

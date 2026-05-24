@@ -60,7 +60,10 @@ async function processEpisode(episode, run_id) {
   return true;
 }
 
-export async function runEpisode({ url, dryRun }) {
+// markDeliveredOnSend (default true): controls whether the episode is marked
+// 'delivered' after sending. The web UI's ad-hoc URL flow passes false so the
+// episode also rolls up into the next daily run alongside other content.
+export async function runEpisode({ url, dryRun, markDeliveredOnSend = true }) {
   const mode = dryRun ? 'dry-run-episode' : 'episode';
   const run_id = startRun(mode);
   let processed = 0, ok = false, briefResult = null;
@@ -72,7 +75,7 @@ export async function runEpisode({ url, dryRun }) {
 
     const html = await stage('compose', () => composeBrief(episodes));
     briefResult = await stage('deliver', () =>
-      deliver(html, { dryRun, episodes, date: new Date() })
+      deliver(html, { dryRun, episodes, date: new Date(), markDeliveredOnSend })
     );
     ok = true;
   } finally {

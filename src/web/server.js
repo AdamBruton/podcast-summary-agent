@@ -14,7 +14,8 @@ import {
   listAll, addChannel, removeChannel, patchChannel,
   addIndividual, removeIndividual,
 } from '../lib/sources-store.js';
-import { resolveHandle } from '../lib/youtube.js';
+import { resolveHandle, videoIdFromUrl } from '../lib/youtube.js';
+import { runEpisode } from '../pipeline.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.WEB_PORT) || 3000;
@@ -71,6 +72,32 @@ app.post('/api/resolve', wrap(async req => {
     throw new Error(`resolution returned unexpected value: ${channel_id || '(empty)'}`);
   }
   return { handle, channel_id };
+}));
+
+// Ad-hoc: process a single YouTube URL right now, email the brief immediately,
+// and leave the episode in 'ranked' status so it ALSO rolls up into tomorrow's
+// daily brief. Blocks for the full pipeline duration (typically 1-3 min).
+// Pass { dryRun: true } in the body to write HTML to disk instead of sending
+// (useful for local testing without spending tokens on the email path).
+app.post('/api/summarize-url', wrap(async req => {
+  const url = req.body?.url?.trim();
+  if (!url) throw new Error('url is required');
+  const vid = videoIdFromUrl(url);
+  if (!vid) throw new Error('not a recognizable YouTube URL');
+  const dryRun = req.body.dryRun === true;
+
+  // No socket idle timeout — Express defaults to none, but Node's HTTP layer
+  // may close after 2 min. Disable for this long-running request.
+  req.setTimeout(0);
+
+  const result = await runEpisode({ url, dryRun, markDeliveredOnSend: false });
+  return {
+    ok:        true,
+    video_id:  vid,
+    sent:      !!result?.delivered,
+    path:      result?.path || null,
+    rolled_up: true,    // episode will appear in tomorrow's daily run
+  };
 }));
 
 // --- start ------------------------------------------------------------------
