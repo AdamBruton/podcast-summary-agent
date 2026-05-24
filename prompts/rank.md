@@ -19,7 +19,9 @@ Sometimes two or three candidates separated by only seconds or minutes — or sc
 
 When you see this kind of synergy, emit a **bundle** instead of multiple separate items. A bundle is one ranked entry whose `candidate_ids` list contains all the candidates that compose the story (2–4 items typical), with a `label` that headlines the synthesis and a `why_matters` that explains why the combination is more interesting than the sum.
 
-Be conservative — most episodes warrant **0 or 1 bundles**; rarely 2. Don't bundle unrelated items just because they share a theme. The test: would the reader, seeing only one of these candidates without the others, miss the headline?
+**Let the text decide how many bundles to emit.** If an episode genuinely contains four thematic clusters that each meet the synthesis test, emit four bundles. If none of the candidates combine into a story richer than their parts, emit zero. There is no target count and no ceiling — the signal lives in the transcript, not in a predetermined budget. What you must not do: bundle items that share only a surface-level theme (both about chips, both about money, both said by the same speaker) without producing a genuinely emergent insight; or split a real synthesis story across multiple singletons just to avoid bundling.
+
+The test for any candidate proposed bundle: **would the reader, seeing only one of these candidates without the others, miss the headline?** If yes, bundle. If no, don't.
 
 ## Output format
 
