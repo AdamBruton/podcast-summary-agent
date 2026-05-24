@@ -26,12 +26,28 @@ import { loadPrompt } from '../lib/config.js';
 import { diffLines } from 'diff';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = Number(process.env.WEB_PORT) || 3000;
-const HOST = '127.0.0.1';
+// Railway sets PORT automatically. Local dev uses WEB_PORT (default 3000).
+const PORT = Number(process.env.PORT) || Number(process.env.WEB_PORT) || 3000;
+// Bind 0.0.0.0 when running in a container (Railway sets PORT); 127.0.0.1
+// for local dev so the UI doesn't accidentally expose itself on the LAN.
+const HOST = process.env.PORT ? '0.0.0.0' : '127.0.0.1';
 
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Health check for Railway. Lightweight: just confirm the DB opens.
+app.get('/healthz', (req, res) => {
+  try {
+    // Importing db here to avoid circular issues on cold start; cached after first call.
+    import('../lib/db.js').then(({ db }) => {
+      db().prepare('SELECT 1').get();
+      res.status(200).json({ ok: true, ts: new Date().toISOString() });
+    }).catch(err => res.status(500).json({ ok: false, err: err.message }));
+  } catch (err) {
+    res.status(500).json({ ok: false, err: err.message });
+  }
+});
 
 // --- helpers ----------------------------------------------------------------
 
@@ -222,7 +238,9 @@ const server = app.listen(PORT, HOST, () => {
   const url = `http://${HOST}:${PORT}`;
   console.log(`Podcast sources UI running at ${url}`);
   console.log('Edits write directly to config/sources.yaml. Ctrl+C to stop.');
-  openBrowser(url);
+  // Only auto-open the browser when running locally on Windows/macOS/Linux
+  // desktop. In a container (Railway, Docker) there's no browser to open.
+  if (HOST === '127.0.0.1') openBrowser(url);
 });
 
 server.on('error', err => {

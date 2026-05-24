@@ -1,0 +1,15 @@
+# Don't ship local state, secrets, or build artifacts to the Docker image.
+node_modules
+data
+.env
+.env.*
+!.env.example
+*.log
+.git
+.github
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+# Keep package-lock.json (npm ci needs it), but skip backup variants.
+package-lock.json.bak
