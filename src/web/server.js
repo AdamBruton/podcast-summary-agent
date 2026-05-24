@@ -23,6 +23,7 @@ import { resolveHandle, videoIdFromUrl } from '../lib/youtube.js';
 import { runEpisode } from '../pipeline.js';
 import { complete, parseJsonResponse, MODELS } from '../lib/claude.js';
 import { loadPrompt } from '../lib/config.js';
+import { diffLines } from 'diff';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.WEB_PORT) || 3000;
@@ -120,9 +121,11 @@ app.post('/api/feedback', wrap(req => {
 app.post('/api/profile/suggest', wrap(async () => {
   const feedback = getAllFeedbackWithContext();
   if (feedback.length === 0) {
+    const current = readProfile();
     return {
       summary: 'No feedback to learn from yet — go give some thumbs ratings on the episode inspector and try again.',
-      revised_profile: readProfile(),
+      revised_profile: current,
+      diff: [],
     };
   }
 
@@ -179,7 +182,12 @@ app.post('/api/profile/suggest', wrap(async () => {
   if (!parsed?.summary || !parsed?.revised_profile) {
     throw new Error('model returned malformed suggestion (missing summary or revised_profile)');
   }
-  return parsed;
+
+  // Compute line-level diff so the UI can render a track-changes view.
+  // diffLines returns [{ value, added?, removed?, count }, …] — each chunk
+  // is one or more contiguous lines that are unchanged, added, or removed.
+  const diff = diffLines(profile, parsed.revised_profile);
+  return { ...parsed, diff };
 }));
 
 // Ad-hoc: process a single YouTube URL right now, email the brief immediately,

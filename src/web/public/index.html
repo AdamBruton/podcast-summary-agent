@@ -150,6 +150,30 @@
     font-size: 12px; color: var(--muted); margin-top: 4px;
   }
 
+  /* Diff viewer for proposed profile revisions */
+  pre.diff {
+    background: #fff; border: 1px solid var(--line); border-radius: 4px;
+    padding: 12px; margin: 0; max-height: 480px; overflow: auto;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 12px; line-height: 1.5;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  pre.diff .line { display: block; padding: 0 4px; }
+  pre.diff .add { background: #e6ffed; color: #064; }
+  pre.diff .add::before { content: "+ "; color: #0a7a3a; font-weight: 700; }
+  pre.diff .del { background: #ffeef0; color: #82071e; text-decoration: line-through; text-decoration-color: #d33; }
+  pre.diff .del::before { content: "− "; color: #a3001f; font-weight: 700; text-decoration: none; }
+  pre.diff .ctx { color: #888; }
+  pre.diff .ctx::before { content: "  "; }
+  .diff-empty { padding: 16px; color: var(--muted); font-style: italic;
+                background: #fff; border: 1px solid var(--line); border-radius: 4px; }
+  details.edit-revision { margin-top: 12px; }
+  details.edit-revision summary {
+    cursor: pointer; font-size: 12px; color: var(--muted);
+    padding: 4px 0; user-select: none;
+  }
+  details.edit-revision[open] summary { margin-bottom: 8px; }
+
   .err {
     color: var(--danger); font-size: 12px; margin-top: 8px; min-height: 16px;
     display: flex; align-items: center; gap: 8px;
@@ -233,8 +257,12 @@
     <div id="refine-panel" hidden>
       <h3>Suggested revision</h3>
       <div id="refine-summary"></div>
-      <textarea class="profile" id="refine-revised" spellcheck="false"
-                style="min-height: 240px;"></textarea>
+      <div id="refine-diff"></div>
+      <details class="edit-revision">
+        <summary>Edit this revision before applying</summary>
+        <textarea class="profile" id="refine-revised" spellcheck="false"
+                  style="min-height: 240px;"></textarea>
+      </details>
       <div class="row-actions">
         <button class="primary" id="refine-apply">Apply this revision</button>
         <button id="refine-discard">Discard</button>
@@ -334,6 +362,32 @@ async function loadProfile() {
   const el = document.getElementById('profile-content');
   el.value = content;
   el.dataset.original = content;   // baseline for revert
+}
+
+// Render a diff (array of {value, added?, removed?}) as colored lines.
+// Each chunk's `value` may contain multiple lines; we split so styling
+// applies per line and the +/− gutter marker is per-line, not per-chunk.
+function renderDiff(diff) {
+  if (!Array.isArray(diff) || diff.length === 0) {
+    return '<div class="diff-empty">No changes proposed — the profile would stay as-is.</div>';
+  }
+  // If every chunk is "neither added nor removed", treat as unchanged.
+  const anyChange = diff.some(c => c.added || c.removed);
+  if (!anyChange) {
+    return '<div class="diff-empty">No changes proposed — the profile would stay as-is.</div>';
+  }
+  const html = ['<pre class="diff">'];
+  for (const chunk of diff) {
+    const cls = chunk.added ? 'add' : chunk.removed ? 'del' : 'ctx';
+    // Split chunk into lines, drop trailing empty line from split if present.
+    const lines = String(chunk.value).split('\n');
+    if (lines[lines.length - 1] === '') lines.pop();
+    for (const line of lines) {
+      html.push(`<span class="line ${cls}">${esc(line) || '&nbsp;'}</span>`);
+    }
+  }
+  html.push('</pre>');
+  return html.join('');
 }
 
 let _episodesCache = null;     // for re-rendering after detail expand/collapse
@@ -545,6 +599,7 @@ document.addEventListener('click', async (ev) => {
     try {
       const r = await api('POST', '/api/profile/suggest');
       document.getElementById('refine-summary').textContent = r.summary;
+      document.getElementById('refine-diff').innerHTML = renderDiff(r.diff);
       document.getElementById('refine-revised').value = r.revised_profile;
       document.getElementById('refine-panel').hidden = false;
       document.getElementById('refine-status').textContent = '';
