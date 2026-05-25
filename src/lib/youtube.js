@@ -74,19 +74,26 @@ export function youtubeUrl(video_id, t = null) {
 }
 
 // Resolve an @handle to a canonical channel_id (UC...).
-// We grab metadata for the first video on the channel's videos tab — that's
-// the cheapest way to coax yt-dlp to populate the channel_id field reliably.
-// `--flat-playlist` is NOT used because it leaves channel_id blank.
+//
+// Strategy: --flat-playlist (cheap, no per-video metadata fetch) + --print
+// scoped to the PLAYLIST (the "playlist:" prefix). yt-dlp treats a channel's
+// /videos URL as a playlist, and channel_id is a playlist-level field that's
+// reliably populated — unlike the per-video channel_id field, which often
+// resolves to literal "NA" in flat mode.
 export async function resolveHandle(handle) {
   const url = `https://www.youtube.com/${handle}/videos`;
   const out = await run([
+    '--flat-playlist',
     '--playlist-end', '1',
-    '--skip-download',
-    '--print', '%(channel_id)s',
+    '--print', 'playlist:%(channel_id)s',
     '--no-warnings',
     url,
   ]);
-  return out.trim().split('\n').pop().trim();
+  const channelId = out.trim().split('\n').pop().trim();
+  if (!channelId.startsWith('UC')) {
+    throw new Error(`yt-dlp did not return a UC… channel_id; got: "${channelId}"`);
+  }
+  return channelId;
 }
 
 // List recent uploads from a channel by channel_id. Returns array of
