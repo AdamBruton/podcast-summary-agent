@@ -18,6 +18,7 @@ import { readProfile, writeProfile } from '../lib/profile-store.js';
 import {
   listEpisodesWithCounts, getEpisodeDetail,
   setFeedback, getAllFeedbackWithContext,
+  getEpisode, setEpisodeStatus,
 } from '../lib/db.js';
 import { resolveHandle, videoIdFromUrl } from '../lib/youtube.js';
 import { runEpisode } from '../pipeline.js';
@@ -222,14 +223,23 @@ app.post('/api/summarize-url', wrap(async req => {
   // may close after 2 min. Disable for this long-running request.
   req.setTimeout(0);
 
+  // Ad-hoc semantics: the user explicitly wants this URL processed NOW,
+  // regardless of any prior state. Reset 'skipped' or 'delivered' to 'new'
+  // so processEpisode doesn't early-out at the status check. The daily-cron
+  // path keeps its respect-skip/delivered behavior (unchanged) — this only
+  // applies to ad-hoc URL submissions.
+  const prior = getEpisode(vid);
+  if (prior && prior.status !== 'new') {
+    setEpisodeStatus(vid, 'new', null);
+  }
+
   const result = await runEpisode({ url, dryRun, markDeliveredOnSend: false });
 
-  // If deliver returned `empty`, the pipeline ran but found nothing to
-  // brief (most often: no captions + no Groq fallback). Surface the actual
-  // skip reason from the DB so the UI shows something useful instead of
-  // a misleading "Brief emailed" success.
+  // If deliver returned `empty`, the pipeline ran but found nothing to brief
+  // (most often: transcript-io returned no transcript). Surface the actual
+  // skip reason from the DB so the UI shows a real error instead of a
+  // misleading "Brief emailed" success.
   if (result?.empty) {
-    const { getEpisode } = await import('../lib/db.js');
     const ep = getEpisode(vid);
     const reason = ep?.skip_reason
       ? `episode skipped: ${ep.skip_reason}`
