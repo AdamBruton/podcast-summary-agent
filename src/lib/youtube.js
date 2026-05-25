@@ -16,14 +16,28 @@ import { log } from './log.js';
 // When the file isn't present, we run without cookies (fine for residential
 // IPs like a home machine).
 const COOKIES_PATH = path.join(DATA_DIR, 'cookies.txt');
-function cookieArgs() {
-  return fs.existsSync(COOKIES_PATH) ? ['--cookies', COOKIES_PATH] : [];
+
+// Args we want on EVERY yt-dlp invocation:
+//   --cookies <file>            (if available) auth-as-logged-in-user — required
+//                               to get past datacenter-IP bot challenges on Railway.
+//   --ignore-no-formats-error   our metadata-only operations (resolveHandle,
+//                               listChannelUploads, fetchMetadata, fetchCaptions)
+//                               don't need a downloadable format; without this flag
+//                               yt-dlp aborts when the default format selector can't
+//                               find anything (e.g. live streams, premieres, members-
+//                               only, regional restrictions on the first video of a
+//                               channel). For actual audio downloads (downloadAudio)
+//                               we pass explicit -x flags so this is harmless.
+function commonArgs() {
+  const args = ['--ignore-no-formats-error'];
+  if (fs.existsSync(COOKIES_PATH)) args.unshift('--cookies', COOKIES_PATH);
+  return args;
 }
 
 function run(args, { timeout = 120_000 } = {}) {
-  // Prepend --cookies <file> if cookies.txt is present. Checked per-call so a
-  // freshly-uploaded cookies file is picked up without a restart.
-  const finalArgs = [...cookieArgs(), ...args];
+  // Prepend common args. Checked per-call so a freshly-uploaded cookies file
+  // is picked up without a restart.
+  const finalArgs = [...commonArgs(), ...args];
   return new Promise((resolve, reject) => {
     const proc = spawn('yt-dlp', finalArgs, { windowsHide: true });
     let stdout = '', stderr = '';

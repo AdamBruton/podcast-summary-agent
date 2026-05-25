@@ -11,12 +11,14 @@ import { hasEpisode, hasDiscovery } from './db.js';
 import { DATA_DIR } from './config.js';
 import { log } from './log.js';
 
-// Same cookies handling as youtube.js — see comment there. Duplicated
-// rather than importing because runYtDlp() here has different timeout
-// defaults and we'd rather not factor out a shared utility for two callers.
+// Same common-args handling as youtube.js (cookies + ignore-no-formats-error)
+// — see comment there. Duplicated rather than imported because runYtDlp() here
+// has different timeout defaults and the helper is small.
 const COOKIES_PATH = path.join(DATA_DIR, 'cookies.txt');
-function cookieArgs() {
-  return fs.existsSync(COOKIES_PATH) ? ['--cookies', COOKIES_PATH] : [];
+function commonArgs() {
+  const args = ['--ignore-no-formats-error'];
+  if (fs.existsSync(COOKIES_PATH)) args.unshift('--cookies', COOKIES_PATH);
+  return args;
 }
 
 // Title patterns that almost always indicate non-substantive content.
@@ -34,7 +36,7 @@ const NOISE_TITLE_PATTERNS = [
 ];
 
 function runYtDlp(args, { timeout = 60_000 } = {}) {
-  const finalArgs = [...cookieArgs(), ...args];
+  const finalArgs = [...commonArgs(), ...args];
   return new Promise((resolve, reject) => {
     const proc = spawn('yt-dlp', finalArgs, { windowsHide: true });
     let stdout = '', stderr = '';
