@@ -5,7 +5,7 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { TRANSCRIPT_DIR, DATA_DIR } from './config.js';
+import { DATA_DIR } from './config.js';
 import { log } from './log.js';
 
 // YouTube increasingly blocks unauthenticated requests from datacenter IPs
@@ -21,13 +21,11 @@ const COOKIES_PATH = path.join(DATA_DIR, 'cookies.txt');
 //   --cookies <file>            (if available) auth-as-logged-in-user — required
 //                               to get past datacenter-IP bot challenges on Railway.
 //   --ignore-no-formats-error   our metadata-only operations (resolveHandle,
-//                               listChannelUploads, fetchMetadata, fetchCaptions)
-//                               don't need a downloadable format; without this flag
-//                               yt-dlp aborts when the default format selector can't
-//                               find anything (e.g. live streams, premieres, members-
-//                               only, regional restrictions on the first video of a
-//                               channel). For actual audio downloads (downloadAudio)
-//                               we pass explicit -x flags so this is harmless.
+//                               listChannelUploads, fetchMetadata) don't need a
+//                               downloadable format; without this flag yt-dlp aborts
+//                               when the default format selector can't find anything
+//                               (live streams, premieres, members-only, regional
+//                               restrictions on the first video of a channel).
 function commonArgs() {
   const args = ['--ignore-no-formats-error'];
   if (fs.existsSync(COOKIES_PATH)) args.unshift('--cookies', COOKIES_PATH);
@@ -144,113 +142,9 @@ export async function fetchMetadata(url) {
   };
 }
 
-// Fetch captions (manual OR auto-generated). Returns { cues: [{start, end, text}],
-// language } or null if none are available. yt-dlp prefers manual subs (creator-
-// uploaded, usually higher quality and complete) and falls back to auto-subs
-// (algorithmic, lower quality but ubiquitous). Both flags are needed — earlier
-// the code only had --write-auto-subs, which missed channels that uploaded
-// manual subs only (e.g. Lex Fridman, some Stripe podcast episodes).
-export async function fetchCaptions(video_id) {
-  const url = youtubeUrl(video_id);
-  const outDir = TRANSCRIPT_DIR;
-  const tmpl = path.join(outDir, `${video_id}.%(ext)s`);
-  try {
-    await run([
-      '--write-subs',         // manual / creator-uploaded subs (preferred)
-      '--write-auto-subs',    // algorithmic fallback
-      '--sub-langs', 'en.*,en',
-      '--sub-format', 'vtt',
-      '--skip-download',
-      '--convert-subs', 'vtt',
-      '-o', tmpl,
-      '--no-warnings',
-      url,
-    ]);
-  } catch (err) {
-    log.warn(`captions fetch failed for ${video_id}`, { err: err.message });
-    return null;
-  }
-  // yt-dlp writes <id>.<lang>.vtt — find whichever appeared.
-  const file = fs.readdirSync(outDir)
-    .find(f => f.startsWith(`${video_id}.`) && f.endsWith('.vtt'));
-  if (!file) return null;
-  const lang = file.slice(video_id.length + 1, -4);
-  const vtt = fs.readFileSync(path.join(outDir, file), 'utf8');
-  return { cues: parseVtt(vtt), language: lang };
-}
-
-// Download audio for Whisper fallback. Returns path to mp3.
-// Forces 16kHz mono at 32kbps so even ~1.5hr episodes fit under Groq's 25MB
-// upload limit. Whisper only sees 16kHz mono internally anyway, so this is
-// lossless from the model's POV.
-export async function downloadAudio(video_id) {
-  const url = youtubeUrl(video_id);
-  const out = path.join(TRANSCRIPT_DIR, `${video_id}.mp3`);
-  await run([
-    '-x',
-    '--audio-format', 'mp3',
-    '--postprocessor-args', 'ffmpeg:-ac 1 -ar 16000 -ab 32k',
-    '-o', out.replace('.mp3', '.%(ext)s'),
-    '--no-warnings',
-    url,
-  ], { timeout: 600_000 });
-  return out;
-}
-
-// --- VTT parser -------------------------------------------------------------
-// YouTube auto-captions are quirky: they emit rolling overlapping cues so the
-// raw text duplicates heavily. We dedupe by collapsing adjacent identical
-// trailing text fragments.
-
-function vttTimeToSec(t) {
-  // 00:01:23.456 → 83.456
-  const [h, m, s] = t.split(':');
-  return Number(h) * 3600 + Number(m) * 60 + Number(s);
-}
-
-function parseVtt(text) {
-  const lines = text.split(/\r?\n/);
-  const cues = [];
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i];
-    const m = line.match(/^(\d\d:\d\d:\d\d\.\d{3})\s+-->\s+(\d\d:\d\d:\d\d\.\d{3})/);
-    if (m) {
-      const start = vttTimeToSec(m[1]);
-      const end   = vttTimeToSec(m[2]);
-      const textLines = [];
-      i++;
-      while (i < lines.length && lines[i].trim() !== '') {
-        // Strip VTT inline tags like <00:00:01.234><c>word</c>
-        const cleaned = lines[i].replace(/<[^>]+>/g, '').trim();
-        if (cleaned) textLines.push(cleaned);
-        i++;
-      }
-      const txt = textLines.join(' ').trim();
-      if (txt) cues.push({ start, end, text: txt });
-    } else {
-      i++;
-    }
-  }
-  return dedupeRollingCues(cues);
-}
-
-// YouTube auto-captions emit each phrase 2-3 times as the rolling window
-// advances. Keep only the longest version of each duplicated stretch.
-function dedupeRollingCues(cues) {
-  const out = [];
-  let prev = '';
-  for (const c of cues) {
-    if (c.text === prev) continue;
-    // If current is a prefix of previous or vice versa, prefer the longer one.
-    if (prev && (c.text.startsWith(prev) || prev.startsWith(c.text))) {
-      const longer = c.text.length > prev.length ? c : out[out.length - 1];
-      if (longer === c) out[out.length - 1] = c;
-      prev = longer.text;
-      continue;
-    }
-    out.push(c);
-    prev = c.text;
-  }
-  return out;
-}
+// Caption fetching + audio downloading were removed when we moved transcription
+// to youtube-transcript.io (see src/lib/transcript-io.js + src/stages/2-transcribe.js).
+// yt-dlp is now used ONLY for ingest-stage operations: resolveHandle,
+// listChannelUploads, fetchMetadata — and for the YouTube search in
+// discovery-search.js. Both have proven reliable enough from Railway with
+// cookies + ignore-no-formats-error; transcripts were the unreliable case.

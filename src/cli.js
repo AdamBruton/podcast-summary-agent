@@ -24,11 +24,11 @@ Options:
   --help, -h          Show this message.
 
 Env vars (see .env.example):
-  ANTHROPIC_API_KEY   required
-  GROQ_API_KEY        optional, for Whisper fallback when YouTube has no captions
-  SENDGRID_API_KEY    required when not --dry-run
-  SENDGRID_FROM       required when not --dry-run
-  SENDGRID_TO         required when not --dry-run
+  ANTHROPIC_API_KEY              required
+  YOUTUBE_TRANSCRIPT_IO_TOKEN    required — transcripts come from youtube-transcript.io
+  SENDGRID_API_KEY               required when not --dry-run
+  SENDGRID_FROM                  required when not --dry-run
+  SENDGRID_TO                    required when not --dry-run
 `;
 
 let parsed;

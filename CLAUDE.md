@@ -177,9 +177,14 @@ runDaily()                                 runEpisode({url, markDeliveredOnSend}
 
 Stage invariants:
 
-- **transcribe**: captions-first via yt-dlp (`--write-subs --write-auto-subs`).
-  If no captions AND no GROQ_API_KEY → mark `skipped`. If audio > 25MB → mark
-  `skipped`. Cached transcripts (already in DB) are reused without refetch.
+- **transcribe**: single source — **youtube-transcript.io** (third-party API).
+  Sidesteps the "yt-dlp from a Railway IP gets silently degraded for caption
+  fetching" problem by handing YouTube interaction off to a vendor. No
+  fallback (Groq Whisper was considered and explicitly rejected — caller
+  accepts missed episodes when the API can't return a transcript). Cached
+  transcripts (already in DB) are reused without refetch. Requires
+  `YOUTUBE_TRANSCRIPT_IO_TOKEN` env var. Rate limit: 5 req / 10 sec; the
+  client retries on 429 honoring the Retry-After header.
 - **extract**: chunks long transcripts at ~240k chars with cue overlap.
   Output filtered by `verifyNumericFidelity` (drops candidates whose claim
   contains numbers not present in the supporting_quote — catches the
@@ -288,9 +293,8 @@ Other learned patterns:
 - **Captions**: `--write-subs --write-auto-subs --sub-langs "en.*,en"
   --sub-format vtt --skip-download --convert-subs vtt`. Manual subs preferred;
   auto fallback.
-- **Audio for Whisper**: `-x --audio-format mp3 --postprocessor-args
-  "ffmpeg:-ac 1 -ar 16000 -ab 32k"` — keeps file under Groq's 25MB upload
-  cap for episodes up to ~1.7hr.
+- **Audio download / Whisper**: REMOVED. Transcripts come from youtube-transcript.io
+  (see `src/lib/transcript-io.js`). yt-dlp is no longer involved in transcription.
 
 ---
 
