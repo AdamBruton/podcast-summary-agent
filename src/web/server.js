@@ -7,6 +7,7 @@
 // listen host. Don't expose to the public internet.
 
 import express from 'express';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
@@ -19,11 +20,14 @@ import {
   listEpisodesWithCounts, getEpisodeDetail,
   setFeedback, getAllFeedbackWithContext,
   getEpisode, setEpisodeStatus,
+  db,
 } from '../lib/db.js';
 import { resolveHandle, videoIdFromUrl } from '../lib/youtube.js';
 import { runEpisode } from '../pipeline.js';
 import { complete, parseJsonResponse, MODELS } from '../lib/claude.js';
-import { loadPrompt } from '../lib/config.js';
+import { loadPrompt, DB_PATH } from '../lib/config.js';
+import { backupDatabase, snapshotForRestore, BACKUPS_DIR } from '../lib/backup.js';
+import { log } from '../lib/log.js';
 import { diffLines } from 'diff';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -255,6 +259,102 @@ app.post('/api/summarize-url', wrap(async req => {
     rolled_up: true,
   };
 }));
+
+// --- Admin: DB backup & restore --------------------------------------------
+//
+// These endpoints are protected by Cloudflare Access in production. Locally
+// the server binds to 127.0.0.1, so no extra auth is needed. The restore
+// endpoint must NOT be exposed to the public internet — if you ever bind to
+// 0.0.0.0 without an auth layer in front, gate this behind a token.
+
+// List on-volume snapshots so the user can see what's there before restoring.
+app.get('/api/admin/backups', wrap(() => {
+  if (!fs.existsSync(BACKUPS_DIR)) return { backups: [] };
+  const items = fs.readdirSync(BACKUPS_DIR)
+    .filter(f => f.endsWith('.db.gz') || f.endsWith('.db'))
+    .map(name => {
+      const full = path.join(BACKUPS_DIR, name);
+      const st = fs.statSync(full);
+      return { name, bytes: st.size, mtime: st.mtime.toISOString() };
+    })
+    .sort((a, b) => b.mtime.localeCompare(a.mtime));
+  return { backups: items, dir: BACKUPS_DIR };
+}));
+
+// Trigger an on-demand backup (also runs daily via pipeline). emailIfDue is
+// off for manual runs — a button-press shouldn't surprise-email a copy.
+app.post('/api/admin/backup', wrap(async () => {
+  const result = await backupDatabase({ emailIfDue: false });
+  return { ok: true, file: path.basename(result.path), bytes: result.bytes };
+}));
+
+// Replace state.db with an uploaded snapshot. Expects raw application/octet-
+// stream (the browser reads the file via FileReader and POSTs the buffer).
+// Snapshots the existing DB first, writes the upload, then exits the process
+// so Railway restarts us with a fresh DB handle — this avoids the
+// reset-singleton dance and any stale -wal/-shm sidecars.
+app.post('/api/admin/restore-db',
+  express.raw({ type: 'application/octet-stream', limit: '500mb' }),
+  wrap((req, res) => {
+    const buf = req.body;
+    if (!Buffer.isBuffer(buf) || buf.length < 100) {
+      throw new Error('bad request: expected a binary state.db upload (application/octet-stream)');
+    }
+    // SQLite header magic: bytes 0-15 are ASCII "SQLite format 3" + NUL.
+    // If the upload is gzipped (0x1f 0x8b), tell the user to gunzip first.
+    if (buf[0] === 0x1f && buf[1] === 0x8b) {
+      throw new Error('bad upload: file is gzipped; gunzip it first then try again');
+    }
+    const SQLITE_MAGIC = Buffer.from('SQLite format 3\0', 'latin1');
+    if (Buffer.compare(buf.subarray(0, 16), SQLITE_MAGIC) !== 0) {
+      throw new Error('not a valid SQLite database (bad header)');
+    }
+
+    // Snapshot current DB while it's still open so a botched restore is
+    // recoverable.
+    let preRestorePath;
+    try {
+      preRestorePath = snapshotForRestore();
+    } catch (err) {
+      throw new Error(`could not snapshot current DB before restore: ${err.message}`);
+    }
+
+    // Write upload to a sibling temp file first, then atomic rename — keeps
+    // the live DB intact if disk fills up mid-write.
+    const tmpPath = `${DB_PATH}.incoming`;
+    fs.writeFileSync(tmpPath, buf);
+
+    try { db().close(); } catch { /* connection may already be unusable */ }
+
+    // Stale WAL/SHM sidecars from the pre-restore DB would be applied on
+    // re-open and corrupt the freshly uploaded snapshot.
+    for (const ext of ['-wal', '-shm']) {
+      const sidecar = `${DB_PATH}${ext}`;
+      if (fs.existsSync(sidecar)) fs.unlinkSync(sidecar);
+    }
+    fs.renameSync(tmpPath, DB_PATH);
+
+    log.ok('state.db replaced; scheduling restart', {
+      bytes: buf.length,
+      pre_restore_backup: path.basename(preRestorePath),
+    });
+
+    res.json({
+      ok: true,
+      bytes: buf.length,
+      pre_restore_backup: path.basename(preRestorePath),
+      note: 'Service will restart in ~1s. Refresh the page in ~30s.',
+    });
+
+    // Flush response, then exit so Railway brings us back up with the new DB.
+    // Locally (no orchestrator), the dev server stays down until restarted —
+    // that's documented in the UI.
+    setTimeout(() => {
+      log.info('exiting for restart after restore');
+      process.exit(0);
+    }, 500);
+  })
+);
 
 // --- start ------------------------------------------------------------------
 

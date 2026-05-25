@@ -293,6 +293,34 @@
     <div class="err" id="episodes-err"></div>
   </section>
 
+  <section>
+    <h2>Database backup &amp; restore</h2>
+    <p class="lede" style="margin: 4px 0 8px;">
+      Daily backups run automatically before each scheduled brief and rotate to
+      the last 14 snapshots on the volume. A weekly off-site copy is emailed
+      via SendGrid on Sundays. Restoring replaces <code>state.db</code> with
+      an uploaded file; the service exits and restarts on the new database
+      (refresh after ~30 seconds).
+    </p>
+    <div class="row-actions">
+      <button class="primary" id="admin-backup-now">Run backup now</button>
+      <details style="margin-left: 12px;">
+        <summary style="cursor: pointer; font-size: 12px; color: var(--muted);">Restore from file</summary>
+        <div style="margin-top: 12px; padding: 12px; background: var(--bg-soft); border-radius: 4px;">
+          <p style="font-size: 12px; color: var(--muted); margin: 0 0 8px;">
+            Select an uncompressed <code>state.db</code> file. If you have a
+            <code>.db.gz</code> snapshot, gunzip it first.
+          </p>
+          <input type="file" id="admin-restore-file" accept=".db,application/octet-stream" />
+          <button class="danger" id="admin-restore-submit" style="margin-left: 8px;">Upload &amp; restore</button>
+        </div>
+      </details>
+    </div>
+    <div class="ok-msg" id="admin-status"></div>
+    <div class="err" id="admin-err"></div>
+    <div id="admin-backups-list" style="margin-top: 12px;"></div>
+  </section>
+
   <div class="footer">
     podcast-summary-agent · serving <code>config/sources.yaml</code>
   </div>
@@ -355,6 +383,7 @@ async function load() {
   // Profile + episodes are loaded independently; failures don't block sources.
   loadProfile().catch(e => setErr('profile-err', e.message));
   loadEpisodes().catch(e => setErr('episodes-err', e.message));
+  loadBackups().catch(e => setErr('admin-err', e.message));
 }
 
 async function loadProfile() {
@@ -734,7 +763,97 @@ document.addEventListener('click', async (ev) => {
     } catch (e) { setErr('individuals-err', e.message); }
     return;
   }
+
+  if (t.id === 'admin-backup-now') {
+    setErr('admin-err', '');
+    const status = document.getElementById('admin-status');
+    status.textContent = '';
+    t.disabled = true;
+    const orig = t.textContent;
+    t.textContent = 'Backing up…';
+    try {
+      const r = await api('POST', '/api/admin/backup');
+      const kb = Math.round(r.bytes / 1024);
+      status.textContent = `✓ Backup written: ${r.file} (${kb} KB)`;
+      await loadBackups();
+    } catch (e) {
+      setErr('admin-err', e.message);
+    } finally {
+      t.disabled = false;
+      t.textContent = orig;
+    }
+    return;
+  }
+
+  if (t.id === 'admin-restore-submit') {
+    setErr('admin-err', '');
+    const status = document.getElementById('admin-status');
+    status.textContent = '';
+    const fileInput = document.getElementById('admin-restore-file');
+    const file = fileInput.files?.[0];
+    if (!file) { setErr('admin-err', 'pick a state.db file first'); return; }
+    if (!confirm(`Replace state.db with ${file.name} (${Math.round(file.size/1024)} KB)?\n\n` +
+                 'The current database will be snapshotted to /data/backups/ first, ' +
+                 'then the service restarts. This can\'t be undone from the UI.')) return;
+    t.disabled = true;
+    const orig = t.textContent;
+    t.textContent = 'Uploading…';
+    try {
+      const buf = await file.arrayBuffer();
+      const r = await fetch('/api/admin/restore-db', {
+        method: 'POST',
+        headers: { 'content-type': 'application/octet-stream' },
+        body: buf,
+      });
+      if (!r.ok) {
+        let msg;
+        try { msg = (await r.json()).error; } catch { msg = `HTTP ${r.status}`; }
+        throw new Error(msg);
+      }
+      const j = await r.json();
+      status.innerHTML =
+        `✓ state.db replaced (${Math.round(j.bytes/1024)} KB). ` +
+        `Pre-restore snapshot: <code>${esc(j.pre_restore_backup)}</code>. ` +
+        `Service is restarting — refresh in ~30s.`;
+      fileInput.value = '';
+    } catch (e) {
+      setErr('admin-err', e.message);
+    } finally {
+      t.disabled = false;
+      t.textContent = orig;
+    }
+    return;
+  }
 });
+
+async function loadBackups() {
+  const wrap = document.getElementById('admin-backups-list');
+  try {
+    const r = await api('GET', '/api/admin/backups');
+    if (!r.backups.length) {
+      wrap.innerHTML = '<p class="empty">No backups yet. Run one now or wait for the daily cron.</p>';
+      return;
+    }
+    const rows = r.backups.slice(0, 10).map(b => {
+      const kb = Math.round(b.bytes / 1024);
+      const when = new Date(b.mtime).toISOString().replace('T', ' ').slice(0, 19);
+      return `<tr>
+        <td class="mono">${esc(b.name)}</td>
+        <td class="mono" style="text-align: right;">${kb} KB</td>
+        <td class="mono">${esc(when)} UTC</td>
+      </tr>`;
+    }).join('');
+    wrap.innerHTML = `
+      <table>
+        <thead><tr><th>file</th><th style="text-align:right;">size</th><th>modified</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p class="empty" style="margin-top: 4px;">Stored at <code>${esc(r.dir)}</code>. Showing ${Math.min(10, r.backups.length)} of ${r.backups.length}.</p>
+    `;
+  } catch (e) {
+    wrap.innerHTML = `<p class="empty">Failed to load backups: ${esc(e.message)}</p>`;
+  }
+}
 
 // Enable/disable toggle uses 'change' rather than 'click' so the checkbox fires once.
 document.addEventListener('change', async (ev) => {

@@ -305,6 +305,39 @@ Other learned patterns:
 
 ---
 
+## Database backup & restore
+
+- **Snapshots**: `backupDatabase()` in `src/lib/backup.js` writes a gzipped
+  copy to `<DATA_DIR>/backups/state-<utc-ts>.db.gz` using `VACUUM INTO`.
+  That clones the live DB into a clean single-file artifact regardless of
+  WAL state, so we don't have to coordinate with readers or deal with
+  `-wal`/`-shm` sidecars.
+- **Schedule**: backup runs at the START of `runDaily` (before any new
+  writes for the day). Wrapped in try/catch — a failed backup must NOT
+  block the brief from going out. The cron service shares the same volume
+  as the web service, so backups appear in both.
+- **Rotation**: keep last 14 snapshots on disk, sorted by mtime. The
+  pre-restore snapshots (`state.pre-restore-<ts>.db`, uncompressed) are
+  NOT rotated — restores are rare and we want to keep all of them.
+- **Off-site**: on Sunday UTC, the daily snapshot is also emailed via
+  SendGrid as an attachment (≤ 20 MB compressed; current size ~3 KB so
+  there's huge headroom). If SendGrid env isn't set, off-site is silently
+  skipped. To restore: gunzip the attachment → upload via the web UI's
+  "Database backup & restore" section.
+- **Restore endpoint** (`POST /api/admin/restore-db`): accepts
+  `application/octet-stream`, validates SQLite magic bytes
+  (`Buffer.compare` against `SQLite format 3\0`), snapshots current DB to
+  `state.pre-restore-<ts>.db`, deletes stale WAL/SHM sidecars, writes the
+  upload atomically (tmp file + rename), then calls `process.exit(0)` so
+  Railway restarts the service with the new DB. The singleton DB handle
+  in `src/lib/db.js` doesn't expose a reset path — process exit is the
+  intentional way to recycle it.
+- **Cloudflare Access protects the admin endpoints in production.** Locally
+  the server binds 127.0.0.1 so no extra auth is needed. If you ever bind
+  to 0.0.0.0 outside of Railway, gate `/api/admin/*` behind a token first.
+
+---
+
 ## Web UI conventions
 
 - **Errors flow through `setErr(elemId, message)`** in `index.html`. Auto-fade
@@ -401,17 +434,15 @@ or quietly re-introduce them.
 
 ### Not yet done (work the user has acknowledged but deferred)
 
-- **State migration to Railway is incomplete.** Local `state.db` (~1.3 MB)
-  was encoded to base64 (`data/state.b64.txt`) but the upload to the
-  Railway volume never finished. Production DB is currently a fresh init —
-  feedback ratings, delivery history, and the ~38 ranked episodes from
-  local dev are NOT on prod. Re-do the SSH + base64-paste flow when
-  resuming (see "Useful commands" → `railway ssh`).
-- **No DB backup strategy.** `state.db` lives on the Railway volume only;
-  if the volume is lost/corrupted, all history (episodes, candidates,
-  rankings, feedback, discoveries) vanishes. Manual download via
-  `railway ssh` is the only existing "backup" path. A periodic snapshot
-  job (cron-via-Railway-cron, or pre-deploy hook) is worth building.
+- **State migration to Railway: tooling is built, run it once.** Local
+  `state.db` is uploaded to the production volume via the web UI
+  ("Database backup & restore" → "Restore from file") or via
+  `npm run upload-state-db` with `ADMIN_UPLOAD_URL` +
+  `CF_ACCESS_CLIENT_ID/SECRET` set (Cloudflare service token for
+  `brief.adambruton.co`). The endpoint snapshots the existing prod DB to
+  `/data/backups/state.pre-restore-<ts>.db`, swaps in the upload, and
+  exits the process so Railway restarts on the new DB. After running it,
+  delete this bullet.
 - **No failure alerting for the daily cron.** If `npm run brief` errors
   out (rate limit, API outage, transcript-io down), no email goes out and
   no notification fires. Possible fixes: wrap the brief command in a small
@@ -497,6 +528,13 @@ node scripts/inspect-window.js <video_id> <sec>  # candidates near a timestamp
 npm run resolve-channels                       # populate channel_id from @handle
 node scripts/rerank.js [<video_id>]            # re-rank without re-extract
 node scripts/recompose.js [--send]             # re-render brief from current state
+
+# Backup / restore
+npm run backup                                 # on-demand local snapshot (also via UI button)
+npm run backup -- --email                      # also email a copy if SendGrid configured
+$env:ADMIN_UPLOAD_URL="https://brief.adambruton.co/api/admin/restore-db"
+$env:CF_ACCESS_CLIENT_ID="...";  $env:CF_ACCESS_CLIENT_SECRET="..."
+npm run upload-state-db                        # push local data/state.db to prod
 
 # Railway
 railway login
