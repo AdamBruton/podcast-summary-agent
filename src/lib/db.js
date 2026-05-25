@@ -197,6 +197,17 @@ export function getTranscript(video_id) {
 
 // --- Candidates / rankings --------------------------------------------------
 
+// Coerce a possibly-string-ish value into a string-or-null that node:sqlite
+// can bind. Handles arrays (joined), objects (JSON.stringify), undefined,
+// numbers, booleans — anything except null comes back as a string.
+function asStringOrNull(v) {
+  if (v == null) return null;
+  if (typeof v === 'string') return v;
+  if (Array.isArray(v)) return v.join(' ');
+  if (typeof v === 'object') return JSON.stringify(v);
+  return String(v);
+}
+
 export function saveCandidates(video_id, candidates) {
   const d = db();
   // Replace any prior extraction for idempotency. Rankings reference candidate
@@ -208,17 +219,37 @@ export function saveCandidates(video_id, candidates) {
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
   const ids = [];
+  let skipped = 0;
   for (const c of candidates) {
-    const info = stmt.run(
-      video_id,
-      c.timestamp_sec ?? 0,
-      c.speaker ?? null,
-      c.claim,
-      c.category ?? null,
-      c.novelty_score ?? null,
-      c.supporting_quote ?? null,
-    );
-    ids.push(Number(info.lastInsertRowid));
+    // Defensive coercion: the model occasionally returns arrays for quotes
+    // or non-numeric novelty scores. node:sqlite is strict — bind anything
+    // weird and it throws "Provided value cannot be bound to SQLite parameter N".
+    // Per-candidate try/catch so one bad candidate doesn't kill the whole save.
+    try {
+      const info = stmt.run(
+        video_id,
+        Number.isFinite(c.timestamp_sec) ? Math.floor(c.timestamp_sec) : 0,
+        asStringOrNull(c.speaker),
+        asStringOrNull(c.claim) || '(missing claim)',
+        asStringOrNull(c.category),
+        Number.isFinite(c.novelty_score) ? c.novelty_score : null,
+        asStringOrNull(c.supporting_quote),
+      );
+      ids.push(Number(info.lastInsertRowid));
+    } catch (err) {
+      skipped++;
+      // Log enough to debug without spamming with the full quote text.
+      console.error(`[saveCandidates] skipping malformed candidate: ${err.message}`,
+        JSON.stringify({
+          timestamp_sec:    c.timestamp_sec,
+          claim_preview:    String(c.claim || '').slice(0, 60),
+          category:         c.category,
+          quote_type:       Array.isArray(c.supporting_quote) ? 'array' : typeof c.supporting_quote,
+        }));
+    }
+  }
+  if (skipped > 0) {
+    console.error(`[saveCandidates] ${skipped} of ${candidates.length} candidates were malformed and skipped`);
   }
   return ids;
 }
