@@ -149,11 +149,23 @@ export function upsertEpisode(ep) {
             @duration_sec, @url, @source, @discovered_for)
     ON CONFLICT(video_id) DO NOTHING
   `);
-  const info = stmt.run({
-    source:         'subscribed',
-    discovered_for: null,
-    ...ep,
-  });
+  // Defensive coercion — yt-dlp returns null/undefined for several fields on
+  // live streams, premieres, scheduled broadcasts, and oddly-encoded videos.
+  // node:sqlite is strict (no auto-coercion of undefined/NaN/BigInt) so we
+  // sanitize here rather than at each call site.
+  const sanitized = {
+    video_id:       String(ep.video_id),
+    channel_id:     ep.channel_id   ? String(ep.channel_id)   : null,
+    channel_name:   ep.channel_name ? String(ep.channel_name) : null,
+    title:          String(ep.title || ''),
+    description:    String(ep.description || ''),
+    published_at:   ep.published_at || null,
+    duration_sec:   Number.isFinite(ep.duration_sec) ? Math.floor(ep.duration_sec) : null,
+    url:            String(ep.url || ''),
+    source:         ep.source         || 'subscribed',
+    discovered_for: ep.discovered_for || null,
+  };
+  const info = stmt.run(sanitized);
   return info.changes > 0; // true if newly inserted
 }
 
