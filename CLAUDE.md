@@ -211,6 +211,13 @@ Stage invariants:
   web UI's ad-hoc URL endpoint (the user explicitly wants both: immediate
   brief AND inclusion in tomorrow's roundup).
 
+**Ad-hoc URL semantics**: the `/api/summarize-url` endpoint **resets any
+non-`new` status to `new` before invoking the pipeline**. When the user pastes
+a URL, they're explicitly asking us to process it — prior `skipped` /
+`delivered` / `ranked` shouldn't short-circuit. The daily cron path is
+unchanged (it respects `delivered`/`skipped` to avoid wasted work). Don't
+change this without thinking about the retry-after-failure case.
+
 ---
 
 ## Cost discipline
@@ -383,6 +390,77 @@ Other learned patterns:
   needs access. The web service and cron service both need the same mount.
 - **Cloudflare Access OTPs are single-use.** If a code "doesn't work", it's
   because it was already redeemed; request a new one.
+
+---
+
+## Known issues / open work
+
+State of the world at last update. Re-evaluate these every few sessions —
+they're listed here so future Claude doesn't waste time rediscovering them
+or quietly re-introduce them.
+
+### Not yet done (work the user has acknowledged but deferred)
+
+- **State migration to Railway is incomplete.** Local `state.db` (~1.3 MB)
+  was encoded to base64 (`data/state.b64.txt`) but the upload to the
+  Railway volume never finished. Production DB is currently a fresh init —
+  feedback ratings, delivery history, and the ~38 ranked episodes from
+  local dev are NOT on prod. Re-do the SSH + base64-paste flow when
+  resuming (see "Useful commands" → `railway ssh`).
+- **No DB backup strategy.** `state.db` lives on the Railway volume only;
+  if the volume is lost/corrupted, all history (episodes, candidates,
+  rankings, feedback, discoveries) vanishes. Manual download via
+  `railway ssh` is the only existing "backup" path. A periodic snapshot
+  job (cron-via-Railway-cron, or pre-deploy hook) is worth building.
+- **No failure alerting for the daily cron.** If `npm run brief` errors
+  out (rate limit, API outage, transcript-io down), no email goes out and
+  no notification fires. Possible fixes: wrap the brief command in a small
+  shell script that catches non-zero exit and POSTs to a notification
+  webhook; or have the brief subject always include episode count so
+  absence-of-mail becomes a tracking signal.
+- **6 disabled sources need handle fixes.** `sources.yaml` has
+  `enabled: false` on Sharp Tech, Logan Bartlett, Google DeepMind,
+  Fireworks AI, Baseten, Cloudflare. Wrong handles or no `/videos` tab.
+  Fix via the web UI when convenient.
+
+### Minor product gaps (nice-to-have, not blocking)
+
+- **Dropped candidates have no LLM rejection reason.** The rank pass only
+  emits `why_matters` for SELECTED items. The episode inspector shows
+  extract-time fields (category, novelty_score) for drops but no "why the
+  ranker dropped this" insight. Adding rejection reasons = extend
+  `rank.md` to emit a brief reason per non-selected item; ~+200 output
+  tokens per episode (~$0.003).
+- **No "re-rank this episode" button in the inspector UI.** Currently
+  requires CLI: `node scripts/rerank.js <video_id>`. A button per row
+  would let the user iterate on profile changes by re-ranking individual
+  episodes from the UI.
+
+### Hygiene / tokens to rotate
+
+These tokens appeared in earlier debugging chat logs (the user pasted them
+inline when working through CLI issues). Rotate at convenience:
+
+- `RAILWAY_API_TOKEN` — Railway → Account Settings → Tokens
+- `YOUTUBE_TRANSCRIPT_IO_TOKEN` — youtube-transcript.io → Profile
+- (Anthropic + SendGrid keys are also in the repo's local `.env` which is
+  gitignored — not exposed, but rotate annually as standard practice.)
+
+### What's STABLE and shouldn't be undone
+
+- **Transcripts come from youtube-transcript.io.** yt-dlp's caption fetching
+  was silently degraded by YouTube when called from Railway's datacenter
+  IPs even with valid cookies. Don't reintroduce yt-dlp-based captions
+  thinking "this'll work" — it works locally but not in prod.
+- **Whisper fallback is deliberately removed.** It was considered and
+  explicitly rejected. The user accepts missed episodes over the operational
+  complexity of audio download + Groq integration + their own potential
+  reliability issues.
+- **Defensive type coercion in saveCandidates + upsertEpisode is load-
+  bearing.** node:sqlite refuses arrays/objects/NaN/undefined for binding;
+  Claude occasionally returns arrays for `supporting_quote`, yt-dlp returns
+  null/undefined `duration` for live streams. Don't simplify these helpers
+  back to direct binding "for cleanliness" — the gnarliness is the point.
 
 ---
 
