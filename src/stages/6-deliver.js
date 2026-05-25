@@ -25,6 +25,16 @@ export async function deliver(html, { dryRun, episodes, date = new Date(), markD
     return { delivered: false, path: file };
   }
 
+  // Don't send empty briefs. A real-mode call with zero episodes means
+  // upstream stages couldn't process anything (skipped, no captions, etc.).
+  // Silently sending a "no items today" email creates false-success noise
+  // — better to surface the no-op to the caller so the ad-hoc UI path
+  // can show a real error and the daily run logs it.
+  if (!episodes.length) {
+    log.info('no episodes to brief; skipping send');
+    return { delivered: false, empty: true };
+  }
+
   const { SENDGRID_API_KEY, SENDGRID_FROM, SENDGRID_TO } =
     requireEnv('SENDGRID_API_KEY', 'SENDGRID_FROM', 'SENDGRID_TO');
   sgMail.setApiKey(SENDGRID_API_KEY);

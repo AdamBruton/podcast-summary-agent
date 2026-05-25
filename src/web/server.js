@@ -223,12 +223,26 @@ app.post('/api/summarize-url', wrap(async req => {
   req.setTimeout(0);
 
   const result = await runEpisode({ url, dryRun, markDeliveredOnSend: false });
+
+  // If deliver returned `empty`, the pipeline ran but found nothing to
+  // brief (most often: no captions + no Groq fallback). Surface the actual
+  // skip reason from the DB so the UI shows something useful instead of
+  // a misleading "Brief emailed" success.
+  if (result?.empty) {
+    const { getEpisode } = await import('../lib/db.js');
+    const ep = getEpisode(vid);
+    const reason = ep?.skip_reason
+      ? `episode skipped: ${ep.skip_reason}`
+      : `episode produced no ranked items (status: ${ep?.status || 'unknown'})`;
+    throw new Error(reason);
+  }
+
   return {
     ok:        true,
     video_id:  vid,
     sent:      !!result?.delivered,
     path:      result?.path || null,
-    rolled_up: true,    // episode will appear in tomorrow's daily run
+    rolled_up: true,
   };
 }));
 

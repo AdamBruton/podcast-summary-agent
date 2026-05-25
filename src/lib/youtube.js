@@ -144,15 +144,20 @@ export async function fetchMetadata(url) {
   };
 }
 
-// Fetch auto-generated captions. Returns { cues: [{start, end, text}], language }
-// or null if none are available.
+// Fetch captions (manual OR auto-generated). Returns { cues: [{start, end, text}],
+// language } or null if none are available. yt-dlp prefers manual subs (creator-
+// uploaded, usually higher quality and complete) and falls back to auto-subs
+// (algorithmic, lower quality but ubiquitous). Both flags are needed — earlier
+// the code only had --write-auto-subs, which missed channels that uploaded
+// manual subs only (e.g. Lex Fridman, some Stripe podcast episodes).
 export async function fetchCaptions(video_id) {
   const url = youtubeUrl(video_id);
   const outDir = TRANSCRIPT_DIR;
   const tmpl = path.join(outDir, `${video_id}.%(ext)s`);
   try {
     await run([
-      '--write-auto-subs',
+      '--write-subs',         // manual / creator-uploaded subs (preferred)
+      '--write-auto-subs',    // algorithmic fallback
       '--sub-langs', 'en.*,en',
       '--sub-format', 'vtt',
       '--skip-download',
