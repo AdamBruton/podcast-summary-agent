@@ -13,6 +13,7 @@ import { extractEpisode } from './stages/3-extract.js';
 import { rankEpisode } from './stages/4-rank.js';
 import { composeBrief } from './stages/5-compose.js';
 import { deliver } from './stages/6-deliver.js';
+import { backupDatabase } from './lib/backup.js';
 import { log, stage } from './lib/log.js';
 
 // Statuses that mean "ingested but not finished" — these get picked back up
@@ -91,6 +92,14 @@ export async function runDaily({ dryRun, lookbackDays = 2 } = {}) {
   const run_id = startRun(mode);
   let processed = 0, ok = false, briefResult = null;
   try {
+    // Snapshot the DB before any new writes for the day. Non-fatal: a failed
+    // backup must not block the brief from going out. Email-attached weekly
+    // off-site copy is gated inside backupDatabase by UTC day-of-week.
+    await stage('backup', async () => {
+      try { await backupDatabase({ emailIfDue: true }); }
+      catch (err) { log.warn('backup failed (continuing)', { err: err.message }); }
+    });
+
     await stage('ingest', () => ingestDaily({ lookbackDays }));
     // Discovery: searches YouTube for watched individuals and promotes
     // LLM-approved finds into episodes (status='new'). Skipped silently if
