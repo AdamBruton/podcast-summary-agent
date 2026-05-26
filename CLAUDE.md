@@ -17,7 +17,7 @@ optional Whisper fallback), runs two Claude passes (extract → rank, plus a
 cross-episode global rank), composes an HTML brief with timestamp deep-links,
 sends via SendGrid. Tuned by an editable profile.md and per-candidate thumbs
 feedback from the web UI. Runs in production on Railway with a Cloudflare-Access-
-protected web UI at `brief.adambruton.co` and a daily cron service.
+protected web UI and a daily cron service.
 
 Reader for the brief: the project owner. Bias is business / strategy / tokenomics
 over technical detail (see `config/profile.md` "Priority hierarchy" section).
@@ -441,8 +441,8 @@ or quietly re-introduce them.
   `state.db` is uploaded to the production volume via the web UI
   ("Database backup & restore" → "Restore from file") or via
   `npm run upload-state-db` with `ADMIN_UPLOAD_URL` +
-  `CF_ACCESS_CLIENT_ID/SECRET` set (Cloudflare service token for
-  `brief.adambruton.co`). The endpoint snapshots the existing prod DB to
+  `CF_ACCESS_CLIENT_ID/SECRET` set (Cloudflare service token for the
+  deployment's hostname). The endpoint snapshots the existing prod DB to
   `/data/backups/state.pre-restore-<ts>.db`, swaps in the upload, and
   resets the singleton DB handle so the next query opens the new file —
   no service restart. After running it, delete this bullet.
@@ -535,7 +535,7 @@ node scripts/recompose.js [--send]             # re-render brief from current st
 # Backup / restore
 npm run backup                                 # on-demand local snapshot (also via UI button)
 npm run backup -- --email                      # also email a copy if SendGrid configured
-$env:ADMIN_UPLOAD_URL="https://brief.adambruton.co/api/admin/restore-db"
+$env:ADMIN_UPLOAD_URL="https://your-deployment.example.com/api/admin/restore-db"
 $env:CF_ACCESS_CLIENT_ID="...";  $env:CF_ACCESS_CLIENT_SECRET="..."
 npm run upload-state-db                        # push local data/state.db to prod
 

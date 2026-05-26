@@ -6,12 +6,12 @@
 //   node scripts/upload-state-db.js [path-to-local-state.db]
 //
 // Defaults the local file to ./data/state.db. Required env:
-//   ADMIN_UPLOAD_URL          full URL, e.g. https://brief.adambruton.co/api/admin/restore-db
+//   ADMIN_UPLOAD_URL          full URL, e.g. https://your-deployment.example.com/api/admin/restore-db
 //   CF_ACCESS_CLIENT_ID       Cloudflare Access service token ID
 //   CF_ACCESS_CLIENT_SECRET   Cloudflare Access service token secret
 //
 // The Cloudflare service token must be issued for the Access application
-// protecting brief.adambruton.co (Zero Trust → Service Auth → Service Tokens),
+// protecting your-deployment.example.com (Zero Trust → Service Auth → Service Tokens),
 // and the Access policy must include an "Include: Service Token" rule
 // matching that token.
 //
@@ -24,7 +24,7 @@ import { DB_PATH } from '../src/lib/config.js';
 
 const url = process.env.ADMIN_UPLOAD_URL;
 if (!url) {
-  console.error('ADMIN_UPLOAD_URL is required (e.g. https://brief.adambruton.co/api/admin/restore-db)');
+  console.error('ADMIN_UPLOAD_URL is required (e.g. https://your-deployment.example.com/api/admin/restore-db)');
   process.exit(1);
 }
 
