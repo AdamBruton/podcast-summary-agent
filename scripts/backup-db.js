@@ -12,4 +12,3 @@ const emailIfDue = process.argv.includes('--email');
 
 const result = await backupDatabase({ emailIfDue });
 console.log(`backup written: ${result.path} (${result.bytes} bytes)`);
-process.exit(0);

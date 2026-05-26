@@ -15,8 +15,8 @@
 // and the Access policy must include an "Include: Service Token" rule
 // matching that token.
 //
-// On success the remote service exits and Railway restarts it; wait ~30
-// seconds before hitting the UI again.
+// On success the remote service swaps the DB in place — no restart needed.
+// Reload the web UI immediately to see the migrated data.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -56,6 +56,11 @@ const res = await fetch(url, {
     'Content-Type':            'application/octet-stream',
     'CF-Access-Client-Id':     cfId,
     'CF-Access-Client-Secret': cfSecret,
+    // Tell undici not to put the socket back in the keep-alive pool, so the
+    // process can exit immediately after the response is consumed. Without
+    // this, Node on Windows can crash with a libuv assertion when exit
+    // races with the socket teardown.
+    'Connection':              'close',
   },
   body: buf,
 });
@@ -75,4 +80,6 @@ try {
 } catch {
   console.log('upload OK (server response was not JSON):', text);
 }
-process.exit(0);
+// Don't call process.exit(0) — let Node exit naturally once the event loop
+// drains. Forcing exit while undici is still tearing down sockets triggers
+// the same libuv assertion on Windows.

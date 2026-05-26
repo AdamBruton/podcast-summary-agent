@@ -327,11 +327,14 @@ Other learned patterns:
 - **Restore endpoint** (`POST /api/admin/restore-db`): accepts
   `application/octet-stream`, validates SQLite magic bytes
   (`Buffer.compare` against `SQLite format 3\0`), snapshots current DB to
-  `state.pre-restore-<ts>.db`, deletes stale WAL/SHM sidecars, writes the
-  upload atomically (tmp file + rename), then calls `process.exit(0)` so
-  Railway restarts the service with the new DB. The singleton DB handle
-  in `src/lib/db.js` doesn't expose a reset path — process exit is the
-  intentional way to recycle it.
+  `state.pre-restore-<ts>.db`, writes the upload to a tmp file, calls
+  `resetDb()` to close the singleton, deletes stale WAL/SHM sidecars,
+  atomically renames the tmp file over `DB_PATH`, then calls `db()` to
+  reopen against the new file (which surfaces any "bad upload" errors in
+  the response rather than the next unrelated request). The process keeps
+  running — important because Railway's `restartPolicyType=ON_FAILURE`
+  does NOT restart after a `process.exit(0)`; the old "exit and let
+  Railway restart" approach stranded the service.
 - **Cloudflare Access protects the admin endpoints in production.** Locally
   the server binds 127.0.0.1 so no extra auth is needed. If you ever bind
   to 0.0.0.0 outside of Railway, gate `/api/admin/*` behind a token first.
@@ -441,8 +444,8 @@ or quietly re-introduce them.
   `CF_ACCESS_CLIENT_ID/SECRET` set (Cloudflare service token for
   `brief.adambruton.co`). The endpoint snapshots the existing prod DB to
   `/data/backups/state.pre-restore-<ts>.db`, swaps in the upload, and
-  exits the process so Railway restarts on the new DB. After running it,
-  delete this bullet.
+  resets the singleton DB handle so the next query opens the new file —
+  no service restart. After running it, delete this bullet.
 - **No failure alerting for the daily cron.** If `npm run brief` errors
   out (rate limit, API outage, transcript-io down), no email goes out and
   no notification fires. Possible fixes: wrap the brief command in a small
