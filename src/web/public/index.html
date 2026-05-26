@@ -742,6 +742,7 @@ document.addEventListener('click', async (ev) => {
           ` Video <code>${esc(r.video_id)}</code> will also appear in tomorrow's daily roundup.`
         : `<span style="color: #1a8800">✓ Brief written to disk (${esc(r.path || '?')}) in ${elapsed}s.</span>`;
       document.getElementById('adhoc-url').value = '';
+      await loadEpisodes();
     } catch (e) {
       setErr('adhoc-err', e.message);
       status.textContent = '';
