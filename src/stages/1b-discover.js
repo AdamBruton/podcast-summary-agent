@@ -91,13 +91,80 @@ export async function discoverIndividuals({ run_id = null, promote = true, names
       return { searched: namesToSearch.length, kept: 0, dropped: totalDropped, approved: 0, rejected: 0, promoted: 0 };
     }
 
-    // 2) LLM curation pass — single call, all surviving candidates at once.
-    log.info(`curating ${allKept.length} candidates via Claude`);
-    const decisions = await curate(allKept, { run_id });
-
-    // 3) Persist all candidates with their decision; promote approved.
-    let approved = 0, rejected = 0, promoted = 0;
+    // 2) Authoritative date check. yt-dlp's flat-playlist search mode returns
+    // fuzzy/missing upload_date, so the mechanical filter can't reliably drop
+    // old videos. Fetch full metadata per candidate now to get a real
+    // published_at + reliable duration. Too-old candidates get recorded as
+    // 'filtered' and skipped before the LLM sees them — without this, the LLM
+    // was spending ~$0.15/run evaluating videos from 2009-2025 only to have
+    // them reclassified post-curation. Survivors carry their metadata forward
+    // so the promotion step doesn't have to re-fetch.
+    const cutoffMs = Date.now() - cfg.lookback_days * 86_400_000;
+    const dateFiltered = [];
+    let droppedTooOld = 0, droppedMetadataErr = 0;
     for (const cand of allKept) {
+      let meta;
+      try {
+        meta = await fetchMetadata(cand.url);
+      } catch (err) {
+        log.warn('metadata fetch failed; dropping candidate', { vid: cand.video_id, err: err.message });
+        saveDiscovery({
+          video_id:        cand.video_id,
+          searched_for:    cand.searched_for,
+          title:           cand.title,
+          channel_name:    cand.channel_name,
+          duration_sec:    cand.duration_sec,
+          upload_date:     cand.upload_date,
+          url:             cand.url,
+          decision:        'filtered',
+          decision_reason: `metadata fetch failed: ${err.message}`,
+          promoted:        0,
+        });
+        droppedMetadataErr++;
+        continue;
+      }
+      const pubMs = meta.published_at ? Date.parse(meta.published_at) : null;
+      if (Number.isFinite(pubMs) && pubMs < cutoffMs) {
+        saveDiscovery({
+          video_id:        cand.video_id,
+          searched_for:    cand.searched_for,
+          title:           meta.title || cand.title,
+          channel_name:    meta.channel_name || cand.channel_name,
+          duration_sec:    meta.duration_sec || cand.duration_sec,
+          upload_date:     meta.published_at,
+          url:             cand.url,
+          decision:        'filtered',
+          decision_reason: `older than ${cfg.lookback_days}d (published ${meta.published_at})`,
+          promoted:        0,
+        });
+        droppedTooOld++;
+        continue;
+      }
+      cand.metadata     = meta;
+      cand.duration_sec = meta.duration_sec || cand.duration_sec;
+      cand.title        = meta.title        || cand.title;
+      cand.channel_name = meta.channel_name || cand.channel_name;
+      cand.upload_date  = meta.published_at || cand.upload_date;
+      dateFiltered.push(cand);
+    }
+    log.info('date-filtered candidates', {
+      survivors:       dateFiltered.length,
+      dropped_too_old: droppedTooOld,
+      dropped_meta_err: droppedMetadataErr,
+    });
+
+    if (dateFiltered.length === 0) {
+      log.ok('discover: no candidates survived date filter');
+      return { searched: namesToSearch.length, kept: allKept.length, dropped: totalDropped, approved: 0, rejected: 0, promoted: 0 };
+    }
+
+    // 3) LLM curation pass — single call, all date-surviving candidates at once.
+    log.info(`curating ${dateFiltered.length} candidates via Claude`);
+    const decisions = await curate(dateFiltered, { run_id });
+
+    // 4) Persist all candidates with their decision; promote approved.
+    let approved = 0, rejected = 0, promoted = 0;
+    for (const cand of dateFiltered) {
       const dec = decisions.get(cand.video_id) || { decision: 'reject', reason: 'no LLM response' };
       saveDiscovery({
         video_id:        cand.video_id,
@@ -114,37 +181,9 @@ export async function discoverIndividuals({ run_id = null, promote = true, names
       if (dec.decision === 'approve') approved++; else rejected++;
 
       if (dec.decision === 'approve' && promote) {
-        // Fetch full metadata for the approved video and insert into episodes.
-        // We also re-verify upload date here — yt-dlp's flat-playlist search
-        // mode doesn't populate upload_date reliably, so the pre-filter
-        // lookback check is best-effort. The full-metadata fetch always
-        // gives us a definitive published_at.
         try {
-          const meta = await fetchMetadata(cand.url);
-          const cutoffMs = Date.now() - cfg.lookback_days * 86_400_000;
-          const pubMs = meta.published_at ? Date.parse(meta.published_at) : null;
-          if (Number.isFinite(pubMs) && pubMs < cutoffMs) {
-            log.info(`approved but too old; not promoting`, {
-              vid: cand.video_id, published: meta.published_at, lookback_days: cfg.lookback_days,
-            });
-            // Downgrade decision so the audit reflects the final outcome.
-            saveDiscovery({
-              video_id:        cand.video_id,
-              searched_for:    cand.searched_for,
-              title:           cand.title,
-              channel_name:    cand.channel_name,
-              duration_sec:    meta.duration_sec || cand.duration_sec,
-              upload_date:     meta.published_at,
-              url:             cand.url,
-              decision:        'filtered',
-              decision_reason: `LLM approved but published ${meta.published_at} (> ${cfg.lookback_days}d ago)`,
-              promoted:        0,
-            });
-            approved--; rejected++;   // reclassify in the rolling counts
-            continue;
-          }
           upsertEpisode({
-            ...meta,
+            ...cand.metadata,
             source:         'discovery',
             discovered_for: cand.searched_for,
           });
@@ -152,7 +191,7 @@ export async function discoverIndividuals({ run_id = null, promote = true, names
           promoted++;
           log.ok(`promoted to episodes`, { vid: cand.video_id, searched: cand.searched_for });
         } catch (err) {
-          log.warn(`promote failed (metadata fetch)`, { vid: cand.video_id, err: err.message });
+          log.warn(`promote failed`, { vid: cand.video_id, err: err.message });
         }
       }
     }
