@@ -372,6 +372,22 @@ export function hasEpisode(video_id) {
 }
 
 export function saveDiscovery(rec) {
+  // node:sqlite refuses NaN/undefined/objects. yt-dlp returns null/undefined
+  // duration_sec for live streams and the occasional weird video; titles can
+  // come back as arrays in flat-playlist mode. Coerce defensively, matching
+  // saveCandidates / upsertEpisode.
+  const row = {
+    video_id:        asStringOrNull(rec.video_id),
+    searched_for:    asStringOrNull(rec.searched_for),
+    title:           asStringOrNull(rec.title),
+    channel_name:    asStringOrNull(rec.channel_name),
+    duration_sec:    Number.isFinite(rec.duration_sec) ? Math.floor(rec.duration_sec) : null,
+    upload_date:     asStringOrNull(rec.upload_date),
+    url:             asStringOrNull(rec.url),
+    decision:        asStringOrNull(rec.decision),
+    decision_reason: asStringOrNull(rec.decision_reason),
+    promoted:        rec.promoted ? 1 : 0,
+  };
   db().prepare(`
     INSERT INTO discoveries (video_id, searched_for, title, channel_name, duration_sec,
                              upload_date, url, decision, decision_reason, promoted)
@@ -381,7 +397,7 @@ export function saveDiscovery(rec) {
       decision        = excluded.decision,
       decision_reason = excluded.decision_reason,
       promoted        = excluded.promoted
-  `).run({ promoted: 0, decision_reason: null, ...rec });
+  `).run(row);
 }
 
 export function markDiscoveryPromoted(video_id) {
