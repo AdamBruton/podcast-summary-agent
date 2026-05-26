@@ -15,6 +15,17 @@ export function db() {
   return _db;
 }
 
+// Close the live connection and clear the singleton. The next db() call
+// reopens against whatever is currently at DB_PATH — used by the restore
+// endpoint to swap the underlying file in place without restarting the
+// process.
+export function resetDb() {
+  if (_db) {
+    try { _db.close(); } catch { /* already closed or in a bad state */ }
+    _db = null;
+  }
+}
+
 // SQLite CREATE TABLE IF NOT EXISTS doesn't add columns to existing tables,
 // so for DBs created before a column was added (episodes pre-discovery feature),
 // we add columns idempotently. Duplicate-column errors are swallowed.

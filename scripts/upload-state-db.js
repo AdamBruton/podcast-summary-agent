@@ -15,8 +15,8 @@
 // and the Access policy must include an "Include: Service Token" rule
 // matching that token.
 //
-// On success the remote service exits and Railway restarts it; wait ~30
-// seconds before hitting the UI again.
+// On success the remote service swaps the DB in place — no restart needed.
+// Reload the web UI immediately to see the migrated data.
 
 import fs from 'node:fs';
 import path from 'node:path';

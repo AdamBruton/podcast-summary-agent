@@ -20,7 +20,7 @@ import {
   listEpisodesWithCounts, getEpisodeDetail,
   setFeedback, getAllFeedbackWithContext,
   getEpisode, setEpisodeStatus,
-  db,
+  db, resetDb,
 } from '../lib/db.js';
 import { resolveHandle, videoIdFromUrl } from '../lib/youtube.js';
 import { runEpisode } from '../pipeline.js';
@@ -290,12 +290,14 @@ app.post('/api/admin/backup', wrap(async () => {
 
 // Replace state.db with an uploaded snapshot. Expects raw application/octet-
 // stream (the browser reads the file via FileReader and POSTs the buffer).
-// Snapshots the existing DB first, writes the upload, then exits the process
-// so Railway restarts us with a fresh DB handle — this avoids the
-// reset-singleton dance and any stale -wal/-shm sidecars.
+// Snapshots the existing DB, writes the upload to a temp file, then swaps
+// it in atomically and resets the singleton DB handle so the next query
+// opens against the new file. The process keeps running — no restart
+// needed, which matters because Railway's restartPolicyType=ON_FAILURE
+// would not restart the service after a process.exit(0).
 app.post('/api/admin/restore-db',
   express.raw({ type: 'application/octet-stream', limit: '500mb' }),
-  wrap((req, res) => {
+  wrap(req => {
     const buf = req.body;
     if (!Buffer.isBuffer(buf) || buf.length < 100) {
       throw new Error('bad request: expected a binary state.db upload (application/octet-stream)');
@@ -324,7 +326,11 @@ app.post('/api/admin/restore-db',
     const tmpPath = `${DB_PATH}.incoming`;
     fs.writeFileSync(tmpPath, buf);
 
-    try { db().close(); } catch { /* connection may already be unusable */ }
+    // Close the live connection and drop the singleton so the swap below is
+    // safe (the OS can replace the file even while a handle is open, but the
+    // existing connection would then be pointing at the wrong inode and
+    // queries would behave unpredictably).
+    resetDb();
 
     // Stale WAL/SHM sidecars from the pre-restore DB would be applied on
     // re-open and corrupt the freshly uploaded snapshot.
@@ -334,25 +340,23 @@ app.post('/api/admin/restore-db',
     }
     fs.renameSync(tmpPath, DB_PATH);
 
-    log.ok('state.db replaced; scheduling restart', {
+    // Eagerly reopen so any error (bad upload, schema-incompatible DB) is
+    // surfaced in this response rather than the next unrelated request. db()
+    // also runs the migration pass, so the new file picks up any columns
+    // added since whenever it was snapshotted.
+    db();
+
+    log.ok('state.db replaced and reopened', {
       bytes: buf.length,
       pre_restore_backup: path.basename(preRestorePath),
     });
 
-    res.json({
+    return {
       ok: true,
       bytes: buf.length,
       pre_restore_backup: path.basename(preRestorePath),
-      note: 'Service will restart in ~1s. Refresh the page in ~30s.',
-    });
-
-    // Flush response, then exit so Railway brings us back up with the new DB.
-    // Locally (no orchestrator), the dev server stays down until restarted —
-    // that's documented in the UI.
-    setTimeout(() => {
-      log.info('exiting for restart after restore');
-      process.exit(0);
-    }, 500);
+      note: 'Database swapped in place. Refresh the page now to see the new data.',
+    };
   })
 );
 

@@ -298,9 +298,9 @@
     <p class="lede" style="margin: 4px 0 8px;">
       Daily backups run automatically before each scheduled brief and rotate to
       the last 14 snapshots on the volume. A weekly off-site copy is emailed
-      via SendGrid on Sundays. Restoring replaces <code>state.db</code> with
-      an uploaded file; the service exits and restarts on the new database
-      (refresh after ~30 seconds).
+      via SendGrid on Sundays. Restoring snapshots the current
+      <code>state.db</code>, then swaps in the uploaded file in place — no
+      service restart required.
     </p>
     <div class="row-actions">
       <button class="primary" id="admin-backup-now">Run backup now</button>
@@ -793,8 +793,8 @@ document.addEventListener('click', async (ev) => {
     const file = fileInput.files?.[0];
     if (!file) { setErr('admin-err', 'pick a state.db file first'); return; }
     if (!confirm(`Replace state.db with ${file.name} (${Math.round(file.size/1024)} KB)?\n\n` +
-                 'The current database will be snapshotted to /data/backups/ first, ' +
-                 'then the service restarts. This can\'t be undone from the UI.')) return;
+                 'The current database is snapshotted to /data/backups/ first, ' +
+                 'then swapped in place. This can\'t be undone from the UI.')) return;
     t.disabled = true;
     const orig = t.textContent;
     t.textContent = 'Uploading…';
@@ -814,8 +814,10 @@ document.addEventListener('click', async (ev) => {
       status.innerHTML =
         `✓ state.db replaced (${Math.round(j.bytes/1024)} KB). ` +
         `Pre-restore snapshot: <code>${esc(j.pre_restore_backup)}</code>. ` +
-        `Service is restarting — refresh in ~30s.`;
+        `Refresh the page to see the new data.`;
       fileInput.value = '';
+      await loadBackups();
+      await loadEpisodes();
     } catch (e) {
       setErr('admin-err', e.message);
     } finally {
