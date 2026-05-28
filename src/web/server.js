@@ -23,7 +23,7 @@ import {
   db, resetDb,
 } from '../lib/db.js';
 import { resolveHandle, videoIdFromUrl } from '../lib/youtube.js';
-import { runEpisode } from '../pipeline.js';
+import { runEpisode, runDaily } from '../pipeline.js';
 import { complete, parseJsonResponse, MODELS } from '../lib/claude.js';
 import { loadPrompt, DB_PATH } from '../lib/config.js';
 import { backupDatabase, snapshotForRestore, BACKUPS_DIR } from '../lib/backup.js';
@@ -360,6 +360,79 @@ app.post('/api/admin/restore-db',
   })
 );
 
+// --- Daily-brief scheduler --------------------------------------------------
+//
+// Replaces the separate Railway "cron" service that previously ran
+// `npm run brief` on a schedule. That setup was split-brained: Railway
+// volumes are single-attach, so the cron and web services each had their
+// own state.db — daily-run output never made it into the web UI.
+//
+// Single in-process scheduler fixes that for good: one service, one
+// volume, one DB. Scheduler fires once a day at DAILY_HOUR_UTC (11:00 UTC
+// = 7am ET). Manual triggers via POST /api/admin/run-daily are also
+// supported (fire-and-forget; client doesn't wait for the full ~5-10 min
+// pipeline).
+
+const DAILY_HOUR_UTC = 11;
+let dailyTimer = null;
+let dailyRunning = false;
+
+function msUntilNextDailyRun() {
+  const now = new Date();
+  const next = new Date(now);
+  next.setUTCHours(DAILY_HOUR_UTC, 0, 0, 0);
+  if (next.getTime() <= now.getTime()) next.setUTCDate(next.getUTCDate() + 1);
+  return next.getTime() - now.getTime();
+}
+
+function scheduleDailyRun() {
+  if (dailyTimer) clearTimeout(dailyTimer);
+  const ms = msUntilNextDailyRun();
+  const at = new Date(Date.now() + ms).toISOString();
+  log.info('daily brief scheduled', { at, in_hours: (ms / 3600_000).toFixed(2) });
+  dailyTimer = setTimeout(async () => {
+    await runDailyInBackground('scheduled');
+    scheduleDailyRun();
+  }, ms);
+}
+
+async function runDailyInBackground(trigger) {
+  if (dailyRunning) {
+    log.warn('daily run already in progress, ignoring new trigger', { trigger });
+    return;
+  }
+  dailyRunning = true;
+  const startedAt = Date.now();
+  log.info('daily run starting', { trigger });
+  try {
+    await runDaily({});
+    log.ok('daily run finished', { trigger, ms: Date.now() - startedAt });
+  } catch (err) {
+    log.error('daily run failed', { trigger, err: err.message, stack: err.stack });
+  } finally {
+    dailyRunning = false;
+  }
+}
+
+// Manual trigger for the daily brief. Returns immediately; the actual run
+// continues in the background. Useful for testing the pipeline on prod
+// after a config change without waiting for 11:00 UTC.
+app.post('/api/admin/run-daily', wrap(() => {
+  if (dailyRunning) {
+    return { started: false, reason: 'a daily run is already in progress' };
+  }
+  // Fire-and-forget. The .catch is belt-and-suspenders — runDailyInBackground
+  // already catches and logs, but Node would still emit unhandled-rejection
+  // warnings if the function ever threw synchronously before the try block.
+  runDailyInBackground('manual').catch(err =>
+    log.error('manual daily trigger crashed', { err: err.message })
+  );
+  return {
+    started: true,
+    note: 'Daily run started in the background. Watch service logs for progress; typical duration 5-10 min.',
+  };
+}));
+
 // --- start ------------------------------------------------------------------
 
 const server = app.listen(PORT, HOST, () => {
@@ -369,6 +442,12 @@ const server = app.listen(PORT, HOST, () => {
   // Only auto-open the browser when running locally on Windows/macOS/Linux
   // desktop. In a container (Railway, Docker) there's no browser to open.
   if (HOST === '127.0.0.1') openBrowser(url);
+  // Scheduler runs only in Railway mode (PORT env var set). Locally, use
+  // `npm run brief` for manual daily runs — no point firing a real daily
+  // at 11:00 UTC against a dev DB. Override by setting RUN_DAILY_LOCALLY=1.
+  if (process.env.PORT || process.env.RUN_DAILY_LOCALLY) {
+    scheduleDailyRun();
+  }
 });
 
 server.on('error', err => {

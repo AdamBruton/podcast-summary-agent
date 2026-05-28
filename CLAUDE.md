@@ -16,8 +16,9 @@ YouTube for named individuals/companies daily, transcribes via captions (with
 optional Whisper fallback), runs two Claude passes (extract → rank, plus a
 cross-episode global rank), composes an HTML brief with timestamp deep-links,
 sends via SendGrid. Tuned by an editable profile.md and per-candidate thumbs
-feedback from the web UI. Runs in production on Railway with a Cloudflare-Access-
-protected web UI and a daily cron service.
+feedback from the web UI. Runs in production on Railway as a single
+long-lived web service (Cloudflare-Access-protected) that also schedules
+the daily brief from in-process at 11:00 UTC. No separate cron service.
 
 Reader for the brief: the project owner. Bias is business / strategy / tokenomics
 over technical detail (see `config/profile.md` "Priority hierarchy" section).
@@ -314,8 +315,9 @@ Other learned patterns:
   `-wal`/`-shm` sidecars.
 - **Schedule**: backup runs at the START of `runDaily` (before any new
   writes for the day). Wrapped in try/catch — a failed backup must NOT
-  block the brief from going out. The cron service shares the same volume
-  as the web service, so backups appear in both.
+  block the brief from going out. Since `runDaily` is now invoked from
+  in-process by the web server's scheduler, backups land on the same
+  volume the UI reads from.
 - **Rotation**: keep last 14 snapshots on disk, sorted by mtime. The
   pre-restore snapshots (`state.pre-restore-<ts>.db`, uncompressed) are
   NOT rotated — restores are rare and we want to keep all of them.
@@ -390,9 +392,14 @@ Other learned patterns:
   datacenter IPs); optional locally on residential IPs.
 - **state.db survives Railway deploys** via the persistent volume. Don't
   re-deploy code changes assuming state will be wiped.
-- **Cron service** on Railway runs `npm run brief` daily at 11:00 UTC (= 7am ET).
-  Shares the same volume as the web service. Cron restart policy: never (it
-  should run once and exit).
+- **Daily brief runs in-process** in the web service via an in-process
+  scheduler (`scheduleDailyRun` in `src/web/server.js`) that fires at
+  11:00 UTC (= 7am ET). The scheduler only starts when `PORT` is set
+  (Railway mode); locally use `npm run brief`. Manually trigger a daily
+  on prod via `POST /api/admin/run-daily` (Cloudflare Access protected,
+  fire-and-forget). There is NO separate Railway cron service — that
+  approach broke because Railway volumes are single-attach (each service
+  gets its own mount, so the cron and web volumes silently diverged).
 - **Ad-hoc URLs** flow through `POST /api/summarize-url` → `runEpisode({url,
   markDeliveredOnSend: false})`. Intentionally NOT marked delivered so they
   also appear in the next daily brief.
@@ -422,8 +429,12 @@ Other learned patterns:
   subs.** Use both `--write-subs --write-auto-subs`.
 - **Express 5 dropped regex route patterns** like `/:cat(channel|company)`.
   Use simple `:param` and route per-path.
-- **Railway volumes must be attached separately to each service** that
-  needs access. The web service and cron service both need the same mount.
+- **Railway volumes are single-attach.** Each service mounts its own
+  volume; two services can't share one filesystem. We learned this the
+  hard way when a separate cron service silently wrote daily-run output
+  to its own `/data/state.db` while the web service kept reading from a
+  different volume. Fix: keep all work inside one service (the web
+  service schedules `runDaily` in-process — see "Operational notes").
 - **Cloudflare Access OTPs are single-use.** If a code "doesn't work", it's
   because it was already redeemed; request a new one.
 
