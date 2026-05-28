@@ -394,9 +394,11 @@ Other learned patterns:
   re-deploy code changes assuming state will be wiped.
 - **Daily brief runs in-process** in the web service via an in-process
   scheduler (`scheduleDailyRun` in `src/web/server.js`) that fires at
-  11:00 UTC (= 7am ET). The scheduler only starts when `PORT` is set
-  (Railway mode); locally use `npm run brief`. Manually trigger a daily
-  on prod via `POST /api/admin/run-daily` (Cloudflare Access protected,
+  10:00 UTC (= 6am EDT / 5am EST). The hour is fixed in UTC, so it
+  drifts an hour vs ET across DST — acceptable for a morning brief.
+  The scheduler only starts when `PORT` is set (Railway mode); locally
+  use `npm run brief`. Manually trigger a daily on prod via
+  `POST /api/admin/run-daily` (Cloudflare Access protected,
   fire-and-forget). There is NO separate Railway cron service — that
   approach broke because Railway volumes are single-attach (each service
   gets its own mount, so the cron and web volumes silently diverged).

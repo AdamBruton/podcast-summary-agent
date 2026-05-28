@@ -368,12 +368,14 @@ app.post('/api/admin/restore-db',
 // own state.db — daily-run output never made it into the web UI.
 //
 // Single in-process scheduler fixes that for good: one service, one
-// volume, one DB. Scheduler fires once a day at DAILY_HOUR_UTC (11:00 UTC
-// = 7am ET). Manual triggers via POST /api/admin/run-daily are also
-// supported (fire-and-forget; client doesn't wait for the full ~5-10 min
-// pipeline).
+// volume, one DB. Scheduler fires once a day at DAILY_HOUR_UTC (10:00
+// UTC = 6am EDT / 5am EST — the hour is fixed in UTC, so it drifts an
+// hour relative to ET across DST changes; that's intentional and
+// acceptable for a morning brief). Manual triggers via
+// POST /api/admin/run-daily are also supported (fire-and-forget; client
+// doesn't wait for the full ~5-10 min pipeline).
 
-const DAILY_HOUR_UTC = 11;
+const DAILY_HOUR_UTC = 10;
 let dailyTimer = null;
 let dailyRunning = false;
 
