@@ -18,7 +18,7 @@ cross-episode global rank), composes an HTML brief with timestamp deep-links,
 sends via SendGrid. Tuned by an editable profile.md and per-candidate thumbs
 feedback from the web UI. Runs in production on Railway as a single
 long-lived web service (Cloudflare-Access-protected) that also schedules
-the daily brief from in-process at 11:00 UTC. No separate cron service.
+the daily brief from in-process at 10:00 UTC. No separate cron service.
 
 Reader for the brief: the project owner. Bias is business / strategy / tokenomics
 over technical detail (see `config/profile.md` "Priority hierarchy" section).

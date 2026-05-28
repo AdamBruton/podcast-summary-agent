@@ -80,28 +80,23 @@ You can usually skip this when running locally on a residential connection.
 
 ## Production deployment (Railway)
 
-Railway is what's tested. Any host that can run Node 22, persist a volume, and
-schedule a cron job will work — substitute as needed.
+Railway is what's tested. Any host that can run Node 22 and persist a volume
+will work — substitute as needed. No separate cron job needed: the daily
+brief is scheduled from inside the web service's Node process.
 
 ### One-time Railway setup
 
 1. **Create a Railway project.** https://railway.app → New Project → Empty Project.
-2. **Add two services** in the same project, both pointed at your fork of this repo:
-   - **`web`** — leave the default config; it uses `railway.json`, which runs
-     `npm run web` and exposes a `/healthz` healthcheck.
-   - **`cron`** — in the service's Settings, set the **Config Path** to
-     `railway.cron.json`. That overrides the start command to `npm run brief`
-     and disables auto-restart (it should run once a day and exit).
-3. **Attach a persistent volume** to **both** services. Mount path: `/data` on
-   each. Railway sets the env var `RAILWAY_VOLUME_MOUNT_PATH=/data` automatically,
+2. **Add a single service** pointed at your fork of this repo. It uses
+   `railway.json`, which runs `npm run web` and exposes a `/healthz`
+   healthcheck. The service stays running 24/7 and serves both the web UI
+   and the daily brief (via an in-process `setTimeout` that fires at 10:00
+   UTC = 6am EDT / 5am EST — see `scheduleDailyRun` in `src/web/server.js`).
+3. **Attach a persistent volume** to the service. Mount path: `/data`.
+   Railway sets the env var `RAILWAY_VOLUME_MOUNT_PATH=/data` automatically,
    which switches the code into production-paths mode (state.db, transcripts,
    briefs, cookies, and `/data/config/` all live on the volume).
-
-   Note: the same volume must be attached to both services so cron and web see
-   the same database. Configure the second attachment under the service's
-   Settings → Volumes.
-
-4. **Set environment variables** on both services (the same set on each):
+4. **Set environment variables** on the service:
 
    ```
    ANTHROPIC_API_KEY=sk-ant-...
@@ -111,20 +106,31 @@ schedule a cron job will work — substitute as needed.
    SENDGRID_TO=you@yourdomain.com
    ```
 
-5. **Configure the cron schedule.** In the `cron` service: Settings → Cron Schedule
-   → set to e.g. `0 11 * * *` (daily 11:00 UTC = 7am ET). The service will run
-   `npm run brief` once at that time and exit.
-
-6. **Expose the web service** at a public domain. Settings → Networking →
+5. **Expose the service** at a public domain. Settings → Networking →
    Generate Domain (or attach a custom one). At this point the UI is reachable
    on the public internet **with no auth** — set up Cloudflare Access before
    sending anyone the URL (see next section).
 
-7. **Seed your configuration.** On first boot, the web service copies the
+6. **Seed your configuration.** On first boot, the service copies the
    committed `config/profile.md` and `config/sources.yaml` from the image into
    `/data/config/`. After that, edits via the web UI persist on the volume
    across deploys. If you want to migrate an existing local `state.db`, use
    the UI's "Database backup & restore → Restore from file" button.
+
+### Triggering a daily run manually
+
+Once deployed, the scheduler logs a line at startup like
+`daily brief scheduled {"at":"YYYY-MM-DDT10:00:00.000Z","in_hours":"N.NN"}`.
+If you want to fire a run on demand (e.g. to test after a config change), POST
+to `/api/admin/run-daily`. Returns immediately; the pipeline runs in the
+background. Watch Railway service logs for `daily run finished {ms: NNNNN}`.
+
+```bash
+curl -X POST \
+  -H "CF-Access-Client-Id: <service-token-id>" \
+  -H "CF-Access-Client-Secret: <service-token-secret>" \
+  https://your-deployment.example.com/api/admin/run-daily
+```
 
 ### Putting Cloudflare Access in front of the web UI
 
