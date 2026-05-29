@@ -328,8 +328,8 @@ Other learned patterns:
 Audio podcasts have no captions, so they're transcribed by a **WhisperX worker
 deployed to [Modal](https://modal.com)** — separate language (Python), separate
 cloud, separate deploy lifecycle from the Node app. The Node ingestion layer
-will call it over HTTPS (Phase 2d); it never imports this code. Lives in
-`modal_worker/`.
+calls it over HTTPS (the Phase 2d endpoint); it never imports this code. Lives
+in `modal_worker/`.
 
 **This does NOT reintroduce Whisper for YouTube.** The "Whisper deliberately
 removed" rule below still holds for YouTube (captions via youtube-transcript.io).
@@ -340,7 +340,8 @@ sources that have no captions at all.
   glyphs crash the console with a cp1252 `charmap` error (the function still
   runs — it's purely a stdout-encoding issue). Invoke as `py -m modal ...`
   (the `modal` script isn't on PATH). `py -m modal run modal_worker/transcribe.py`
-  runs it ephemerally; `modal deploy` (Phase 2d) will publish the HTTPS endpoint.
+  runs it ephemerally; `py -m modal deploy modal_worker/transcribe.py` publishes
+  the Phase 2d HTTPS endpoint (the FastAPI `web` app in `transcribe.py`).
 - **Image recipe (load-bearing version pins):** `debian_slim(3.11)` + ffmpeg +
   matched torch trio **torch 2.7.1 / torchaudio 2.7.1 / torchvision 0.22.1** +
   **whisperx 3.7.2**. whisperx requires torch>=2.7.1; pinning the whole trio
@@ -363,14 +364,28 @@ sources that have no captions at all.
 - **HF token:** the gated pyannote models (`speaker-diarization-3.1` +
   `segmentation-3.0`, both must be license-accepted) need a token, supplied as
   the Modal secret **`huggingface`** (key `HF_TOKEN`) — never in the repo.
+- **HTTPS endpoint (Phase 2d):** the `web` FastAPI app in `transcribe.py`,
+  published by `py -m modal deploy`. Job-queue pattern (the GPU job is ~14 min,
+  too long for one synchronous request): `POST /transcribe {audio_url,
+  clip_seconds?}` → `{call_id}`; `GET /result/{call_id}` → `200`
+  `{status:"done", result:{...cues...}}` when finished, `202`
+  `{status:"pending"}` while running, `410` once Modal's result-retention
+  window lapses. Auth is a **shared bearer token** from the Modal secret
+  **`transcribe-auth`** (key `TRANSCRIBE_SECRET`), sent as
+  `Authorization: Bearer <token>` — never in the repo. The web container is
+  fastapi-only (no torch) so it cold-starts fast and scales to zero; the GPU
+  image only spins up inside the spawned `transcribe` call.
 - **Output contract:** cues `[{start, end, text, speaker}]`. `speaker` is an
   anonymous `SPEAKER_NN` diarization label (no real names).
 - **Cost (grounded on a 5-min clip, L4):** ~47s GPU compute for 5 min audio →
   ~14 min / **~$0.18 per 90-min episode**; ~15 episodes/week ≈ ~$11/mo, inside
   the $30 free credit. GPU = L4 ($0.000222/s).
-- **Status:** 2a hello-world, 2b CPU/tiny, 2c GPU+diarization all done. 2d
-  (HTTPS endpoint + shared secret) and the Node-side transcribe router (Phase 3)
-  are the remaining integration work.
+- **Status:** 2a hello-world, 2b CPU/tiny, 2c GPU+diarization, 2d (HTTPS
+  endpoint + shared bearer-token secret) all done in code. 2d still needs a
+  one-time `py -m modal secret create transcribe-auth TRANSCRIBE_SECRET=<hex>`
+  + `py -m modal deploy` to go live (not runnable from CI/this container — no
+  Modal creds/GPU here). The Node-side transcribe router (Phase 3) is the
+  remaining integration work.
 
 ---
 
@@ -531,15 +546,23 @@ transcribe path and otherwise flow through the same intelligence layer.
   `podcasts:` bucket. `scripts/ingest-podcasts.js` polls + upserts —
   **standalone, intentionally NOT wired into `runDaily` yet.** Verified
   against the real DB: 25 YouTube rows untouched, 33 podcasts ingested.
-- **Phase 2 — NEXT.** WhisperX-on-Modal transcription worker (Python,
-  deployed separately to Modal; the one genuinely separate-language piece).
-  Stage 2 (`2-transcribe.js`) becomes a router: YouTube → transcript-io
-  (unchanged), podcast → download audio + POST to Modal/WhisperX with
-  diarization, write cues with `speaker`. The "Whisper deliberately
-  removed" stable note below still holds **for YouTube** — Phase 2 does not
-  reintroduce Whisper for captions; it adds WhisperX for audio-only podcast
-  sources that have no captions at all. Different decision, different medium.
-- **Phases 3-8 — LATER.** Wire podcasts into `runDaily`; confirm extract/
+- **Phase 2 — DONE in code (deploy pending).** WhisperX-on-Modal transcription
+  worker (Python, deployed separately to Modal; the one genuinely
+  separate-language piece). 2a/2b/2c built the GPU worker; **2d** added the
+  deployable HTTPS endpoint (the FastAPI `web` app in `transcribe.py`) with a
+  shared bearer-token secret — see "Modal transcription worker" above for the
+  request contract. Still needs the one-time `modal secret create
+  transcribe-auth` + `modal deploy` to go live (can't run from this container).
+  The "Whisper deliberately removed" stable note below still holds **for
+  YouTube** — Phase 2 does not reintroduce Whisper for captions; it adds
+  WhisperX for audio-only podcast sources that have no captions at all.
+  Different decision, different medium.
+- **Phase 3 — NEXT.** Stage 2 (`2-transcribe.js`) becomes a router: YouTube →
+  transcript-io (unchanged), podcast → POST audio_url to the Modal endpoint +
+  poll `/result`, write cues with `speaker`. Needs a small Node client wrapper
+  (mirroring `src/lib/transcript-io.js`) reading `MODAL_TRANSCRIBE_URL` +
+  `MODAL_TRANSCRIBE_SECRET` env vars.
+- **Phases 4-8 — LATER.** Wire podcasts into `runDaily`; confirm extract/
   rank work unmodified (expected, since they read only episode+transcript);
   compose URL builder becomes medium-aware (YouTube `&t=Ns` vs podcast page/
   audio link); web UI feeds editor + medium filter.
