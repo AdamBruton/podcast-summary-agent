@@ -56,6 +56,7 @@ src/
     db.js                    node:sqlite schema + helpers (single source of truth)
     claude.js                Anthropic SDK wrapper with prompt caching + cost telemetry
     youtube.js               yt-dlp subprocess wrapper (resolveHandle, fetchCaptions, etc.)
+    rss.js                   podcast RSS adapter (rss-parser → normalized episode rows + pod_<hex> IDs)
     log.js                   tiny structured logger + stage() timing wrapper
     sources-store.js         read/write config/sources.yaml via yaml Document API (preserves comments)
     profile-store.js         read/write config/profile.md as plain text
@@ -80,9 +81,10 @@ prompts/
   discovery-curate.md        system prompt for LLM-curating YouTube search results
   profile-refine.md          system prompt for feedback-driven profile suggestions
 config/
-  sources.yaml               channels + individuals/companies list; web UI edits this
+  sources.yaml               channels + podcasts (RSS) + individuals/companies list; web UI edits this
   profile.md                 interest profile (tier hierarchy + themes); web UI edits this
 scripts/
+  ingest-podcasts.js         poll RSS feeds in sources.yaml → upsert podcast episodes (standalone; not yet wired into runDaily)
   resolve-channels.js        one-time / on-demand: populate channel_id from @handle
   recompose.js               re-render the current ranked pool (with optional --send)
   rerank.js                  re-run rank pass on existing episodes (no re-extract)
@@ -124,12 +126,19 @@ Don't move config to env vars or to the DB; the file workflow is intentional.
 
 Tables (all migrations via `safeAlter` in `src/lib/db.js#migrate`):
 
-- `episodes` — one row per video. `status` flows
+- `episodes` — one row per video OR podcast episode. `status` flows
   `new → transcribed → extracted → ranked → delivered`, plus `skipped`
   (with `skip_reason`). `source` is `subscribed` or `discovery`;
-  `discovered_for` is the individual name if from discovery.
-- `transcripts` — one row per video. `cues_json` is JSON `[{start, end, text}]`.
-  `source` is `captions` or `whisper`.
+  `discovered_for` is the individual name if from discovery. `medium` is
+  `youtube` (default) or `podcast`. For `medium='podcast'`: `feed_url`,
+  `audio_url`, and `episode_page_url` are populated (NULL for YouTube),
+  `channel_name` holds the show name, and `video_id` is `pod_<16 hex>`
+  (a sha1 of normalized feed_url + guid|audio_url+pubdate — stable for
+  idempotent dedupe; can't collide with YouTube's 11-char IDs).
+- `transcripts` — one row per episode. `cues_json` is JSON
+  `[{start, end, text, speaker?}]` (`speaker` present for diarized
+  WhisperX output, absent for YouTube captions). `source` is `captions`,
+  `transcript-io`, or `whisperx-modal`.
 - `candidates` — many per video. Output of extract pass. **IDs are unstable
   across re-extracts** (saveCandidates DELETEs and re-INSERTs); anything
   referencing candidate_id (rankings, feedback, bundle_members) cascades.
@@ -434,6 +443,34 @@ Other learned patterns:
 State of the world at last update. Re-evaluate these every few sessions —
 they're listed here so future Claude doesn't waste time rediscovering them
 or quietly re-introduce them.
+
+### Podcasts as a first-class medium (in progress)
+
+Multi-phase effort to add audio podcasts alongside YouTube, reusing the
+existing extract→rank→compose→deliver stages unchanged. The
+ingestion/intelligence boundary already in this codebase (stages 1-2 vs
+3-6) is the separation being preserved — podcasts add a parallel ingest +
+transcribe path and otherwise flow through the same intelligence layer.
+
+- **Phase 1 — DONE.** Schema gained `episodes.medium` + `feed_url` /
+  `audio_url` / `episode_page_url` (additive `safeAlter`, existing rows
+  default `medium='youtube'`). `src/lib/rss.js` parses feeds via
+  rss-parser and mints `pod_<16hex>` IDs. `config/sources.yaml` has a
+  `podcasts:` bucket. `scripts/ingest-podcasts.js` polls + upserts —
+  **standalone, intentionally NOT wired into `runDaily` yet.** Verified
+  against the real DB: 25 YouTube rows untouched, 33 podcasts ingested.
+- **Phase 2 — NEXT.** WhisperX-on-Modal transcription worker (Python,
+  deployed separately to Modal; the one genuinely separate-language piece).
+  Stage 2 (`2-transcribe.js`) becomes a router: YouTube → transcript-io
+  (unchanged), podcast → download audio + POST to Modal/WhisperX with
+  diarization, write cues with `speaker`. The "Whisper deliberately
+  removed" stable note below still holds **for YouTube** — Phase 2 does not
+  reintroduce Whisper for captions; it adds WhisperX for audio-only podcast
+  sources that have no captions at all. Different decision, different medium.
+- **Phases 3-8 — LATER.** Wire podcasts into `runDaily`; confirm extract/
+  rank work unmodified (expected, since they read only episode+transcript);
+  compose URL builder becomes medium-aware (YouTube `&t=Ns` vs podcast page/
+  audio link); web UI feeds editor + medium filter.
 
 ### Not yet done (work the user has acknowledged but deferred)
 
