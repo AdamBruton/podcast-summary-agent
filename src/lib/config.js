@@ -64,8 +64,12 @@ export function loadSources() {
   const raw = fs.readFileSync(path.join(CONFIG_DIR, 'sources.yaml'), 'utf8');
   const parsed = YAML.parse(raw);
   const channels = (parsed.channels || []).filter(c => c.enabled !== false);
+  const podcasts = (parsed.podcasts || []).filter(p => p.enabled !== false);
   return {
     channels,
+    // Podcasts are RSS feeds polled daily for new episodes. See src/lib/rss.js
+    // and the podcast branch of src/stages/1-ingest.js.
+    podcasts,
     // individuals is a list of names (people OR companies) that Discovery
     // searches for daily. See src/stages/1b-discover.js.
     individuals: parsed.individuals || [],

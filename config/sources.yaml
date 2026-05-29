@@ -1,7 +1,8 @@
 # Source configuration for the podcast intelligence agent.
 #
-# Two buckets:
+# Three buckets:
 #   - channels:    YouTube channels we poll for new uploads (subscribed feed)
+#   - podcasts:    RSS feeds we poll for new audio episodes (see src/lib/rss.js)
 #   - individuals: People AND companies we want to discover appearances of
 #                  via daily YouTube search (LLM-curated, see src/stages/1b-discover.js)
 #
@@ -51,6 +52,21 @@ channels:
   - name: Patrick Boyle
     handle: "@PBoyle"
     channel_id: "UCASM0cgfkJxQ1ICmRilfHLw"
+
+# Podcast RSS feeds. Polled daily for new audio episodes; transcribed via
+# the WhisperX-Modal worker. Each item just needs `name` + `url`; set
+# `enabled: false` to mute without removing.
+podcasts:
+  - name: Dwarkesh Patel
+    url: https://apple.dwarkesh-podcast.workers.dev/feed.rss
+  - name: Cheeky Pint with John Collison
+    url: https://feeds.transistor.fm/cheeky-pint-with-john-collison
+  - name: Another Podcast
+    url: https://feeds.simplecast.com/bZ7U2PEk
+  - name: The a16z Show
+    url: https://feeds.simplecast.com/JGE3yC0V
+  - name: Moonshots
+    url: https://feeds.megaphone.fm/DVVTS2890392624
 
 # Discovery: search YouTube broadly for the named individuals below and
 # auto-curate via Claude before promoting into the daily pipeline.
