@@ -604,6 +604,15 @@ inline when working through CLI issues). Rotate at convenience:
   Claude occasionally returns arrays for `supporting_quote`, yt-dlp returns
   null/undefined `duration` for live streams. Don't simplify these helpers
   back to direct binding "for cleanliness" — the gnarliness is the point.
+- **`markDelivered` updates BOTH `rankings.included_in_brief_at` AND
+  `episodes.status = 'delivered'`.** The status flip is the load-bearing
+  part: without it, `resumableEpisodes()` (which picks status IN
+  `('new','transcribed','extracted','ranked')`) re-picks the same episode
+  every day and the brief re-sends the same content indefinitely. There's
+  also an idempotent backfill in `migrate()` that flips any
+  `ranked`-but-already-emailed rows to `delivered` — for the historical
+  prod DB whose rows are stuck from before the fix. Leave both pieces in
+  place.
 
 ---
 

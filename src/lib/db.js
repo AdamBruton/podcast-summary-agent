@@ -158,6 +158,23 @@ function migrate(d) {
   safeAlter(d, `ALTER TABLE episodes ADD COLUMN feed_url TEXT`);
   safeAlter(d, `ALTER TABLE episodes ADD COLUMN audio_url TEXT`);
   safeAlter(d, `ALTER TABLE episodes ADD COLUMN episode_page_url TEXT`);
+
+  // Backfill: markDelivered() historically only stamped
+  // rankings.included_in_brief_at and forgot to flip episodes.status to
+  // 'delivered'. Any episode whose rankings show it was actually emailed
+  // (included_in_brief_at NOT NULL) but is still 'ranked' needs to be
+  // corrected, otherwise resumableEpisodes() re-picks it every day. Idempotent
+  // — UPDATE on no matching rows is a no-op.
+  d.exec(`
+    UPDATE episodes
+       SET status = 'delivered'
+     WHERE status = 'ranked'
+       AND video_id IN (
+         SELECT DISTINCT video_id
+           FROM rankings
+          WHERE included_in_brief_at IS NOT NULL
+       )
+  `);
 }
 
 // --- Episode helpers --------------------------------------------------------
@@ -354,8 +371,18 @@ export function getRankedBriefItems(video_id) {
 }
 
 export function markDelivered(video_id) {
-  db().prepare(`UPDATE rankings SET included_in_brief_at = datetime('now') WHERE video_id = ?`)
-      .run(video_id);
+  const d = db();
+  // Two updates because they touch different tables. WAL handles them as
+  // separate atomic writes — there's no consistency requirement between
+  // the timestamp on rankings and the status on episodes (a partial state
+  // would just mean re-processing on the next run, which is recoverable).
+  d.prepare(`UPDATE rankings SET included_in_brief_at = datetime('now') WHERE video_id = ?`)
+   .run(video_id);
+  // Without this, resumableEpisodes() keeps picking up the same episode
+  // every day because 'ranked' is in its filter — the brief would
+  // re-send the same content indefinitely.
+  d.prepare(`UPDATE episodes SET status = 'delivered' WHERE video_id = ?`)
+   .run(video_id);
 }
 
 // --- Runs / cost ------------------------------------------------------------
