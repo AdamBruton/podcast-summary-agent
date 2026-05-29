@@ -37,19 +37,23 @@ function safeAlter(d, sql) {
 function migrate(d) {
   d.exec(`
     CREATE TABLE IF NOT EXISTS episodes (
-      video_id      TEXT PRIMARY KEY,
-      channel_id    TEXT,
-      channel_name  TEXT,
-      title         TEXT,
-      description   TEXT,
-      published_at  TEXT,
-      duration_sec  INTEGER,
-      url           TEXT,
-      status        TEXT DEFAULT 'new',  -- new|transcribed|extracted|ranked|delivered|skipped
-      skip_reason   TEXT,
-      source        TEXT DEFAULT 'subscribed',  -- subscribed|discovery
-      discovered_for TEXT,                       -- if source='discovery', the individual we searched for
-      ingested_at   TEXT DEFAULT (datetime('now'))
+      video_id         TEXT PRIMARY KEY,        -- generic episode id: YT 11-char for medium=youtube, pod_<16hex> for medium=podcast
+      channel_id       TEXT,                     -- YouTube concept; NULL for podcasts
+      channel_name     TEXT,                     -- podcast name for medium=podcast
+      title            TEXT,
+      description      TEXT,
+      published_at     TEXT,
+      duration_sec     INTEGER,
+      url              TEXT,                     -- listener-facing URL (YT watch URL, or podcast episode page)
+      status           TEXT DEFAULT 'new',       -- new|transcribed|extracted|ranked|delivered|skipped
+      skip_reason      TEXT,
+      source           TEXT DEFAULT 'subscribed',-- subscribed|discovery
+      discovered_for   TEXT,                     -- if source='discovery', the individual we searched for
+      medium           TEXT DEFAULT 'youtube',   -- youtube|podcast
+      feed_url         TEXT,                     -- RSS feed URL; NULL for YouTube
+      audio_url        TEXT,                     -- direct audio enclosure URL; NULL for YouTube
+      episode_page_url TEXT,                     -- per-episode landing page URL; NULL for YouTube
+      ingested_at      TEXT DEFAULT (datetime('now'))
     );
 
     CREATE TABLE IF NOT EXISTS discoveries (
@@ -70,10 +74,10 @@ function migrate(d) {
 
     CREATE TABLE IF NOT EXISTS transcripts (
       video_id      TEXT PRIMARY KEY REFERENCES episodes(video_id),
-      source        TEXT,                 -- captions|whisper
+      source        TEXT,                 -- captions|transcript-io|whisperx-modal
       language      TEXT,
       duration_sec  INTEGER,
-      cues_json     TEXT,                 -- JSON array of {start, end, text}
+      cues_json     TEXT,                 -- JSON array of {start, end, text, speaker?}
       fetched_at    TEXT DEFAULT (datetime('now'))
     );
 
@@ -147,6 +151,13 @@ function migrate(d) {
   safeAlter(d, `ALTER TABLE episodes ADD COLUMN source TEXT DEFAULT 'subscribed'`);
   safeAlter(d, `ALTER TABLE episodes ADD COLUMN discovered_for TEXT`);
   safeAlter(d, `ALTER TABLE rankings ADD COLUMN label TEXT`);
+  // Podcast support: medium tags whether the row is a YouTube video or an
+  // RSS-sourced podcast; the three URL columns are NULL for YouTube and
+  // populated for podcasts.
+  safeAlter(d, `ALTER TABLE episodes ADD COLUMN medium TEXT DEFAULT 'youtube'`);
+  safeAlter(d, `ALTER TABLE episodes ADD COLUMN feed_url TEXT`);
+  safeAlter(d, `ALTER TABLE episodes ADD COLUMN audio_url TEXT`);
+  safeAlter(d, `ALTER TABLE episodes ADD COLUMN episode_page_url TEXT`);
 }
 
 // --- Episode helpers --------------------------------------------------------
@@ -155,26 +166,33 @@ export function upsertEpisode(ep) {
   const d = db();
   const stmt = d.prepare(`
     INSERT INTO episodes (video_id, channel_id, channel_name, title, description, published_at,
-                          duration_sec, url, source, discovered_for)
+                          duration_sec, url, source, discovered_for,
+                          medium, feed_url, audio_url, episode_page_url)
     VALUES (@video_id, @channel_id, @channel_name, @title, @description, @published_at,
-            @duration_sec, @url, @source, @discovered_for)
+            @duration_sec, @url, @source, @discovered_for,
+            @medium, @feed_url, @audio_url, @episode_page_url)
     ON CONFLICT(video_id) DO NOTHING
   `);
   // Defensive coercion — yt-dlp returns null/undefined for several fields on
-  // live streams, premieres, scheduled broadcasts, and oddly-encoded videos.
+  // live streams, premieres, scheduled broadcasts, and oddly-encoded videos;
+  // rss-parser returns objects/undefined for missing enclosures and durations.
   // node:sqlite is strict (no auto-coercion of undefined/NaN/BigInt) so we
   // sanitize here rather than at each call site.
   const sanitized = {
-    video_id:       String(ep.video_id),
-    channel_id:     ep.channel_id   ? String(ep.channel_id)   : null,
-    channel_name:   ep.channel_name ? String(ep.channel_name) : null,
-    title:          String(ep.title || ''),
-    description:    String(ep.description || ''),
-    published_at:   ep.published_at || null,
-    duration_sec:   Number.isFinite(ep.duration_sec) ? Math.floor(ep.duration_sec) : null,
-    url:            String(ep.url || ''),
-    source:         ep.source         || 'subscribed',
-    discovered_for: ep.discovered_for || null,
+    video_id:         String(ep.video_id),
+    channel_id:       ep.channel_id   ? String(ep.channel_id)   : null,
+    channel_name:     ep.channel_name ? String(ep.channel_name) : null,
+    title:            String(ep.title || ''),
+    description:      String(ep.description || ''),
+    published_at:     ep.published_at || null,
+    duration_sec:     Number.isFinite(ep.duration_sec) ? Math.floor(ep.duration_sec) : null,
+    url:              String(ep.url || ''),
+    source:           ep.source         || 'subscribed',
+    discovered_for:   ep.discovered_for || null,
+    medium:           ep.medium           || 'youtube',
+    feed_url:         ep.feed_url         ? String(ep.feed_url)         : null,
+    audio_url:        ep.audio_url        ? String(ep.audio_url)        : null,
+    episode_page_url: ep.episode_page_url ? String(ep.episode_page_url) : null,
   };
   const info = stmt.run(sanitized);
   return info.changes > 0; // true if newly inserted
