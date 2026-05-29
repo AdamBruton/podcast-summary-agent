@@ -29,9 +29,13 @@ over technical detail (see `config/profile.md` "Priority hierarchy" section).
 
 - **Node 22 LTS, ESM only.** No CJS, no TypeScript, no build step. Module file
   imports use explicit `.js` extensions.
-- **All JS.** yt-dlp + ffmpeg invoked as subprocesses; no Python code in this
-  codebase. yt-dlp is installed via pip in the Docker image (apt's version
-  lags YouTube changes by weeks).
+- **All JS in the Node runtime.** yt-dlp + ffmpeg invoked as subprocesses; no
+  Python code runs inside the Node app or the Railway image. yt-dlp is
+  installed via pip in the Docker image (apt's version lags YouTube changes by
+  weeks). **Exception:** `modal_worker/` holds the WhisperX transcription
+  worker, which IS Python — but it is deployed *separately* to Modal (not part
+  of the Railway build) and the Node side only ever reaches it over HTTPS. See
+  "Modal transcription worker" below.
 - **`node:sqlite` not `better-sqlite3`.** Built-in, no native deps, no
   VS-build-tools requirement on Windows or Alpine in Docker. See "node:sqlite
   gotchas" below — it's stricter than other SQLite bindings.
@@ -75,6 +79,10 @@ src/
   web/
     server.js                Express API + static file serving
     public/index.html        single-page UI: sources, profile, episode inspector, ad-hoc URL
+modal_worker/                Python, deployed SEPARATELY to Modal (not Railway). Called over HTTPS.
+  hello.py                   Phase 2a smoke test (no GPU)
+  whisperx_cpu_test.py       Phase 2b CPU/tiny proof of the WhisperX path
+  transcribe.py              Phase 2c GPU worker: large-v3 + alignment + pyannote diarization
 prompts/
   extract.md                 system prompt for extract pass
   rank.md                    system prompt for per-episode rank (bundling rules here)
@@ -312,6 +320,57 @@ Other learned patterns:
   auto fallback.
 - **Audio download / Whisper**: REMOVED. Transcripts come from youtube-transcript.io
   (see `src/lib/transcript-io.js`). yt-dlp is no longer involved in transcription.
+
+---
+
+## Modal transcription worker (podcasts)
+
+Audio podcasts have no captions, so they're transcribed by a **WhisperX worker
+deployed to [Modal](https://modal.com)** — separate language (Python), separate
+cloud, separate deploy lifecycle from the Node app. The Node ingestion layer
+will call it over HTTPS (Phase 2d); it never imports this code. Lives in
+`modal_worker/`.
+
+**This does NOT reintroduce Whisper for YouTube.** The "Whisper deliberately
+removed" rule below still holds for YouTube (captions via youtube-transcript.io).
+WhisperX-on-Modal is a *different decision for a different medium* — audio-only
+sources that have no captions at all.
+
+- **Run/deploy** (Windows): always prefix `$env:PYTHONUTF8=1` or Modal's `✓`
+  glyphs crash the console with a cp1252 `charmap` error (the function still
+  runs — it's purely a stdout-encoding issue). Invoke as `py -m modal ...`
+  (the `modal` script isn't on PATH). `py -m modal run modal_worker/transcribe.py`
+  runs it ephemerally; `modal deploy` (Phase 2d) will publish the HTTPS endpoint.
+- **Image recipe (load-bearing version pins):** `debian_slim(3.11)` + ffmpeg +
+  matched torch trio **torch 2.7.1 / torchaudio 2.7.1 / torchvision 0.22.1** +
+  **whisperx 3.7.2**. whisperx requires torch>=2.7.1; pinning the whole trio
+  stops the install from pulling a mismatched torch and breaking torchvision.
+- **Two mandatory compatibility shims** (both in `transcribe.py`, must run
+  before any model load):
+  1. `torch.load` forced to `weights_only=False` — torch 2.7 defaults it to
+     True, which rejects pyannote's checkpoints (they embed omegaconf objects).
+     Trusted HF sources, so this is safe. Force it (don't `setdefault`):
+     `lightning_fabric` passes `weights_only=True` explicitly.
+  2. `hf_hub_download`/`snapshot_download` translate `use_auth_token=` → `token=`
+     — pyannote.audio 3.4 still passes the removed kwarg; the newer
+     huggingface_hub that transformers needs renamed it. **No single hf_hub
+     version satisfies both pyannote and transformers**, so we keep the new one
+     and translate at the call site. Do NOT "fix" this by pinning hf_hub.
+- **Model-weight caching:** a Modal **Volume** (`whisperx-cache`) mounted at
+  `/cache`, with `HF_HOME`/`TORCH_HOME` pointed into it, so large-v3 (~3GB) +
+  alignment + pyannote models download once and persist. `cache_vol.commit()`
+  after a run. Without this, every cold start re-downloads ~4GB on billed GPU.
+- **HF token:** the gated pyannote models (`speaker-diarization-3.1` +
+  `segmentation-3.0`, both must be license-accepted) need a token, supplied as
+  the Modal secret **`huggingface`** (key `HF_TOKEN`) — never in the repo.
+- **Output contract:** cues `[{start, end, text, speaker}]`. `speaker` is an
+  anonymous `SPEAKER_NN` diarization label (no real names).
+- **Cost (grounded on a 5-min clip, L4):** ~47s GPU compute for 5 min audio →
+  ~14 min / **~$0.18 per 90-min episode**; ~15 episodes/week ≈ ~$11/mo, inside
+  the $30 free credit. GPU = L4 ($0.000222/s).
+- **Status:** 2a hello-world, 2b CPU/tiny, 2c GPU+diarization all done. 2d
+  (HTTPS endpoint + shared secret) and the Node-side transcribe router (Phase 3)
+  are the remaining integration work.
 
 ---
 
