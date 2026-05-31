@@ -1,17 +1,23 @@
-# Phase 2c — the real transcription worker: L4 GPU + large-v3 + word alignment
-# + speaker diarization. Output cues match the data contract:
+# Phases 2c + 2d — the real transcription worker: L4 GPU + large-v3 + word
+# alignment + speaker diarization, plus the HTTPS endpoint the Node ingestion
+# layer calls. Output cues match the data contract:
 #   [{start, end, text, speaker}]
 #
-# This is the piece the Node ingestion layer will eventually call over HTTPS
-# (Phase 2d adds the endpoint). For now we exercise it with `modal run`.
+# Two ways to invoke:
 #
-# Run (first GPU job — small clip):
-#     $env:PYTHONUTF8=1
-#     py -m modal run modal_worker/transcribe.py
+#   1. Ephemeral, for local testing (Phase 2c):
+#        $env:PYTHONUTF8=1
+#        py -m modal run modal_worker/transcribe.py
+#      Runs the local_entrypoint below against a short clip.
 #
-# Cost: L4 is ~$0.000222/s. First run also downloads ~4GB of models onto the
-# cache Volume (one-time, on GPU time). Later runs reuse the Volume and skip
-# the download.
+#   2. Deployed HTTPS endpoint (Phase 2d) — what the Node side actually uses:
+#        py -m modal deploy modal_worker/transcribe.py
+#      Publishes the FastAPI `web` app at a stable URL. See the Phase 2d
+#      section at the bottom of this file for the request contract + auth.
+#
+# Cost: L4 is ~$0.000222/s. First GPU run also downloads ~4GB of models onto
+# the cache Volume (one-time, on GPU time). Later runs reuse the Volume and
+# skip the download.
 
 import modal
 
@@ -188,3 +194,97 @@ def main(audio_url: str = DEFAULT_AUDIO_URL, clip_seconds: int = 300):
         print(f"  [{c['start']:>7.1f}–{c['end']:>7.1f}] ({spk})  {c['text']}")
     if len(out["cues"]) > 25:
         print(f"  ... +{len(out['cues']) - 25} more segments")
+
+
+# ---------------------------------------------------------------------------
+# Phase 2d — HTTPS endpoint + shared secret.
+#
+# `py -m modal deploy modal_worker/transcribe.py` publishes the FastAPI app
+# below at a stable HTTPS URL. The Node ingestion layer (Phase 3) POSTs an
+# audio_url and polls for the result — it never imports this code, only talks
+# HTTP.
+#
+# Why spawn + poll instead of one synchronous request: a 90-min episode is
+# ~14 min of GPU work. Holding an HTTP connection open that long is fragile
+# (client/proxy timeouts) and a dropped connection would re-run the job and
+# burn GPU $. So we use Modal's job-queue pattern:
+#     POST /transcribe      -> auth -> transcribe.spawn(...) -> {"call_id": id}
+#     GET  /result/{id}     -> auth -> FunctionCall.from_id(id).get(timeout=0)
+#                               -> 200 {"status":"done","result":{...}} when done
+#                               -> 202 {"status":"pending"} while still running
+#                               -> 410 once Modal's result-retention window lapses
+#
+# Auth is a shared bearer token. The expected value comes from the Modal secret
+# `transcribe-auth` (key TRANSCRIBE_SECRET); the Node side sends it as
+# `Authorization: Bearer <token>`. Create the secret once before deploying:
+#     py -m modal secret create transcribe-auth TRANSCRIBE_SECRET=<random-hex>
+# Generate a token with e.g. `python -c "import secrets;print(secrets.token_hex(32))"`.
+#
+# The web container is intentionally tiny (fastapi only, no torch) so it cold-
+# starts fast and scales to zero — the expensive GPU image only spins up inside
+# the spawned `transcribe` call.
+# ---------------------------------------------------------------------------
+
+web_image = modal.Image.debian_slim(python_version="3.11").pip_install(
+    "fastapi[standard]"
+)
+
+
+@app.function(
+    image=web_image,
+    secrets=[modal.Secret.from_name("transcribe-auth")],  # injects TRANSCRIBE_SECRET
+)
+@modal.concurrent(max_inputs=50)
+@modal.asgi_app()
+def web():
+    import hmac
+    import os
+
+    from fastapi import FastAPI, Header, HTTPException
+    from fastapi.responses import JSONResponse
+
+    api = FastAPI(title="podcast-transcribe", version="2d")
+
+    def _require_auth(authorization: str | None):
+        expected = os.environ.get("TRANSCRIBE_SECRET")
+        if not expected:
+            # Worker misconfiguration, not a client error — make it loud (500)
+            # rather than silently rejecting every request as unauthorized.
+            raise HTTPException(500, "TRANSCRIBE_SECRET not configured on the worker")
+        token = ""
+        if authorization and authorization.lower().startswith("bearer "):
+            token = authorization[len("bearer "):].strip()
+        # constant-time compare so a wrong token can't be timing-probed.
+        if not token or not hmac.compare_digest(token, expected):
+            raise HTTPException(401, "missing or invalid bearer token")
+
+    @api.post("/transcribe")
+    def submit(body: dict, authorization: str | None = Header(default=None)):
+        _require_auth(authorization)
+        audio_url = (body or {}).get("audio_url")
+        if not isinstance(audio_url, str) or not audio_url:
+            raise HTTPException(400, "body must include a non-empty string 'audio_url'")
+        clip_seconds = (body or {}).get("clip_seconds")
+        if clip_seconds is not None and not isinstance(clip_seconds, int):
+            raise HTTPException(400, "'clip_seconds' must be an integer or omitted")
+        # Same-app reference: spawn the GPU function without blocking. Returns a
+        # FunctionCall whose object_id the caller polls on /result.
+        call = transcribe.spawn(audio_url, clip_seconds)
+        return {"call_id": call.object_id}
+
+    @api.get("/result/{call_id}")
+    def result(call_id: str, authorization: str | None = Header(default=None)):
+        _require_auth(authorization)
+        function_call = modal.FunctionCall.from_id(call_id)
+        try:
+            out = function_call.get(timeout=0)
+        except TimeoutError:
+            # Not finished yet — 202 tells the poller to retry later.
+            return JSONResponse({"status": "pending"}, status_code=202)
+        except modal.exception.OutputExpiredError:
+            # Modal discards results after its retention window; the caller must
+            # resubmit rather than wait forever on a stale call_id.
+            raise HTTPException(410, "result expired; resubmit the job")
+        return {"status": "done", "result": out}
+
+    return api
