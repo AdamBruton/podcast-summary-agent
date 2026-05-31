@@ -41,6 +41,17 @@ image = (
         "torchvision==0.22.1",
     )
     .pip_install("whisperx==3.7.2")
+    # whisperx's alignment step (whisperx/alignment.py) sentence-splits via nltk,
+    # which needs the `punkt`/`punkt_tab` tokenizer data. It is NOT bundled with
+    # the pip package, so without this every alignment raises
+    # `LookupError: Resource 'punkt_tab' not found` on a cold container (warm
+    # containers that happened to fetch it survive, which makes it look flaky).
+    # Bake it into the image at a default nltk search path so every cold start
+    # has it. Both names are needed: newer nltk renamed punkt → punkt_tab but
+    # whisperx still probes the old name first.
+    .run_commands(
+        "python -m nltk.downloader -d /usr/local/share/nltk_data punkt punkt_tab"
+    )
     .env({
         "HF_HOME": f"{CACHE_DIR}/huggingface",
         "TORCH_HOME": f"{CACHE_DIR}/torch",
@@ -278,13 +289,27 @@ def web():
         function_call = modal.FunctionCall.from_id(call_id)
         try:
             out = function_call.get(timeout=0)
-        except TimeoutError:
-            # Not finished yet — 202 tells the poller to retry later.
-            return JSONResponse({"status": "pending"}, status_code=202)
-        except modal.exception.OutputExpiredError:
-            # Modal discards results after its retention window; the caller must
-            # resubmit rather than wait forever on a stale call_id.
-            raise HTTPException(410, "result expired; resubmit the job")
+        except Exception as exc:
+            # `.get(timeout=0)` raises when the result isn't ready yet, when the
+            # result has expired, OR when the GPU job itself failed (it re-raises
+            # the remote exception). The exact "not ready" / "expired" classes
+            # have moved across Modal versions, so match on the type NAME rather
+            # than importing a specific symbol (a bad import here would itself
+            # 500). Anything we can't classify is surfaced verbatim so the caller
+            # — and our logs — see the real cause instead of a blank 500.
+            name = type(exc).__name__
+            if name in ("TimeoutError", "FunctionTimeoutError", "OutputTimeoutError"):
+                # Still running — 202 tells the poller to retry later.
+                return JSONResponse({"status": "pending"}, status_code=202)
+            if "Expired" in name:
+                # Modal discards results after its retention window; the caller
+                # must resubmit rather than wait forever on a stale call_id.
+                raise HTTPException(410, "result expired; resubmit the job")
+            # The job raised, or some other unexpected error. Report it.
+            return JSONResponse(
+                {"status": "failed", "error_type": name, "error": str(exc)[:1000]},
+                status_code=502,
+            )
         return {"status": "done", "result": out}
 
     return api

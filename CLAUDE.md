@@ -68,10 +68,12 @@ src/
     discovery-search.js      yt-dlp ytsearch + mechanical pre-filters
     global-rank.js           cross-episode global ordering pass
     number-check.js          numeric-fidelity guard for extracted candidates
+    transcript-io.js         youtube-transcript.io HTTP client (YouTube captions)
+    modal-transcribe.js      WhisperX-on-Modal HTTP client (podcast audio; Phase 3)
   stages/
     1-ingest.js              channel polling + ad-hoc URL ingest
     1b-discover.js           discovery: search → mechanical filter → LLM curate → promote
-    2-transcribe.js          captions-first, Groq Whisper fallback
+    2-transcribe.js          medium router: YouTube→transcript-io, podcast→Modal/WhisperX
     3-extract.js             chunked Claude pass producing candidates
     4-rank.js                per-episode Claude pass (singles + bundles)
     5-compose.js             HTML render incl. canonicalize + bundle layout
@@ -103,6 +105,7 @@ scripts/
   inspect-bundles.js         dump bundle structure for an episode
   test-canonicalize.js       sanity test for the term-canonicalization table
   test-number-check.js       sanity test for the numeric-fidelity guard
+  test-modal-transcribe.js   smoke-test the Modal WhisperX HTTP client (no DB)
 data/                        gitignored. state.db, transcripts/, briefs/, cookies.txt
 ```
 
@@ -195,14 +198,20 @@ runDaily()                                 runEpisode({url, markDeliveredOnSend}
 
 Stage invariants:
 
-- **transcribe**: single source — **youtube-transcript.io** (third-party API).
-  Sidesteps the "yt-dlp from a Railway IP gets silently degraded for caption
-  fetching" problem by handing YouTube interaction off to a vendor. No
-  fallback (Groq Whisper was considered and explicitly rejected — caller
-  accepts missed episodes when the API can't return a transcript). Cached
-  transcripts (already in DB) are reused without refetch. Requires
-  `YOUTUBE_TRANSCRIPT_IO_TOKEN` env var. Rate limit: 5 req / 10 sec; the
-  client retries on 429 honoring the Retry-After header.
+- **transcribe**: medium-aware router (`src/stages/2-transcribe.js`), Phase 3.
+  `medium='youtube'` → **youtube-transcript.io** (third-party API; sidesteps the
+  "yt-dlp from a Railway IP gets silently degraded for caption fetching" problem
+  by handing YouTube interaction to a vendor). `medium='podcast'` → the
+  **WhisperX-on-Modal** HTTPS worker via `src/lib/modal-transcribe.js` (audio has
+  no captions). Both write the same cue contract; only the `source` tag
+  (`transcript-io` vs `whisperx-modal`) and per-cue `speaker` (podcasts only)
+  differ. No fallback in either branch (Groq Whisper was considered and
+  explicitly rejected — caller accepts missed episodes); a failure marks the
+  episode `skipped` with a reason. Cached transcripts (already in DB) are reused
+  without refetch. Env: `YOUTUBE_TRANSCRIPT_IO_TOKEN` (YouTube; rate limit 5 req
+  / 10 sec, client retries on 429 honoring Retry-After) + `MODAL_TRANSCRIBE_URL`
+  / `MODAL_TRANSCRIBE_SECRET` (podcasts; client submits then polls `/result`
+  every 15s up to a 40-min ceiling — the GPU job is ~14 min).
 - **extract**: chunks long transcripts at ~240k chars with cue overlap.
   Output filtered by `verifyNumericFidelity` (drops candidates whose claim
   contains numbers not present in the supporting_quote — catches the
@@ -346,6 +355,14 @@ sources that have no captions at all.
   matched torch trio **torch 2.7.1 / torchaudio 2.7.1 / torchvision 0.22.1** +
   **whisperx 3.7.2**. whisperx requires torch>=2.7.1; pinning the whole trio
   stops the install from pulling a mismatched torch and breaking torchvision.
+- **nltk `punkt`/`punkt_tab` baked into the image (load-bearing).** whisperx's
+  alignment step sentence-splits via nltk, whose tokenizer data is NOT shipped
+  with the pip package. Without it, alignment raises `LookupError: Resource
+  'punkt_tab' not found` — but only on a COLD container (a warm one that already
+  fetched it survives, so the bug masquerades as flakiness). The image runs
+  `python -m nltk.downloader -d /usr/local/share/nltk_data punkt punkt_tab` so
+  every cold start has it. Download BOTH names: newer nltk renamed punkt →
+  punkt_tab, but whisperx still probes the old name first. Don't remove this.
 - **Two mandatory compatibility shims** (both in `transcribe.py`, must run
   before any model load):
   1. `torch.load` forced to `weights_only=False` — torch 2.7 defaults it to
@@ -562,15 +579,22 @@ transcribe path and otherwise flow through the same intelligence layer.
   YouTube** — Phase 2 does not reintroduce Whisper for captions; it adds
   WhisperX for audio-only podcast sources that have no captions at all.
   Different decision, different medium.
-- **Phase 3 — NEXT.** Stage 2 (`2-transcribe.js`) becomes a router: YouTube →
-  transcript-io (unchanged), podcast → POST audio_url to the Modal endpoint +
-  poll `/result`, write cues with `speaker`. Needs a small Node client wrapper
-  (mirroring `src/lib/transcript-io.js`) reading `MODAL_TRANSCRIBE_URL` +
-  `MODAL_TRANSCRIBE_SECRET` env vars.
-- **Phases 4-8 — LATER.** Wire podcasts into `runDaily`; confirm extract/
-  rank work unmodified (expected, since they read only episode+transcript);
-  compose URL builder becomes medium-aware (YouTube `&t=Ns` vs podcast page/
-  audio link); web UI feeds editor + medium filter.
+- **Phase 3 — DONE (2026-05-31).** Stage 2 (`2-transcribe.js`) is now a
+  medium router: YouTube → transcript-io (unchanged), podcast → `audio_url`
+  POSTed to the Modal endpoint + poll `/result`, cues saved with `speaker` and
+  `source='whisperx-modal'`. Node client is `src/lib/modal-transcribe.js`
+  (mirrors `transcript-io.js`), reading `MODAL_TRANSCRIBE_URL` +
+  `MODAL_TRANSCRIBE_SECRET`. Smoke-test via `node scripts/test-modal-transcribe.js`
+  (hits the live endpoint, no DB). NOT yet exercised by a real podcast row
+  through the pipeline — that happens in Phase 4 when podcasts are wired into
+  `runDaily` (ingest-podcasts.js is still standalone).
+- **Phase 4 — NEXT.** Wire `scripts/ingest-podcasts.js` into `runDaily` so
+  podcast rows flow through ingest → the new transcribe router → extract → rank
+  → compose → deliver. Confirm extract/rank work unmodified (they read only
+  episode + transcript). Then make the compose URL builder medium-aware (YouTube
+  `&t=Ns` deep-links vs podcast episode-page / audio links).
+- **Phases 5-8 — LATER.** Web UI podcast feeds editor + medium filter; any
+  remaining compose/deliver polish once podcasts run end-to-end.
 
 ### Not yet done (work the user has acknowledged but deferred)
 
