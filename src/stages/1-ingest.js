@@ -1,14 +1,16 @@
 // Stage 1: Ingest.
 //
-// Two entry points:
-//   ingestEpisode(url) — for --episode flag, single video
-//   ingestDaily(opts)   — for daily run, polls all configured sources
+// Entry points:
+//   ingestEpisode(url)        — for --episode flag, single YouTube video
+//   ingestDaily(opts)         — daily run, polls all configured YouTube channels
+//   ingestPodcastsDaily(opts) — daily run, polls all configured podcast RSS feeds
 //
-// Both return arrays of episode rows. Dedup is via SQLite (video_id PK).
+// All return arrays of episode rows. Dedup is via SQLite (video_id PK).
 
 import { loadSources } from '../lib/config.js';
 import { upsertEpisode, getEpisode } from '../lib/db.js';
 import { fetchMetadata, listChannelUploads, videoIdFromUrl, resolveHandle } from '../lib/youtube.js';
+import { pollPodcasts } from '../lib/rss.js';
 import { log } from '../lib/log.js';
 
 export async function ingestEpisode(url) {
@@ -69,6 +71,42 @@ export async function ingestDaily({ lookbackDays = 2 } = {}) {
       upsertEpisode(meta);
       newEpisodes.push(getEpisode(meta.video_id));
       log.ok(`new`, { channel: ch.name, title: meta.title.slice(0, 60) });
+    }
+  }
+
+  return newEpisodes;
+}
+
+// Poll every enabled podcast RSS feed and insert new episode rows
+// (medium='podcast', status='new'). Mirrors ingestDaily for the audio world:
+// rss.js is the metadata fetcher (yt-dlp's analog), pollPodcasts returns
+// normalized rows ready for upsertEpisode. New podcast rows are picked up by
+// the same resumableEpisodes() loop in the pipeline and routed to the Modal
+// WhisperX transcriber by the medium-aware stage 2.
+//
+// `lookbackDays` matches ingestDaily's window so a daily run considers the same
+// recency horizon across both media. `limit` caps items examined per feed.
+export async function ingestPodcastsDaily({ lookbackDays = 2, limit = 25 } = {}) {
+  const { podcasts } = loadSources();
+  if (!podcasts || !podcasts.length) {
+    log.info('no podcasts configured, skipping podcast ingest');
+    return [];
+  }
+
+  const sinceDate = new Date(Date.now() - lookbackDays * 86400_000).toISOString().slice(0, 10);
+  const candidates = await pollPodcasts(podcasts, { limit });
+  const newEpisodes = [];
+
+  for (const ep of candidates) {
+    // Skip episodes older than the lookback window. Podcasts publish less often
+    // than channels upload, but a fresh feed subscription can surface a long
+    // back-catalog we don't want to transcribe all at once (each is billed GPU).
+    if (ep.published_at && ep.published_at.slice(0, 10) < sinceDate) continue;
+    if (getEpisode(ep.video_id)) continue; // dedup
+    const isNew = upsertEpisode(ep);
+    if (isNew) {
+      newEpisodes.push(getEpisode(ep.video_id));
+      log.ok(`new`, { podcast: ep.channel_name, title: (ep.title || '').slice(0, 60) });
     }
   }
 

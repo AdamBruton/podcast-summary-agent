@@ -129,23 +129,48 @@ function gatherAllItems(episodes) {
     for (const it of getRankedBriefItems(ep.video_id)) {
       out.push({
         ...it,
-        video_id:      ep.video_id,
-        episode_title: ep.title,
-        channel_name:  ep.channel_name,
-        published_at:  ep.published_at,
+        video_id:         ep.video_id,
+        episode_title:    ep.title,
+        channel_name:     ep.channel_name,
+        published_at:     ep.published_at,
+        // Medium + podcast link fields so renderItem can build correct URLs.
+        // NULL for YouTube; populated for medium='podcast'.
+        medium:           ep.medium || 'youtube',
+        audio_url:        ep.audio_url || null,
+        episode_page_url: ep.episode_page_url || null,
       });
     }
   }
   return out;
 }
 
+// Show/episode-level link. YouTube → the video; podcast → the show-notes page
+// (falling back to the audio file, then '#' if a feed gave us neither).
+function episodeLink(it) {
+  if (it.medium === 'podcast') return it.episode_page_url || it.audio_url || '#';
+  return youtubeUrl(it.video_id);
+}
+
+// Timestamp deep-link for a single moment. YouTube supports ?v=…&t=Ns jump-to-
+// time; podcasts have no universal equivalent, so we point at the audio file
+// with an `#t=<seconds>` media fragment — browsers that stream the raw MP3 honor
+// it; apps that ignore the fragment just open the episode audio. Falls back to
+// the episode page (then '#') when there's no audio URL.
+function momentLink(it, t) {
+  if (it.medium === 'podcast') {
+    const base = it.audio_url || it.episode_page_url;
+    return base ? `${base}#t=${Math.floor(t)}` : '#';
+  }
+  return youtubeUrl(it.video_id, t);
+}
+
 function renderItem(it, rank, isFirst) {
-  const showLink = `<a href="${esc(youtubeUrl(it.video_id))}"><span class="show">${esc(it.channel_name)}</span> — ${esc(it.episode_title)}</a>`;
+  const showLink = `<a href="${esc(episodeLink(it))}"><span class="show">${esc(it.channel_name)}</span> — ${esc(it.episode_title)}</a>`;
   const isBundle = Array.isArray(it.bundle_members) && it.bundle_members.length > 0;
 
   if (!isBundle) {
     // Single — original layout.
-    const ts = `<a class="ts" href="${esc(youtubeUrl(it.video_id, it.timestamp_sec))}">${fmtTime(it.timestamp_sec)}</a>`;
+    const ts = `<a class="ts" href="${esc(momentLink(it, it.timestamp_sec))}">${fmtTime(it.timestamp_sec)}</a>`;
     return `
       <table class="item${isFirst ? ' first' : ''}" cellpadding="0" cellspacing="0" border="0">
         <tr>
@@ -170,7 +195,7 @@ function renderItem(it, rank, isFirst) {
   ];
   const speakers = Array.from(new Set(members.map(m => m.speaker).filter(Boolean)));
   const memberRows = members.map(m => {
-    const ts = `<a class="ts" href="${esc(youtubeUrl(it.video_id, m.timestamp_sec))}">${fmtTime(m.timestamp_sec)}</a>`;
+    const ts = `<a class="ts" href="${esc(momentLink(it, m.timestamp_sec))}">${fmtTime(m.timestamp_sec)}</a>`;
     const claimLine = m.claim && m.claim !== headline
       ? `<div class="bundle-claim">${esc(m.claim)}</div>` : '';
     const quote = m.supporting_quote

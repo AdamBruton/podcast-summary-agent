@@ -11,14 +11,15 @@ fix CLAUDE.md.
 
 ## What this is
 
-A podcast intelligence agent. Polls a curated set of YouTube channels + searches
-YouTube for named individuals/companies daily, transcribes via captions (with
-optional Whisper fallback), runs two Claude passes (extract → rank, plus a
+A podcast intelligence agent. Polls a curated set of YouTube channels + podcast
+RSS feeds, and searches YouTube for named individuals/companies daily;
+transcribes YouTube via captions (youtube-transcript.io) and podcasts via
+WhisperX-on-Modal, runs two Claude passes (extract → rank, plus a
 cross-episode global rank), composes an HTML brief with timestamp deep-links,
 sends via SendGrid. Tuned by an editable profile.md and per-candidate thumbs
 feedback from the web UI. Runs in production on Railway as a single
 long-lived web service (Cloudflare-Access-protected) that also schedules
-the daily brief from in-process at 10:00 UTC. No separate cron service.
+the daily brief from in-process at 08:00 UTC. No separate cron service.
 
 Reader for the brief: the project owner. Bias is business / strategy / tokenomics
 over technical detail (see `config/profile.md` "Priority hierarchy" section).
@@ -95,7 +96,7 @@ config/
   sources.yaml               channels + podcasts (RSS) + individuals/companies list; web UI edits this
   profile.md                 interest profile (tier hierarchy + themes); web UI edits this
 scripts/
-  ingest-podcasts.js         poll RSS feeds in sources.yaml → upsert podcast episodes (standalone; not yet wired into runDaily)
+  ingest-podcasts.js         thin wrapper over ingestPodcastsDaily() for debugging RSS in isolation (the daily run calls the same function)
   resolve-channels.js        one-time / on-demand: populate channel_id from @handle
   recompose.js               re-render the current ranked pool (with optional --send)
   rerank.js                  re-run rank pass on existing episodes (no re-extract)
@@ -498,7 +499,8 @@ sources that have no captions at all.
   re-deploy code changes assuming state will be wiped.
 - **Daily brief runs in-process** in the web service via an in-process
   scheduler (`scheduleDailyRun` in `src/web/server.js`) that fires at
-  10:00 UTC (= 6am EDT / 5am EST). The hour is fixed in UTC, so it
+  08:00 UTC (= 4am EDT / 3am EST; moved earlier from 10:00 UTC to buffer
+  for podcast transcription). The hour is fixed in UTC, so it
   drifts an hour vs ET across DST — acceptable for a morning brief.
   The scheduler only starts when `PORT` is set (Railway mode); locally
   use `npm run brief`. Manually trigger a daily on prod via
@@ -564,9 +566,7 @@ transcribe path and otherwise flow through the same intelligence layer.
   `audio_url` / `episode_page_url` (additive `safeAlter`, existing rows
   default `medium='youtube'`). `src/lib/rss.js` parses feeds via
   rss-parser and mints `pod_<16hex>` IDs. `config/sources.yaml` has a
-  `podcasts:` bucket. `scripts/ingest-podcasts.js` polls + upserts —
-  **standalone, intentionally NOT wired into `runDaily` yet.** Verified
-  against the real DB: 25 YouTube rows untouched, 33 podcasts ingested.
+  `podcasts:` bucket. (Polling is now wired into `runDaily` — see Phase 4.)
 - **Phase 2 — DONE and DEPLOYED.** WhisperX-on-Modal transcription
   worker (Python, deployed separately to Modal; the one genuinely
   separate-language piece). 2a/2b/2c built the GPU worker; **2d** added the
@@ -579,22 +579,32 @@ transcribe path and otherwise flow through the same intelligence layer.
   YouTube** — Phase 2 does not reintroduce Whisper for captions; it adds
   WhisperX for audio-only podcast sources that have no captions at all.
   Different decision, different medium.
-- **Phase 3 — DONE (2026-05-31).** Stage 2 (`2-transcribe.js`) is now a
-  medium router: YouTube → transcript-io (unchanged), podcast → `audio_url`
-  POSTed to the Modal endpoint + poll `/result`, cues saved with `speaker` and
+- **Phase 3 — DONE (2026-05-31).** Stage 2 (`2-transcribe.js`) is a medium
+  router: YouTube → transcript-io (unchanged), podcast → `audio_url` POSTed to
+  the Modal endpoint + poll `/result`, cues saved with `speaker` and
   `source='whisperx-modal'`. Node client is `src/lib/modal-transcribe.js`
   (mirrors `transcript-io.js`), reading `MODAL_TRANSCRIBE_URL` +
-  `MODAL_TRANSCRIBE_SECRET`. Smoke-test via `node scripts/test-modal-transcribe.js`
-  (hits the live endpoint, no DB). NOT yet exercised by a real podcast row
-  through the pipeline — that happens in Phase 4 when podcasts are wired into
-  `runDaily` (ingest-podcasts.js is still standalone).
-- **Phase 4 — NEXT.** Wire `scripts/ingest-podcasts.js` into `runDaily` so
-  podcast rows flow through ingest → the new transcribe router → extract → rank
-  → compose → deliver. Confirm extract/rank work unmodified (they read only
-  episode + transcript). Then make the compose URL builder medium-aware (YouTube
-  `&t=Ns` deep-links vs podcast episode-page / audio links).
+  `MODAL_TRANSCRIBE_SECRET`. Smoke-test via `node scripts/test-modal-transcribe.js`.
+- **Phase 4 — DONE (2026-05-31).** Podcasts run end-to-end through `runDaily`:
+  - `ingestPodcastsDaily()` in `src/stages/1-ingest.js` polls RSS feeds and
+    inserts `medium='podcast'` rows; `runDaily` calls it right after
+    `ingestDaily()` (YouTube). Non-fatal — a feed failure can't block the brief.
+  - New podcast rows flow through the existing `resumableEpisodes()` loop
+    (status-based, medium-agnostic) → transcribe router → extract → rank,
+    **unmodified** (extract/rank read only episode + transcript).
+  - Compose (`5-compose.js`) is medium-aware: `episodeLink()` and `momentLink()`
+    build YouTube `?v=…&t=Ns` deep-links for videos, and `episode_page_url` +
+    `audio_url#t=<sec>` for podcasts. Verified both paths render correct links.
+  - **Back-catalog guard:** ingest uses `lookbackDays` (2 in the daily run) so a
+    newly-added feed admits only recent episodes — it won't flood the run with a
+    full back-catalog of billed GPU jobs. The standalone script's `--since-days`
+    (default 30) is separate and only for manual debugging.
+  - Podcasts transcribe **sequentially** like everything else (the daily loop is
+    a plain `for`). A morning with several podcasts can add 14+ min each; the
+    08:00 UTC start (moved earlier from 10:00) buffers for this. Revisit with a
+    cap or parallelism if mornings get slow.
 - **Phases 5-8 — LATER.** Web UI podcast feeds editor + medium filter; any
-  remaining compose/deliver polish once podcasts run end-to-end.
+  remaining compose/deliver polish.
 
 ### Not yet done (work the user has acknowledged but deferred)
 
