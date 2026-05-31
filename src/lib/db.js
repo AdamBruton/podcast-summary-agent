@@ -454,7 +454,17 @@ export function markDiscoveryPromoted(video_id) {
 // Recent episodes with candidate + ranking counts, newest-first.
 // Excludes episodes still in 'new' state (nothing to inspect yet) and those
 // 'skipped' (no transcript). Limit defaults to 25 to keep payloads small.
-export function listEpisodesWithCounts({ limit = 25 } = {}) {
+// `medium` (optional): 'youtube' | 'podcast' — filter the list to one medium.
+// Filtering is done in SQL (not client-side) because the LIMIT means a
+// client-side filter could show too few rows when one medium dominates.
+export function listEpisodesWithCounts({ limit = 25, medium = null } = {}) {
+  const params = [];
+  let mediumClause = '';
+  if (medium === 'youtube' || medium === 'podcast') {
+    mediumClause = 'AND e.medium = ?';
+    params.push(medium);
+  }
+  params.push(limit);
   return db().prepare(`
     SELECT
       e.video_id,
@@ -463,6 +473,7 @@ export function listEpisodesWithCounts({ limit = 25 } = {}) {
       e.published_at,
       e.status,
       e.source,
+      e.medium,
       e.discovered_for,
       e.url,
       e.duration_sec,
@@ -470,9 +481,10 @@ export function listEpisodesWithCounts({ limit = 25 } = {}) {
       (SELECT COUNT(*) FROM rankings   r WHERE r.video_id = e.video_id) AS ranking_count
     FROM episodes e
     WHERE e.status IN ('extracted', 'ranked', 'delivered')
+    ${mediumClause}
     ORDER BY e.published_at DESC, e.ingested_at DESC
     LIMIT ?
-  `).all(limit);
+  `).all(...params);
 }
 
 // All candidates for one episode, with selected/rank/why_matters joined from
