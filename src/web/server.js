@@ -368,14 +368,17 @@ app.post('/api/admin/restore-db',
 // own state.db — daily-run output never made it into the web UI.
 //
 // Single in-process scheduler fixes that for good: one service, one
-// volume, one DB. Scheduler fires once a day at DAILY_HOUR_UTC (10:00
-// UTC = 6am EDT / 5am EST — the hour is fixed in UTC, so it drifts an
+// volume, one DB. Scheduler fires once a day at DAILY_HOUR_UTC (08:00
+// UTC = 4am EDT / 3am EST — the hour is fixed in UTC, so it drifts an
 // hour relative to ET across DST changes; that's intentional and
-// acceptable for a morning brief). Manual triggers via
+// acceptable for a morning brief). Moved earlier (was 10:00 UTC) to add
+// buffer for podcast transcription: a 90-min episode is ~14 min of GPU
+// and several can land in one run, so we start before dawn ET to keep
+// the brief in the inbox by morning. Manual triggers via
 // POST /api/admin/run-daily are also supported (fire-and-forget; client
-// doesn't wait for the full ~5-10 min pipeline).
+// doesn't wait for the full pipeline).
 
-const DAILY_HOUR_UTC = 10;
+const DAILY_HOUR_UTC = 8;
 let dailyTimer = null;
 let dailyRunning = false;
 

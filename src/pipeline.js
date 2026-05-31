@@ -6,7 +6,7 @@
 // runs table, so we can see end-of-run "$X total" telemetry.
 
 import { startRun, endRun, getEpisode, db } from './lib/db.js';
-import { ingestEpisode, ingestDaily } from './stages/1-ingest.js';
+import { ingestEpisode, ingestDaily, ingestPodcastsDaily } from './stages/1-ingest.js';
 import { discoverIndividuals } from './stages/1b-discover.js';
 import { transcribeEpisode } from './stages/2-transcribe.js';
 import { extractEpisode } from './stages/3-extract.js';
@@ -101,6 +101,14 @@ export async function runDaily({ dryRun, lookbackDays = 2 } = {}) {
     });
 
     await stage('ingest', () => ingestDaily({ lookbackDays }));
+    // Podcast RSS ingest runs alongside YouTube channel polling. New podcast
+    // rows (medium='podcast') flow through the same resumable loop below and are
+    // transcribed by the Modal WhisperX worker via the medium-aware stage 2.
+    // Non-fatal: a feed-parsing failure must not block the YouTube brief.
+    await stage('ingest-podcasts', async () => {
+      try { await ingestPodcastsDaily({ lookbackDays }); }
+      catch (err) { log.warn('podcast ingest failed (continuing)', { err: err.message }); }
+    });
     // Discovery: searches YouTube for watched individuals and promotes
     // LLM-approved finds into episodes (status='new'). Skipped silently if
     // disabled in config or no individuals are listed.
