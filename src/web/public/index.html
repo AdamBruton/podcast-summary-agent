@@ -93,6 +93,18 @@
   .ep-row .status-tag.delivered { background: #dfd; color: #050; }
   .ep-row .status-tag.ranked    { background: #fed; color: #530; }
   .ep-row .status-tag.extracted { background: #eee; color: #555; }
+  .medium-badge {
+    font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 10px;
+    text-transform: uppercase; letter-spacing: 0.04em; margin-right: 6px;
+    vertical-align: middle;
+  }
+  .medium-badge.podcast { background: #f3e8ff; color: #7c3aed; }
+  .medium-badge.youtube { background: #fee2e2; color: #dc2626; }
+  .medium-filter { display: inline-flex; gap: 6px; margin: 0 0 12px; }
+  .medium-filter .filter-btn { font-size: 12px; }
+  .medium-filter .filter-btn.active {
+    background: var(--accent); color: #fff; border-color: var(--accent);
+  }
   .ep-detail { padding: 16px; background: var(--bg-soft); border-bottom: 1px solid var(--line); }
   .ep-detail h3 { font-size: 13px; margin: 16px 0 8px;
                   text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
@@ -226,6 +238,21 @@
   </section>
 
   <section>
+    <h2>Podcasts <span id="podcasts-count" style="color:#999"></span></h2>
+    <p class="lede" style="margin: 4px 0 0;">
+      RSS feeds polled daily for new audio episodes, transcribed via the
+      WhisperX-on-Modal worker. Add the feed URL (not the show's web page).
+    </p>
+    <div id="podcasts-list"></div>
+    <div class="add-form">
+      <input type="text" id="podcasts-name" placeholder="Display name (e.g. Dwarkesh Patel)" />
+      <input type="text" id="podcasts-url"  placeholder="https://…/feed.rss" />
+      <button class="primary" id="podcasts-add">+ Add podcast</button>
+    </div>
+    <div class="err" id="podcasts-err"></div>
+  </section>
+
+  <section>
     <h2>Individuals &amp; companies <span id="individuals-count" style="color:#999"></span></h2>
     <p class="lede" style="margin: 4px 0 0;">
       Discovery searches YouTube daily for each of these names — people or companies —
@@ -289,6 +316,11 @@
       candidates: which made the brief (with the ranker's reasoning), and
       which were dropped (with their extract-time category and novelty score).
     </p>
+    <div class="medium-filter" id="episodes-filter">
+      <button class="filter-btn active" data-medium="">All</button>
+      <button class="filter-btn" data-medium="youtube">YouTube</button>
+      <button class="filter-btn" data-medium="podcast">Podcast</button>
+    </div>
     <div id="episodes-list"></div>
     <div class="err" id="episodes-err"></div>
   </section>
@@ -379,6 +411,7 @@ async function load() {
     return;
   }
   renderTable('channels', data.channels);
+  renderPodcasts(data.podcasts || []);
   renderIndividuals(data.individuals);
   // Profile + episodes are loaded independently; failures don't block sources.
   loadProfile().catch(e => setErr('profile-err', e.message));
@@ -420,9 +453,11 @@ function renderDiff(diff) {
 }
 
 let _episodesCache = null;     // for re-rendering after detail expand/collapse
+let _episodeMedium = '';       // '' = all, else 'youtube' | 'podcast'
 
 async function loadEpisodes() {
-  const { episodes } = await api('GET', '/api/episodes');
+  const qs = _episodeMedium ? `?medium=${encodeURIComponent(_episodeMedium)}` : '';
+  const { episodes } = await api('GET', `/api/episodes${qs}`);
   _episodesCache = episodes;
   renderEpisodes(episodes);
 }
@@ -433,12 +468,14 @@ function renderEpisodes(list) {
   if (!list.length) { el.innerHTML = '<div class="empty">No ranked episodes yet.</div>'; return; }
   el.innerHTML = list.map(ep => {
     const tag = `<span class="status-tag ${esc(ep.status)}">${esc(ep.status)}</span>`;
+    const medium = ep.medium === 'podcast' ? 'podcast' : 'youtube';
+    const badge = `<span class="medium-badge ${medium}">${medium}</span>`;
     const counts = `${ep.ranking_count}/${ep.candidate_count}`;
     const date = ep.published_at || '—';
     return `
       <div class="ep-row" data-ep="${esc(ep.video_id)}">
         <div>
-          <div><strong>${esc(ep.title)}</strong></div>
+          <div>${badge}<strong>${esc(ep.title)}</strong></div>
           <div class="meta">${esc(ep.channel_name)} · ${esc(date)}${ep.discovered_for ? ` · via discovery (${esc(ep.discovered_for)})` : ''}</div>
         </div>
         <div class="counts" title="ranked / extracted candidates">${esc(counts)}</div>
@@ -559,6 +596,37 @@ function renderIndividuals(list) {
   el.innerHTML = list.map(n =>
     `<li>${esc(n)}<button data-remove-individual="${esc(n)}" title="remove">×</button></li>`
   ).join('');
+}
+
+function renderPodcasts(list) {
+  const el = document.getElementById('podcasts-list');
+  if (!el) return;
+  document.getElementById('podcasts-count').textContent = `(${list.length})`;
+  if (!list.length) { el.innerHTML = '<div class="empty">None yet — add one below.</div>'; return; }
+  const rows = list.map(p => {
+    const shortUrl = p.url.length > 52 ? p.url.slice(0, 52) + '…' : p.url;
+    return `
+      <tr class="${p.enabled ? '' : 'off'}">
+        <td><strong>${esc(p.name)}</strong></td>
+        <td class="mono"><a href="${esc(p.url)}" target="_blank" rel="noopener" title="${esc(p.url)}">${esc(shortUrl)}</a></td>
+        <td>
+          <label class="toggle">
+            <input type="checkbox" ${p.enabled ? 'checked' : ''} data-podcast-toggle="${esc(p.url)}" />
+            ${p.enabled ? 'on' : 'off'}
+          </label>
+        </td>
+        <td class="actions">
+          <button class="danger" data-podcast-remove="${esc(p.url)}">remove</button>
+        </td>
+      </tr>`;
+  }).join('');
+  el.innerHTML = `
+    <table>
+      <thead>
+        <tr><th>Name</th><th>Feed&nbsp;URL</th><th>Enabled</th><th></th></tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
 }
 
 // --- Event delegation -------------------------------------------------------
@@ -718,6 +786,24 @@ document.addEventListener('click', async (ev) => {
     return;
   }
 
+  if (t.matches('[data-podcast-remove]')) {
+    const url = t.dataset.podcastRemove;
+    if (!confirm(`Remove podcast feed?\n${url}`)) return;
+    // url travels in the body (encoded slashes break path params behind proxies)
+    try { await api('DELETE', '/api/sources/podcasts', { url }); await load(); }
+    catch (e) { setErr('podcasts-err', e.message); }
+    return;
+  }
+
+  if (t.matches('#episodes-filter [data-medium]')) {
+    _episodeMedium = t.dataset.medium;
+    for (const b of document.querySelectorAll('#episodes-filter .filter-btn')) {
+      b.classList.toggle('active', b === t);
+    }
+    loadEpisodes().catch(e => setErr('episodes-err', e.message));
+    return;
+  }
+
   if (t.id === 'adhoc-submit') {
     const url = document.getElementById('adhoc-url').value.trim();
     const status = document.getElementById('adhoc-status');
@@ -762,6 +848,19 @@ document.addEventListener('click', async (ev) => {
       document.getElementById('individuals-name').value = '';
       await load();
     } catch (e) { setErr('individuals-err', e.message); }
+    return;
+  }
+
+  if (t.id === 'podcasts-add') {
+    const name = document.getElementById('podcasts-name').value.trim();
+    const url = document.getElementById('podcasts-url').value.trim();
+    setErr('podcasts-err', '');
+    try {
+      await api('POST', '/api/sources/podcasts', { name, url });
+      document.getElementById('podcasts-name').value = '';
+      document.getElementById('podcasts-url').value = '';
+      await load();
+    } catch (e) { setErr('podcasts-err', e.message); }
     return;
   }
 
@@ -861,14 +960,30 @@ async function loadBackups() {
 // Enable/disable toggle uses 'change' rather than 'click' so the checkbox fires once.
 document.addEventListener('change', async (ev) => {
   const t = ev.target;
-  if (!t.matches('[data-toggle]')) return;
-  const [cat, handle] = t.dataset.toggle.split('|');
-  try {
-    await api('PATCH', `/api/sources/${cat}/${encodeURIComponent(handle)}`, { enabled: t.checked });
-    await load();
-  } catch (e) {
-    setErr(`${cat}-err`, e.message);
-    t.checked = !t.checked;   // revert visual state
+
+  if (t.matches('[data-toggle]')) {
+    const [cat, handle] = t.dataset.toggle.split('|');
+    try {
+      await api('PATCH', `/api/sources/${cat}/${encodeURIComponent(handle)}`, { enabled: t.checked });
+      await load();
+    } catch (e) {
+      setErr(`${cat}-err`, e.message);
+      t.checked = !t.checked;   // revert visual state
+    }
+    return;
+  }
+
+  if (t.matches('[data-podcast-toggle]')) {
+    // url travels in the body (encoded slashes break path params behind proxies)
+    const url = t.dataset.podcastToggle;
+    try {
+      await api('PATCH', '/api/sources/podcasts', { url, enabled: t.checked });
+      await load();
+    } catch (e) {
+      setErr('podcasts-err', e.message);
+      t.checked = !t.checked;   // revert visual state
+    }
+    return;
   }
 });
 

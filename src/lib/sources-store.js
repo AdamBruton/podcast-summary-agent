@@ -35,6 +35,22 @@ function listFor(node) {
   return node.items.map(serializeItem);
 }
 
+// Podcasts are shaped differently from channels: { name, url } (+ optional
+// enabled), no handle/channel_id. They're keyed by `url` because podcast names
+// can collide with channel names (e.g. "Dwarkesh Patel" exists as both).
+function serializePodcast(item) {
+  return {
+    name:    item.get('name'),
+    url:     item.get('url'),
+    enabled: item.get('enabled') !== false,
+  };
+}
+
+function listPodcastsFor(node) {
+  if (!node || !Array.isArray(node.items)) return [];
+  return node.items.map(serializePodcast);
+}
+
 export function listAll() {
   const doc = readDoc();
   const indivNode = doc.get('individuals');
@@ -43,6 +59,7 @@ export function listAll() {
     : [];
   return {
     channels:    listFor(doc.get('channels')),
+    podcasts:    listPodcastsFor(doc.get('podcasts')),
     individuals,
   };
 }
@@ -108,6 +125,66 @@ export function patchChannel(handle, patch) {
   }
   writeDoc(doc);
   return serializeItem(item);
+}
+
+// --- Podcasts ---------------------------------------------------------------
+
+function findPodcastByUrl(node, url) {
+  if (!node || !Array.isArray(node.items)) return -1;
+  return node.items.findIndex(i => i.get('url') === url);
+}
+
+export function addPodcast({ name, url, enabled = true }) {
+  if (!name?.trim()) throw new Error('name is required');
+  if (!url?.trim()) throw new Error('url is required');
+  const cleanUrl = url.trim();
+  if (!/^https?:\/\//i.test(cleanUrl)) throw new Error('url must start with http:// or https://');
+
+  const doc = readDoc();
+  let node = doc.get('podcasts');
+  if (!node) {
+    doc.set('podcasts', []);
+    node = doc.get('podcasts');
+  }
+  if (findPodcastByUrl(node, cleanUrl) !== -1) {
+    throw new Error(`podcast feed ${cleanUrl} already exists`);
+  }
+
+  const itemObj = {
+    name: name.trim(),
+    url: cleanUrl,
+    ...(enabled === false ? { enabled: false } : {}),
+  };
+  node.items.push(doc.createNode(itemObj));
+  writeDoc(doc);
+  return { ...itemObj, enabled: enabled !== false };
+}
+
+export function removePodcast(url) {
+  const doc = readDoc();
+  const node = doc.get('podcasts');
+  const idx = findPodcastByUrl(node, url);
+  if (idx === -1) return false;
+  node.items.splice(idx, 1);
+  writeDoc(doc);
+  return true;
+}
+
+export function patchPodcast(url, patch) {
+  const doc = readDoc();
+  const node = doc.get('podcasts');
+  const idx = findPodcastByUrl(node, url);
+  if (idx === -1) return null;
+  const item = node.items[idx];
+  if ('enabled' in patch) {
+    if (patch.enabled === false) item.set('enabled', false);
+    else if (item.has('enabled')) item.delete('enabled');   // cleaner YAML when re-enabling
+  }
+  if ('name' in patch && patch.name?.trim()) {
+    item.set('name', patch.name.trim());
+  }
+  writeDoc(doc);
+  return serializePodcast(item);
 }
 
 // --- Individuals ------------------------------------------------------------

@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import {
   listAll, addChannel, removeChannel, patchChannel,
+  addPodcast, removePodcast, patchPodcast,
   addIndividual, removeIndividual,
 } from '../lib/sources-store.js';
 import { readProfile, writeProfile } from '../lib/profile-store.js';
@@ -90,6 +91,24 @@ app.patch('/api/sources/channels/:handle', wrap(req => {
   return r;
 }));
 
+// Podcasts are keyed by feed URL (names can collide with channels), and URLs
+// don't survive cleanly as path params (encoded slashes get mangled by some
+// proxies), so the url travels in the request body for remove/patch.
+app.post('/api/sources/podcasts', wrap(req => addPodcast(req.body)));
+
+app.delete('/api/sources/podcasts', wrap(req => {
+  if (!req.body?.url) throw new Error('url is required');
+  return { removed: removePodcast(req.body.url) };
+}));
+
+app.patch('/api/sources/podcasts', wrap(req => {
+  const { url, ...patch } = req.body || {};
+  if (!url) throw new Error('url is required');
+  const r = patchPodcast(url, patch);
+  if (!r) throw new Error('not found');
+  return r;
+}));
+
 app.post('/api/sources/individuals', wrap(req => ({ name: addIndividual(req.body.name) })));
 app.delete('/api/sources/individuals/:name', wrap(req => ({ removed: removeIndividual(decodeParam(req.params.name)) })));
 
@@ -114,9 +133,12 @@ app.put('/api/profile', wrap(req => {
 
 // --- Episode inspector -----------------------------------------------------
 
-app.get('/api/episodes', wrap(() => {
+app.get('/api/episodes', wrap(req => {
   const limit = 25;   // hardcoded for now; UI doesn't paginate yet
-  return { episodes: listEpisodesWithCounts({ limit }) };
+  // Optional ?medium=youtube|podcast filter; anything else means "all".
+  const m = req.query.medium;
+  const medium = (m === 'youtube' || m === 'podcast') ? m : null;
+  return { episodes: listEpisodesWithCounts({ limit, medium }) };
 }));
 
 app.get('/api/episodes/:video_id', wrap(req => {

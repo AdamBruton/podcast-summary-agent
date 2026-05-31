@@ -603,8 +603,15 @@ transcribe path and otherwise flow through the same intelligence layer.
     a plain `for`). A morning with several podcasts can add 14+ min each; the
     08:00 UTC start (moved earlier from 10:00) buffers for this. Revisit with a
     cap or parallelism if mornings get slow.
-- **Phases 5-8 — LATER.** Web UI podcast feeds editor + medium filter; any
-  remaining compose/deliver polish.
+- **Phase 5 — DONE.** Web UI gained a **Podcasts** section (add/remove/enable
+  RSS feeds) and a **medium filter** (All/YouTube/Podcast) on the episode list,
+  plus a per-row medium badge. `sources-store.js` has
+  `addPodcast`/`removePodcast`/`patchPodcast` (keyed by feed **url** — names
+  collide with channels); podcast mutation routes carry the url in the request
+  **body** (encoded slashes break path params behind proxies).
+  `listEpisodesWithCounts({ medium })` filters in SQL; `GET
+  /api/episodes?medium=…` exposes it.
+- **Phases 6-8 — LATER.** Any remaining compose/deliver polish.
 
 ### Not yet done (work the user has acknowledged but deferred)
 
