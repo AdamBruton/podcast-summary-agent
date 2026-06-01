@@ -491,7 +491,14 @@ function openBrowser(url) {
       process.platform === 'win32'  ? ['cmd',  ['/c', 'start', '', url]] :
       process.platform === 'darwin' ? ['open', [url]] :
                                        ['xdg-open', [url]];
-    spawn(cmd[0], cmd[1], { detached: true, stdio: 'ignore' }).unref();
+    const child = spawn(cmd[0], cmd[1], { detached: true, stdio: 'ignore' });
+    // spawn() reports a missing launcher (e.g. no xdg-open on a headless
+    // Linux box) via an async 'error' event, NOT a synchronous throw — so the
+    // try/catch below can't see it. Without this handler the unhandled 'error'
+    // crashes the whole web server moments after it binds. Auto-open is
+    // best-effort; swallow it (the URL is already printed above).
+    child.on('error', () => {});
+    child.unref();
   } catch {
     // Browser auto-open is best-effort. The URL is already printed above.
   }
