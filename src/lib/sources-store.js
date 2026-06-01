@@ -78,9 +78,12 @@ export function addChannel({ name, handle, channel_id = '', enabled = true }) {
 
   const doc = readDoc();
   let node = doc.get('channels');
-  if (!node) {
-    doc.set('channels', []);
-    node = doc.get('channels');
+  // doc.set('channels', []) stores a raw JS array whose get() lacks `.items`;
+  // create an explicit YAMLSeq so node.items.push below works when the key is
+  // absent or null in the file.
+  if (!node || !Array.isArray(node.items)) {
+    node = doc.createNode([]);
+    doc.set('channels', node);
   }
   if (findItemByHandle(node, handle) !== -1) {
     throw new Error(`handle ${handle} already exists`);
@@ -142,9 +145,12 @@ export function addPodcast({ name, url, enabled = true }) {
 
   const doc = readDoc();
   let node = doc.get('podcasts');
-  if (!node) {
-    doc.set('podcasts', []);
-    node = doc.get('podcasts');
+  // doc.set('podcasts', []) stores a raw JS array whose get() lacks `.items`;
+  // create an explicit YAMLSeq so node.items.push below works when the key is
+  // absent or null in the file.
+  if (!node || !Array.isArray(node.items)) {
+    node = doc.createNode([]);
+    doc.set('podcasts', node);
   }
   if (findPodcastByUrl(node, cleanUrl) !== -1) {
     throw new Error(`podcast feed ${cleanUrl} already exists`);
