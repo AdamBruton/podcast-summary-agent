@@ -32,7 +32,9 @@ function normalizeFeedUrl(url) {
   }
 }
 
-function episodeId({ feedUrl, guid, audioUrl, publishedAt }) {
+// Mint a stable pod_<16hex> id. Exported so the ad-hoc podcast resolver
+// (podcast-resolve.js) shares the exact same id scheme as feed polling.
+export function episodeId({ feedUrl, guid, audioUrl, publishedAt }) {
   const seed = guid
     ? `${normalizeFeedUrl(feedUrl)}|${guid}`
     : `${normalizeFeedUrl(feedUrl)}|${audioUrl || ''}|${publishedAt || ''}`;

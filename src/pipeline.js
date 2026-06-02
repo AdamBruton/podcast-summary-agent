@@ -5,7 +5,7 @@
 // Both wrap each stage with timing logs and accumulate Claude cost in the
 // runs table, so we can see end-of-run "$X total" telemetry.
 
-import { startRun, endRun, getEpisode, db } from './lib/db.js';
+import { startRun, endRun, getEpisode, setEpisodeStatus, db } from './lib/db.js';
 import { ingestEpisode, ingestDaily, ingestPodcastsDaily } from './stages/1-ingest.js';
 import { discoverIndividuals } from './stages/1b-discover.js';
 import { transcribeEpisode } from './stages/2-transcribe.js';
@@ -64,12 +64,26 @@ async function processEpisode(episode, run_id) {
 // markDeliveredOnSend (default true): controls whether the episode is marked
 // 'delivered' after sending. The web UI's ad-hoc URL flow passes false so the
 // episode also rolls up into the next daily run alongside other content.
-export async function runEpisode({ url, dryRun, markDeliveredOnSend = true }) {
+//
+// forceReprocess (default false): ad-hoc semantics — the user explicitly asked
+// to process THIS url now, so reset any prior 'skipped'/'delivered'/'ranked'
+// status to 'new' after ingest, so processEpisode doesn't early-out. The daily
+// cron path never sets this (it respects skip/delivered to avoid wasted work).
+//
+// Returns the deliver result augmented with the resolved video_id so callers
+// (the web endpoint) don't have to re-derive it — necessary now that the id of
+// a podcast episode isn't knowable from the pasted URL without resolving it.
+export async function runEpisode({ url, dryRun, markDeliveredOnSend = true, forceReprocess = false }) {
   const mode = dryRun ? 'dry-run-episode' : 'episode';
   const run_id = startRun(mode);
-  let processed = 0, ok = false, briefResult = null;
+  let processed = 0, ok = false, briefResult = null, video_id = null;
   try {
-    const [ep] = await stage('ingest', () => ingestEpisode(url));
+    let [ep] = await stage('ingest', () => ingestEpisode(url));
+    video_id = ep.video_id;
+    if (forceReprocess && ep.status !== 'new') {
+      setEpisodeStatus(ep.video_id, 'new', null);
+      ep = getEpisode(ep.video_id);
+    }
     const ready = await processEpisode(ep, run_id);
     const episodes = ready ? [getEpisode(ep.video_id)] : [];
     processed = episodes.length;
@@ -84,7 +98,7 @@ export async function runEpisode({ url, dryRun, markDeliveredOnSend = true }) {
     endRun(run_id, { ok, episodes_processed: processed, total_usd: usd });
     log.ok('run complete', { run_id, processed, total_usd: usd.toFixed(4) });
   }
-  return briefResult;
+  return { ...briefResult, video_id };
 }
 
 export async function runDaily({ dryRun, lookbackDays = 2 } = {}) {

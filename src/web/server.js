@@ -20,10 +20,10 @@ import { readProfile, writeProfile } from '../lib/profile-store.js';
 import {
   listEpisodesWithCounts, getEpisodeDetail,
   setFeedback, getAllFeedbackWithContext,
-  getEpisode, setEpisodeStatus,
+  getEpisode,
   db, resetDb,
 } from '../lib/db.js';
-import { resolveHandle, videoIdFromUrl } from '../lib/youtube.js';
+import { resolveHandle } from '../lib/youtube.js';
 import { runEpisode, runDaily } from '../pipeline.js';
 import { complete, parseJsonResponse, MODELS } from '../lib/claude.js';
 import { loadPrompt, DB_PATH } from '../lib/config.js';
@@ -233,40 +233,40 @@ app.post('/api/profile/suggest', wrap(async () => {
   return { ...parsed, diff };
 }));
 
-// Ad-hoc: process a single YouTube URL right now, email the brief immediately,
+// Ad-hoc: process a single episode URL right now, email the brief immediately,
 // and leave the episode in 'ranked' status so it ALSO rolls up into tomorrow's
-// daily brief. Blocks for the full pipeline duration (typically 1-3 min).
-// Pass { dryRun: true } in the body to write HTML to disk instead of sending
-// (useful for local testing without spending tokens on the email path).
+// daily brief. Medium-agnostic — a YouTube video URL goes the captions route
+// (1-3 min); any other URL is treated as a podcast (direct audio, RSS feed, or
+// an episode page we scrape for the enclosure) and transcribed on GPU via Modal
+// WhisperX (~10-15 min). Pass { dryRun: true } to write HTML to disk instead of
+// emailing.
+//
+// NB (prod): a podcast run can outlast Cloudflare's ~100s edge timeout, so the
+// browser may see a 524 even though the run completes server-side. That's
+// non-fatal here — markDeliveredOnSend:false means the finished episode rolls
+// into the next daily brief regardless, so no content is lost.
 app.post('/api/summarize-url', wrap(async req => {
   const url = req.body?.url?.trim();
   if (!url) throw new Error('url is required');
-  const vid = videoIdFromUrl(url);
-  if (!vid) throw new Error('not a recognizable YouTube URL');
   const dryRun = req.body.dryRun === true;
 
   // No socket idle timeout — Express defaults to none, but Node's HTTP layer
   // may close after 2 min. Disable for this long-running request.
   req.setTimeout(0);
 
-  // Ad-hoc semantics: the user explicitly wants this URL processed NOW,
-  // regardless of any prior state. Reset 'skipped' or 'delivered' to 'new'
-  // so processEpisode doesn't early-out at the status check. The daily-cron
-  // path keeps its respect-skip/delivered behavior (unchanged) — this only
-  // applies to ad-hoc URL submissions.
-  const prior = getEpisode(vid);
-  if (prior && prior.status !== 'new') {
-    setEpisodeStatus(vid, 'new', null);
-  }
-
-  const result = await runEpisode({ url, dryRun, markDeliveredOnSend: false });
+  // forceReprocess: ad-hoc semantics — the user explicitly wants this URL
+  // processed NOW regardless of any prior 'skipped'/'delivered'/'ranked' state.
+  // runEpisode resets it to 'new' after ingest (it owns the video_id, which for
+  // a podcast isn't knowable from the pasted URL until the enclosure resolves).
+  // The daily-cron path keeps its respect-skip/delivered behavior (unchanged).
+  const result = await runEpisode({ url, dryRun, markDeliveredOnSend: false, forceReprocess: true });
+  const vid = result?.video_id;
 
   // If deliver returned `empty`, the pipeline ran but found nothing to brief
-  // (most often: transcript-io returned no transcript). Surface the actual
-  // skip reason from the DB so the UI shows a real error instead of a
-  // misleading "Brief emailed" success.
+  // (most often: no transcript was produced). Surface the actual skip reason
+  // from the DB so the UI shows a real error instead of a misleading success.
   if (result?.empty) {
-    const ep = getEpisode(vid);
+    const ep = vid ? getEpisode(vid) : null;
     const reason = ep?.skip_reason
       ? `episode skipped: ${ep.skip_reason}`
       : `episode produced no ranked items (status: ${ep?.status || 'unknown'})`;

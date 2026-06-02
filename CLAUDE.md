@@ -184,11 +184,25 @@ Stage invariants:
 `false` (web ad-hoc URL) sends but keeps `ranked` so it also rolls into the next
 daily brief.
 
-**Ad-hoc URL** (`/api/summarize-url`): resets any non-`new` status to `new`
-before the pipeline (user explicitly asked to process it — prior
-`skipped`/`delivered`/`ranked` shouldn't short-circuit). Daily cron path is
-unchanged (respects `delivered`/`skipped`). Don't change without considering
-retry-after-failure.
+**Ad-hoc URL** (`/api/summarize-url`): **medium-agnostic**. `ingestEpisode(url)`
+auto-detects — `videoIdFromUrl` matches → YouTube; else → podcast via
+`resolvePodcastEpisode` (`src/lib/podcast-resolve.js`), which accepts a direct
+audio URL, an RSS feed (takes the latest item), or an episode page (scrapes the
+enclosure: og:audio → JSON-LD → `<audio>`/`<source>` → `.mp3`-ish regex). Apple/
+Spotify pages don't expose audio, so they fail with a clear message. Podcast
+ad-hoc rows reuse the `pod_<hex>` id scheme (exported `episodeId` from rss.js).
+`runEpisode({forceReprocess:true})` resets any non-`new` status to `new` after
+ingest (user explicitly asked to process it — prior `skipped`/`delivered`/
+`ranked` shouldn't short-circuit) and returns the resolved `video_id` (a
+podcast's id isn't knowable from the pasted URL until the enclosure resolves).
+Daily cron path is unchanged (respects `delivered`/`skipped`). Don't change
+without considering retry-after-failure.
+
+**Caveat (prod):** a podcast ad-hoc run is ~10-15 min (GPU) and can outlast
+Cloudflare's ~100s edge timeout, so the browser may see a 524. Non-fatal — the
+run finishes server-side and (markDeliveredOnSend:false) rolls into the next
+daily brief, so no content is lost. If this becomes annoying, make the ad-hoc
+path fire-and-forget + poll episode status from the UI.
 
 ---
 
