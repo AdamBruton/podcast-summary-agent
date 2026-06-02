@@ -214,12 +214,22 @@ export async function resolvePodcastEpisode(pageUrl) {
       `or a page that links the audio. Apple/Spotify pages don't expose the audio.`
     );
   }
-  log.info('ad-hoc podcast: scraped enclosure from page', { page: finalUrl, audioUrl });
+  // Show name: the page's RSS <link> tag carries it as a `title` attribute on
+  // most podcast hosts (Transistor/Simplecast/Libsyn/Buzzsprout/Podbean), and
+  // it's the authoritative show name without a second fetch. Fall back to
+  // og:site_name, then (in buildRow) the URL host.
+  const showName = feedLinkTitle(body) || metaContent(body, 'og:site_name') || null;
+  // Episode title: og:title is cleanest when present; else <title>, which on
+  // many hosts is "Show | Episode" — strip the show segment we just resolved so
+  // the brief doesn't repeat it. twitter:title is a last resort (often carries
+  // trailing "| Episode N" cruft).
+  const rawTitle = metaContent(body, 'og:title') || htmlTitle(body) || metaContent(body, 'twitter:title');
+  log.info('ad-hoc podcast: scraped enclosure from page', { page: finalUrl, audioUrl, show: showName });
   return buildRow({
     pageUrl: finalUrl,
     audioUrl,
-    title: metaContent(body, 'og:title') || htmlTitle(body),
-    showName: metaContent(body, 'og:site_name'),
+    title: stripShowFromTitle(rawTitle, showName),
+    showName,
     description: metaContent(body, 'og:description'),
     publishedAt: metaContent(body, 'article:published_time'),
   });
@@ -228,4 +238,26 @@ export async function resolvePodcastEpisode(pageUrl) {
 function htmlTitle(html) {
   const m = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
   return m ? decodeEntities(m[1].trim()) : null;
+}
+
+// Show name from the page's RSS/Atom <link> tag's `title` attribute.
+function feedLinkTitle(html) {
+  const tag = (html.match(/<link[^>]+type=["']application\/(?:rss|atom)\+xml["'][^>]*>/i) || [])[0];
+  if (!tag) return null;
+  const m = tag.match(/\btitle=["']([^"']+)["']/i);
+  return m ? decodeEntities(m[1].trim()) : null;
+}
+
+// Drop a leading "Show | " or trailing " | Show" (also - – —) from an episode
+// title, plus a trailing "| Episode N". Falls back to the original if stripping
+// would empty it.
+function stripShowFromTitle(title, show) {
+  if (!title) return title;
+  const SEP = '\\s*[|\\u2013\\u2014-]\\s*';
+  let t = title.replace(new RegExp(`${SEP}(?:episode|ep\\.?)\\s*\\d+\\s*$`, 'i'), '');
+  if (show) {
+    const s = show.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    t = t.replace(new RegExp(`^${s}${SEP}`, 'i'), '').replace(new RegExp(`${SEP}${s}\\s*$`, 'i'), '');
+  }
+  return t.trim() || title;
 }
