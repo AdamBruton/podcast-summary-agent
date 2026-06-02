@@ -49,3 +49,68 @@ export function verifyNumericFidelity(claim, quote) {
   const missing = claimNums.filter(n => !quoteNums.has(n));
   return { ok: missing.length === 0, missing };
 }
+
+// Lowercased word tokens (letters/digits), punctuation stripped. Used to
+// measure how much NEW content a corrected quote introduces vs the raw.
+function wordTokens(s) {
+  return String(s || '').toLowerCase().match(/[a-z0-9]+/g) || [];
+}
+
+// Count words in `corrected` that aren't accounted for by `raw` (multiset
+// difference). Removing/reordering words contributes 0; only genuinely new
+// words count. A homophone/proper-noun fix adds ~1; a rewrite adds many.
+function newWordCount(raw, corrected) {
+  const counts = new Map();
+  for (const w of wordTokens(raw)) counts.set(w, (counts.get(w) || 0) + 1);
+  let added = 0;
+  for (const w of wordTokens(corrected)) {
+    const n = counts.get(w) || 0;
+    if (n > 0) counts.set(w, n - 1);
+    else added++;
+  }
+  return added;
+}
+
+/**
+ * Validate an LLM-proposed corrected quote against the raw (verbatim-from-ASR)
+ * quote. The corrected copy is for DISPLAY ONLY — the raw quote stays the audit
+ * trail and the number-fidelity input. A correction may fix mis-transcribed
+ * words/punctuation/proper-nouns and trim filler, but NOT invent or reshape
+ * content. Hard gates, any failure → reject (caller falls back to raw):
+ *   1. No NEW numerals — every numeric token in `corrected` must already appear
+ *      in `raw` (after word→digit normalization). Stops the model "correcting" a
+ *      number to match its belief (the $75B↔$7.5B class, in reverse).
+ *   2. Claim numbers survive — `corrected` must still satisfy verifyNumericFidelity
+ *      against the claim, so the displayed quote keeps backing the claim's numbers.
+ *   3. Bounded ADDED content — new-word count ≤ max(`minNewWords`, `addRatio` ×
+ *      corrected length). Trimming filler is free (removal adds nothing); only
+ *      injected words count, so a rewrite toward the lead-in is caught while a
+ *      proper-noun/homophone fix passes.
+ *   4. No runaway growth — corrected can't be much longer than raw.
+ *
+ * @returns {string|null} the corrected string if it passes all gates, else null.
+ */
+export function validateCorrectedQuote(
+  { raw, corrected, claim, minNewWords = 3, addRatio = 0.15, maxGrowth = 1.4 }
+) {
+  if (typeof corrected !== 'string') return null;
+  const c = corrected.trim();
+  const r = String(raw || '');
+  if (!c || c === r) return null;            // empty or unchanged → use raw
+
+  // 1. no new numerals
+  const rawNums = new Set(numericTokens(normalizeWordNumbers(r)));
+  for (const n of numericTokens(normalizeWordNumbers(c))) {
+    if (!rawNums.has(n)) return null;
+  }
+  // 2. claim numbers still present
+  if (claim != null && !verifyNumericFidelity(claim, c).ok) return null;
+  // 3. bounded added content
+  const corrWords = wordTokens(c).length;
+  const budget = Math.max(minNewWords, Math.ceil(addRatio * corrWords));
+  if (newWordCount(r, c) > budget) return null;
+  // 4. no runaway growth
+  if (c.length > r.length * maxGrowth) return null;
+
+  return c;
+}

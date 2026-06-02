@@ -12,15 +12,26 @@ import { log } from './log.js';
 
 export const MODELS = {
   SONNET: 'claude-sonnet-4-6',
+  OPUS:   'claude-opus-4-8',
 };
 
 // USD per million tokens. Sonnet 4.6 rates as of model release.
+// NOTE: the Opus row below is BEST-KNOWN, not confirmed — verify current Opus
+// 4.x rates before trusting its cost telemetry, then correct here. calcCost
+// returns 0 for any model missing from this table, so a wrong row only skews
+// the $ ledger, never the actual API call.
 const MODEL_PRICING = {
   'claude-sonnet-4-6': {
     input:        3.00,
     output:      15.00,
     cache_read:   0.30,
     cache_write_5m: 3.75,
+  },
+  'claude-opus-4-8': {
+    input:        5.00,
+    output:      25.00,
+    cache_read:   0.50,
+    cache_write_5m: 6.25,
   },
 };
 

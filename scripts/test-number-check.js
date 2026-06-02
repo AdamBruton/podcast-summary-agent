@@ -1,8 +1,8 @@
-// Sanity test for verifyNumericFidelity. Runs representative cases including
-// the original Krishna $75B → $7.5B regression and several edge cases.
-// Safe to delete; useful to keep for regression-checking the rule.
+// Sanity test for verifyNumericFidelity + validateCorrectedQuote. Runs
+// representative cases including the original Krishna $75B → $7.5B regression
+// and several edge cases. Safe to delete; useful for regression-checking.
 
-import { verifyNumericFidelity } from '../src/lib/number-check.js';
+import { verifyNumericFidelity, validateCorrectedQuote } from '../src/lib/number-check.js';
 
 const cases = [
   {
@@ -63,6 +63,62 @@ for (const c of cases) {
   console.log(`   ok=${r.ok}, expected=${c.expectOk}, missing=[${r.missing.join(', ')}]`);
   if (ok) passed++; else failed++;
 }
+
+// --- validateCorrectedQuote: accept genuine fixes, reject fabrication ---------
+// expectApplied=true means the correction is kept; false means it's rejected
+// and compose falls back to the raw quote.
+const corrCases = [
+  {
+    label: 'PROPER NOUN — Lambda→LaMDA: APPLY',
+    raw: 'We built it on Lambda back then.', claim: 'They built it on LaMDA.',
+    corrected: 'We built it on LaMDA back then.', expectApplied: true,
+  },
+  {
+    label: 'TRIM FILLER — drop "um, you know": APPLY',
+    raw: 'um, you know, we shipped Sora to everyone', claim: 'They shipped Sora.',
+    corrected: 'We shipped Sora to everyone.', expectApplied: true,
+  },
+  {
+    label: 'WORD→DIGIT — nine→9: APPLY',
+    raw: 'nine of the Fortune 10 use it', claim: '9 of the Fortune 10.',
+    corrected: '9 of the Fortune 10 use it.', expectApplied: true,
+  },
+  {
+    label: 'INVENTS NUMERAL — adds $75B not in raw: REJECT',
+    raw: 'We spend a lot on capex.', claim: 'Capex is high.',
+    corrected: 'We spend $75 billion on capex.', expectApplied: false,
+  },
+  {
+    label: 'CHANGES NUMBER — $75B→$7.5B: REJECT',
+    raw: 'We spend $75 billion on capex.', claim: 'Capex is $75 billion.',
+    corrected: 'We spend $7.5 billion on capex.', expectApplied: false,
+  },
+  {
+    label: 'DROPS CLAIM NUMBER — loses $75B the claim needs: REJECT',
+    raw: 'We spend $75 billion on capex.', claim: 'Capex is $75 billion.',
+    corrected: 'We spend a lot on capex.', expectApplied: false,
+  },
+  {
+    label: 'REWRITE TOWARD LEAD-IN — many new words: REJECT',
+    raw: 'um so we kind of think about it a little differently you know',
+    claim: 'They think differently.',
+    corrected: 'Our strategic framework diverges fundamentally from every competitor.',
+    expectApplied: false,
+  },
+  {
+    label: 'UNCHANGED — identical to raw: REJECT (use raw)',
+    raw: 'Same text here.', claim: 'x', corrected: 'Same text here.', expectApplied: false,
+  },
+];
+for (const c of corrCases) {
+  const out = validateCorrectedQuote({ raw: c.raw, corrected: c.corrected, claim: c.claim });
+  const applied = out !== null;
+  const ok = applied === c.expectApplied;
+  console.log(`${ok ? '✓' : '✗'} ${c.label}`);
+  console.log(`   ${applied ? 'APPLIED: ' + JSON.stringify(out) : 'rejected (raw kept)'}`);
+  if (ok) passed++; else failed++;
+}
+
 console.log();
 console.log(`${passed}/${passed + failed} passed`);
 if (failed > 0) process.exit(1);

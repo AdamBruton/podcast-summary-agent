@@ -180,7 +180,7 @@ function renderItem(it, rank, isFirst) {
             <div class="claim">${esc(it.claim)}</div>
             ${it.speaker ? `<div class="speaker">${esc(it.speaker)}</div>` : ''}
             <div class="why">${esc(it.why_matters)}</div>
-            ${it.supporting_quote ? `<div class="quote">${esc(canonicalize(it.supporting_quote))}</div>` : ''}
+            ${(it.display_quote || it.supporting_quote) ? `<div class="quote">${esc(canonicalize(it.display_quote || it.supporting_quote))}</div>` : ''}
           </td>
         </tr>
       </table>`;
@@ -190,7 +190,7 @@ function renderItem(it, rank, isFirst) {
   // moments (one timestamp + quote per member, primary first), then why_matters.
   const headline = it.label || it.claim;
   const members = [
-    { timestamp_sec: it.timestamp_sec, supporting_quote: it.supporting_quote, claim: it.claim, speaker: it.speaker },
+    { timestamp_sec: it.timestamp_sec, supporting_quote: it.supporting_quote, display_quote: it.display_quote, claim: it.claim, speaker: it.speaker },
     ...it.bundle_members,
   ];
   const speakers = Array.from(new Set(members.map(m => m.speaker).filter(Boolean)));
@@ -198,8 +198,9 @@ function renderItem(it, rank, isFirst) {
     const ts = `<a class="ts" href="${esc(momentLink(it, m.timestamp_sec))}">${fmtTime(m.timestamp_sec)}</a>`;
     const claimLine = m.claim && m.claim !== headline
       ? `<div class="bundle-claim">${esc(m.claim)}</div>` : '';
-    const quote = m.supporting_quote
-      ? `<div class="quote bundle-quote">${esc(canonicalize(m.supporting_quote))}</div>` : '';
+    const mQuote = m.display_quote || m.supporting_quote;
+    const quote = mQuote
+      ? `<div class="quote bundle-quote">${esc(canonicalize(mQuote))}</div>` : '';
     return `<div class="bundle-row">${ts}${claimLine}${quote}</div>`;
   }).join('');
 

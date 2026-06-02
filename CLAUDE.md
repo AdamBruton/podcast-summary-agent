@@ -126,7 +126,10 @@ Tables (all migrations via `safeAlter` in `db.js#migrate` — never raw
   (saveCandidates DELETEs + re-INSERTs); referencing rows cascade.
 - `rankings` — one per brief item. `candidate_id` primary; bundles store extras
   in `ranking_bundle_members`; `label` = bundle headline (NULL for singles).
+  `display_quote` = rank-corrected quote for display (NULL → fall back to the
+  candidate's raw `supporting_quote`). See "Quote correction" below.
 - `ranking_bundle_members` — junction, ON DELETE CASCADE from both parents.
+  Also carries per-member `display_quote` (same semantics as on `rankings`).
 - `feedback` — per-candidate thumbs (`up`|`down`), CASCADE from candidates (so
   re-extract loses feedback).
 - `discoveries` — every YouTube search result + LLM curation decision. Audit
@@ -171,9 +174,11 @@ Stage invariants:
   from supporting_quote — the $75B-vs-$7.5B class). Skipped on re-runs when
   already `extracted`/`ranked` (deterministic + profile-independent).
 - **rank**: cheap (~$0.03). Always reruns on non-delivered so profile edits
-  propagate. SINGLES `{candidate_id, rank, why_matters}` or BUNDLES
-  `{candidate_ids:[...], rank, why_matters, label}`. Bundling is text-signal
-  driven in rank.md, no fixed cap.
+  propagate. SINGLES `{candidate_id, rank, why_matters, corrected_quote?}` or
+  BUNDLES `{candidate_ids:[...], rank, why_matters, label, corrected_quotes?}`.
+  Bundling is text-signal driven in rank.md, no fixed cap. Model is
+  `RANK_MODEL`-selectable (Sonnet default, `opus` to A/B). Also runs quote
+  correction — see below.
 - **compose**: runs global-rank for multi-episode briefs; single-episode skips
   it. Flat top-down ordinal list, no item cap.
 - **deliver**: real mode refuses to send if `episodes.length === 0` (returns
@@ -210,7 +215,11 @@ retry-after-failure.
 
 ## Anthropic SDK conventions
 
-- Models in `MODELS.SONNET` only. Adding a model → also add its `MODEL_PRICING` row.
+- Models: `MODELS.SONNET` (default everywhere) + `MODELS.OPUS` (`claude-opus-4-8`).
+  Adding a model → also add its `MODEL_PRICING` row. **The Opus pricing row is
+  best-known, NOT verified** — confirm current Opus rates before trusting its $
+  ledger (a wrong row only skews telemetry; `calcCost` returns 0 for unknown
+  models, never blocks the call). `RANK_MODEL=opus` runs the rank pass on Opus.
 - System prompts via `loadPrompt('name')` → `prompts/name.md`. Never inline.
 - `parseJsonResponse(text)` strips markdown fences + finds first `{`/`[`. Use on
   every model JSON output — models add fences even when told not to.
@@ -356,6 +365,31 @@ reintroduce Whisper for YouTube** — different decision for a different medium.
 - **number-fidelity check** (`number-check.js`) drops candidates whose claim has
   numbers absent from supporting_quote. Belt-and-suspenders with the prompt's
   "Numbers must match" rule — don't remove.
+
+---
+
+## Quote correction (display-only, rank pass)
+
+The brief's `supporting_quote` is ASR output and sometimes mis-hears words
+(proper nouns, homophones). The rank pass — which understands episode context —
+emits a lightly **corrected** quote per selected item (`corrected_quote` /
+`corrected_quotes` keyed by candidate_id). Invariants (don't weaken):
+
+- **Raw `supporting_quote` is never mutated.** It stays the audit trail and the
+  number-fidelity input. The correction is stored separately as `display_quote`
+  (on `rankings` + `ranking_bundle_members`); compose renders
+  `display_quote || supporting_quote`.
+- **Corrections are validated, not trusted** — `validateCorrectedQuote` in
+  `number-check.js` rejects (→ falls back to raw) any correction that: invents a
+  numeral not in the raw quote, drops a number the claim needs, injects too much
+  new content (new-word budget — trimming filler is free, rewriting toward the
+  lead-in is caught), or balloons the length. This is what keeps the
+  $75B↔$7.5B class from sneaking back in via "correction".
+- **It's a fix toward what was *said*, not toward `why_matters`.** rank.md says
+  so explicitly; the new-word budget enforces it mechanically.
+- Off-switch: `QUOTE_CORRECTION=off` shows raw quotes (A/B the feature
+  independent of `RANK_MODEL`). `node scripts/test-number-check.js` covers both
+  the numeric guard and the corrected-quote validator.
 
 ---
 

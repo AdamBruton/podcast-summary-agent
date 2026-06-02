@@ -33,7 +33,8 @@ Return a **JSON array** (only — no prose), ranked best-first. Each entry is ei
   {
     "candidate_id": 17,                   // the `id` field from the input candidates
     "rank": 1,
-    "why_matters": "Concrete capex ..."   // ONE sentence, max ~25 words, framed to the reader's themes
+    "why_matters": "Concrete capex ...",  // ONE sentence, max ~25 words, framed to the reader's themes
+    "corrected_quote": "We're spending $75 billion on capex this year."  // see "Quote correction" below
   },
 
   // bundle — multiple candidates that together form one story
@@ -41,10 +42,36 @@ Return a **JSON array** (only — no prose), ranked best-first. Each entry is ei
     "candidate_ids": [42, 47],            // first id is the "primary" / strongest standalone
     "rank": 2,
     "label": "Anthropic is operationalizing internal AI agentically",   // short bolded headline shown in the brief
-    "why_matters": "Together these two adjacent disclosures …"          // explains the synthesis
+    "why_matters": "Together these two adjacent disclosures …",         // explains the synthesis
+    "corrected_quotes": { "42": "...", "47": "..." }   // one per candidate_id; see below
   }
 ]
 ```
+
+## Quote correction
+
+Each candidate carries a `supporting_quote` transcribed by automatic speech
+recognition, which sometimes mishears words — especially proper nouns, product
+names, and homophones (e.g. "Lambda" for "LaMDA", "sora" for "Sora"). You
+understand the episode's context, so you can tell what was actually said.
+
+For every candidate you select, emit a **corrected** version of its quote:
+`corrected_quote` for a single, or a `corrected_quotes` object keyed by
+`candidate_id` (as strings) for a bundle (one entry per id in `candidate_ids`).
+
+Correction rules — these are strict; a violation gets your correction silently
+discarded in favor of the raw quote:
+
+- **Fix transcription errors only**: mis-heard words, wrong homophones, garbled
+  proper nouns, punctuation, capitalization. You may trim leading/trailing
+  filler ("um", "you know", false starts) and tidy obvious run-ons.
+- **Preserve the speaker's actual wording and meaning.** This is the speaker's
+  quote, not your paraphrase. Do NOT rewrite it toward your `why_matters`.
+- **Never add, remove, or change any number, amount, date, or named fact.** If
+  the ASR says "$75 billion", keep "$75 billion" even if you suspect otherwise.
+- **When unsure whether something is an error, leave it as transcribed.**
+- Keep the edit small — a few words. If the quote is already clean, return it
+  unchanged.
 
 ## Rules
 
