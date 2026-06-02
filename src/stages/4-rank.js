@@ -6,9 +6,28 @@
 import { loadProfile, loadPrompt } from '../lib/config.js';
 import { complete, parseJsonResponse, MODELS } from '../lib/claude.js';
 import { getCandidates, saveRankings, setEpisodeStatus } from '../lib/db.js';
+import { validateCorrectedQuote } from '../lib/number-check.js';
 import { log } from '../lib/log.js';
 
 const SYSTEM = `${loadPrompt('rank')}\n\n--- READER INTEREST PROFILE ---\n\n${loadProfile()}`;
+
+// A/B knob: RANK_MODEL=opus runs the synthesis pass (selection + why_matters +
+// quote correction) on Opus instead of Sonnet. Defaults to Sonnet.
+const RANK_MODEL = process.env.RANK_MODEL === 'opus' ? MODELS.OPUS : MODELS.SONNET;
+// QUOTE_CORRECTION=off keeps the model's corrected quotes out of the brief
+// (raw supporting_quote is shown). Defaults on. Lets you A/B the feature itself
+// independent of the model knob.
+const QUOTE_CORRECTION = process.env.QUOTE_CORRECTION !== 'off';
+
+// Pull the model's proposed corrected quote for a given candidate id out of a
+// ranking entry — `corrected_quotes` map (bundle) takes precedence, else the
+// single `corrected_quote`. JSON object keys are strings; ids are numbers.
+function proposedCorrection(r, id) {
+  const map = r.corrected_quotes;
+  if (map && typeof map === 'object') return map[id] ?? map[String(id)] ?? null;
+  if (typeof r.corrected_quote === 'string') return r.corrected_quote;
+  return null;
+}
 
 export async function rankEpisode(episode, { run_id }) {
   const candidates = getCandidates(episode.video_id);
@@ -38,9 +57,9 @@ export async function rankEpisode(episode, { run_id }) {
   ].join('\n');
 
   const { text } = await complete({
-    model: MODELS.SONNET,
+    model: RANK_MODEL,
     system: SYSTEM,
-    max_tokens: 2048,
+    max_tokens: 4096,   // headroom for per-item corrected quotes on top of why_matters
     messages: [{ role: 'user', content: userMsg }],
     telemetry: { run_id, video_id: episode.video_id, stage: 'rank' },
   });
@@ -76,11 +95,36 @@ export async function rankEpisode(episode, { run_id }) {
     })
     .filter(Boolean);
 
+  // Validate the model's proposed quote corrections against each candidate's
+  // RAW supporting_quote. The raw quote is never mutated — it stays the audit
+  // trail + number-fidelity input; we only attach a vetted display copy. Any
+  // correction that invents a numeral, drops a claim number, or rewrites too
+  // much is rejected → compose falls back to the raw quote.
+  const byId = new Map(candidates.map(c => [c.id, c]));
+  let applied = 0, rejected = 0;
+  for (const r of rankings) {
+    const ids = Array.isArray(r.candidate_ids) && r.candidate_ids.length
+      ? r.candidate_ids : [r.candidate_id];
+    const dq = {};
+    for (const id of ids) {
+      const cand = byId.get(id);
+      if (!cand) continue;
+      const proposed = QUOTE_CORRECTION ? proposedCorrection(r, id) : null;
+      const valid = proposed
+        ? validateCorrectedQuote({ raw: cand.supporting_quote, corrected: proposed, claim: cand.claim })
+        : null;
+      dq[id] = valid;
+      if (proposed) (valid ? applied++ : rejected++);
+    }
+    r.display_quotes = dq;
+  }
+
   const bundleCount = rankings.filter(r => Array.isArray(r.candidate_ids)).length;
   saveRankings(episode.video_id, rankings);
   setEpisodeStatus(episode.video_id, 'ranked');
   log.ok('ranked', {
     video_id: episode.video_id, picked: rankings.length, bundles: bundleCount,
+    model: RANK_MODEL, quotes_corrected: applied, quotes_rejected: rejected,
   });
   return rankings;
 }

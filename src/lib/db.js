@@ -158,6 +158,13 @@ function migrate(d) {
   safeAlter(d, `ALTER TABLE episodes ADD COLUMN feed_url TEXT`);
   safeAlter(d, `ALTER TABLE episodes ADD COLUMN audio_url TEXT`);
   safeAlter(d, `ALTER TABLE episodes ADD COLUMN episode_page_url TEXT`);
+  // Quote correction: a display-only copy of the candidate's supporting_quote,
+  // lightly corrected by the rank pass for ASR transcription errors. NULL means
+  // "fall back to the raw supporting_quote". The raw quote in `candidates` is
+  // never mutated — it stays the audit trail + number-fidelity input. Stored
+  // per ranking (primary) and per bundle member.
+  safeAlter(d, `ALTER TABLE rankings ADD COLUMN display_quote TEXT`);
+  safeAlter(d, `ALTER TABLE ranking_bundle_members ADD COLUMN display_quote TEXT`);
 
   // Backfill: markDelivered() historically only stamped
   // rankings.included_in_brief_at and forgot to flip episodes.status to
@@ -322,26 +329,35 @@ export function getCandidates(video_id) {
 //   bundle:  { candidate_ids: [primary, …extras], rank, why_matters, label? }
 // In both cases the FIRST id becomes rankings.candidate_id (the "primary").
 // Extras are inserted into ranking_bundle_members. Singles get no junction rows.
+//
+// Optional `r.display_quotes` is a `{ [candidate_id]: correctedString|null }`
+// map (validated upstream in 4-rank.js). A null/missing entry stores NULL →
+// compose falls back to the raw supporting_quote.
 export function saveRankings(video_id, rankings) {
   const d = db();
   d.prepare(`DELETE FROM rankings WHERE video_id = ?`).run(video_id);
   const insertRanking = d.prepare(`
-    INSERT INTO rankings (video_id, candidate_id, rank, why_matters, label)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO rankings (video_id, candidate_id, rank, why_matters, label, display_quote)
+    VALUES (?, ?, ?, ?, ?, ?)
   `);
   const insertMember = d.prepare(`
-    INSERT INTO ranking_bundle_members (ranking_id, candidate_id, display_order)
-    VALUES (?, ?, ?)
+    INSERT INTO ranking_bundle_members (ranking_id, candidate_id, display_order, display_quote)
+    VALUES (?, ?, ?, ?)
   `);
+  const dq = (map, id) => {
+    const v = map && (map[id] ?? map[String(id)]);
+    return typeof v === 'string' && v ? v : null;
+  };
   for (const r of rankings) {
     const ids = Array.isArray(r.candidate_ids) && r.candidate_ids.length
       ? r.candidate_ids
       : [r.candidate_id];
     if (ids.length === 0 || ids[0] == null) continue;   // malformed entry, skip
-    const info = insertRanking.run(video_id, ids[0], r.rank, r.why_matters, r.label || null);
+    const info = insertRanking.run(
+      video_id, ids[0], r.rank, r.why_matters, r.label || null, dq(r.display_quotes, ids[0]));
     const ranking_id = Number(info.lastInsertRowid);
     for (let i = 1; i < ids.length; i++) {
-      insertMember.run(ranking_id, ids[i], i);
+      insertMember.run(ranking_id, ids[i], i, dq(r.display_quotes, ids[i]));
     }
   }
 }
@@ -350,15 +366,17 @@ export function saveRankings(video_id, rankings) {
 // array. Bundles list their extra candidates in bundle_members ordered by
 // display_order (the order the rank pass listed them).
 export function getRankedBriefItems(video_id) {
+  // display_quote is selected AFTER c.* so it overrides any same-named column
+  // (candidates has none today, but ordering makes the intent explicit).
   const rankings = db().prepare(`
-    SELECT r.id AS ranking_id, r.rank, r.why_matters, r.label, c.*
+    SELECT r.id AS ranking_id, r.rank, r.why_matters, r.label, c.*, r.display_quote AS display_quote
     FROM rankings r
     JOIN candidates c ON c.id = r.candidate_id
     WHERE r.video_id = ?
     ORDER BY r.rank
   `).all(video_id);
   const memberStmt = db().prepare(`
-    SELECT c.*
+    SELECT c.*, rbm.display_quote AS display_quote
     FROM ranking_bundle_members rbm
     JOIN candidates c ON c.id = rbm.candidate_id
     WHERE rbm.ranking_id = ?
