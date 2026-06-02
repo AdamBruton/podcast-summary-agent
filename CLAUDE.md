@@ -1,53 +1,47 @@
 # CLAUDE.md
 
-Repo-level instructions for Claude. Loaded automatically when working in this
-repo. Captures the design rules, invariants, and debugged pitfalls that aren't
-obvious from reading the code.
-
-If the code disagrees with this file, the code is right and this file is stale —
-fix CLAUDE.md.
+Repo-level instructions for Claude. Captures design rules, invariants, and
+debugged pitfalls that aren't obvious from the code. **If the code disagrees
+with this file, the code is right — fix CLAUDE.md.**
 
 ---
 
 ## What this is
 
-A podcast intelligence agent. Polls a curated set of YouTube channels + podcast
-RSS feeds, and searches YouTube for named individuals/companies daily;
-transcribes YouTube via captions (youtube-transcript.io) and podcasts via
-WhisperX-on-Modal, runs two Claude passes (extract → rank, plus a
-cross-episode global rank), composes an HTML brief with timestamp deep-links,
-sends via SendGrid. Tuned by an editable profile.md and per-candidate thumbs
-feedback from the web UI. Runs in production on Railway as a single
-long-lived web service (Cloudflare-Access-protected) that also schedules
-the daily brief from in-process at 08:00 UTC. No separate cron service.
+A podcast intelligence agent. Polls curated YouTube channels + podcast RSS
+feeds, and searches YouTube for named individuals/companies daily. Transcribes
+YouTube via captions (youtube-transcript.io) and podcasts via WhisperX-on-Modal,
+runs two Claude passes (extract → rank, plus a cross-episode global rank),
+composes an HTML brief with timestamp deep-links, sends via SendGrid. Tuned by
+an editable `config/profile.md` + per-candidate thumbs feedback from the web UI.
 
-Reader for the brief: the project owner. Bias is business / strategy / tokenomics
-over technical detail (see `config/profile.md` "Priority hierarchy" section).
+Runs in production on Railway as a single long-lived web service
+(Cloudflare-Access-protected) that also schedules the daily brief in-process at
+08:00 UTC. **No separate cron service** (Railway volumes are single-attach — a
+second service silently diverges onto its own volume).
+
+Reader: the project owner. Bias is business / strategy / tokenomics over
+technical detail (see `config/profile.md` "Priority hierarchy").
 
 ---
 
 ## Tech stack — non-negotiable
 
-- **Node 22 LTS, ESM only.** No CJS, no TypeScript, no build step. Module file
-  imports use explicit `.js` extensions.
-- **All JS in the Node runtime.** yt-dlp + ffmpeg invoked as subprocesses; no
-  Python code runs inside the Node app or the Railway image. yt-dlp is
-  installed via pip in the Docker image (apt's version lags YouTube changes by
-  weeks). **Exception:** `modal_worker/` holds the WhisperX transcription
-  worker, which IS Python — but it is deployed *separately* to Modal (not part
-  of the Railway build) and the Node side only ever reaches it over HTTPS. See
-  "Modal transcription worker" below.
-- **`node:sqlite` not `better-sqlite3`.** Built-in, no native deps, no
-  VS-build-tools requirement on Windows or Alpine in Docker. See "node:sqlite
-  gotchas" below — it's stricter than other SQLite bindings.
-- **Express 5** for the web server. Note: Express 5 dropped regex route
-  patterns (`/:cat(channel|company)`) — use simple `:param` and route
-  per-path instead.
+- **Node 22 LTS, ESM only.** No CJS, no TypeScript, no build step. Explicit
+  `.js` import extensions.
+- **All JS in the Node runtime.** yt-dlp + ffmpeg as subprocesses; no Python in
+  the Node app or Railway image. yt-dlp installed via pip in Docker (apt lags
+  YouTube by weeks). **Exception:** `modal_worker/` (WhisperX) is Python,
+  deployed *separately* to Modal; Node only reaches it over HTTPS.
+- **`node:sqlite`, not `better-sqlite3`.** Built-in, no native deps. Stricter
+  binding — see gotchas below.
+- **Express 5.** Dropped regex route patterns (`/:cat(channel|company)`) — use
+  simple `:param` and route per-path.
 - **No frontend framework.** Vanilla JS + CSS in `src/web/public/index.html`,
-  one file. Static-served by Express.
-- **Anthropic SDK** (`@anthropic-ai/sdk`) for all LLM calls. **Claude Sonnet 4.6
-  (`claude-sonnet-4-6`)** for every stage. Pricing constants live in
-  `src/lib/claude.js#MODEL_PRICING`. When bumping models, update there.
+  one file, static-served. Adding a framework requires explicit discussion.
+- **Anthropic SDK** (`@anthropic-ai/sdk`), **Claude Sonnet 4.6
+  (`claude-sonnet-4-6`)** every stage. Pricing in `src/lib/claude.js#MODEL_PRICING`
+  — update when bumping models.
 
 ---
 
@@ -55,127 +49,93 @@ over technical detail (see `config/profile.md` "Priority hierarchy" section).
 
 ```
 src/
-  cli.js                     command-line entry (npm run brief)
-  pipeline.js                runDaily / runEpisode orchestrators
+  cli.js                command entry (npm run brief)
+  pipeline.js           runDaily / runEpisode orchestrators
   lib/
-    config.js                env, paths, source/profile loaders
-    db.js                    node:sqlite schema + helpers (single source of truth)
-    claude.js                Anthropic SDK wrapper with prompt caching + cost telemetry
-    youtube.js               yt-dlp subprocess wrapper (resolveHandle, fetchCaptions, etc.)
-    rss.js                   podcast RSS adapter (rss-parser → normalized episode rows + pod_<hex> IDs)
-    log.js                   tiny structured logger + stage() timing wrapper
-    sources-store.js         read/write config/sources.yaml via yaml Document API (preserves comments)
-    profile-store.js         read/write config/profile.md as plain text
-    discovery-search.js      yt-dlp ytsearch + mechanical pre-filters
-    global-rank.js           cross-episode global ordering pass
-    number-check.js          numeric-fidelity guard for extracted candidates
-    transcript-io.js         youtube-transcript.io HTTP client (YouTube captions)
-    modal-transcribe.js      WhisperX-on-Modal HTTP client (podcast audio; Phase 3)
+    config.js           env, paths, source/profile loaders (+ Railway seeding on import)
+    db.js               node:sqlite schema + helpers (single source of truth)
+    claude.js           Anthropic wrapper: prompt caching + cost telemetry
+    youtube.js          yt-dlp subprocess wrapper
+    rss.js              podcast RSS adapter (rss-parser → rows + pod_<hex> IDs)
+    log.js              structured logger + stage() timing
+    sources-store.js    read/write config/sources.yaml via yaml Document API (preserves comments)
+    profile-store.js    read/write config/profile.md as plain text
+    discovery-search.js yt-dlp ytsearch + mechanical pre-filters
+    global-rank.js      cross-episode global ordering pass
+    number-check.js     numeric-fidelity guard
+    transcript-io.js    youtube-transcript.io client (YouTube captions)
+    modal-transcribe.js WhisperX-on-Modal client (podcast audio)
+    backup.js           DB snapshot/restore (VACUUM INTO)
   stages/
-    1-ingest.js              channel polling + ad-hoc URL ingest
-    1b-discover.js           discovery: search → mechanical filter → LLM curate → promote
-    2-transcribe.js          medium router: YouTube→transcript-io, podcast→Modal/WhisperX
-    3-extract.js             chunked Claude pass producing candidates
-    4-rank.js                per-episode Claude pass (singles + bundles)
-    5-compose.js             HTML render incl. canonicalize + bundle layout
-    6-deliver.js             SendGrid send (or write-to-disk on --dry-run)
+    1-ingest.js         channel polling + ad-hoc URL ingest + ingestPodcastsDaily()
+    1b-discover.js      search → mechanical filter → LLM curate → promote
+    2-transcribe.js     medium router: YouTube→transcript-io, podcast→Modal/WhisperX
+    3-extract.js        chunked Claude pass → candidates
+    4-rank.js           per-episode Claude pass (singles + bundles)
+    5-compose.js        HTML render (medium-aware links, canonicalize, bundles)
+    6-deliver.js        SendGrid send (or write-to-disk on --dry-run)
   web/
-    server.js                Express API + static file serving
-    public/index.html        single-page UI: sources, profile, episode inspector, ad-hoc URL
-modal_worker/                Python, deployed SEPARATELY to Modal (not Railway). Called over HTTPS.
-  hello.py                   Phase 2a smoke test (no GPU)
-  whisperx_cpu_test.py       Phase 2b CPU/tiny proof of the WhisperX path
-  transcribe.py              Phase 2c GPU worker: large-v3 + alignment + pyannote diarization
-prompts/
-  extract.md                 system prompt for extract pass
-  rank.md                    system prompt for per-episode rank (bundling rules here)
-  global-rank.md             system prompt for cross-episode ordering
-  discovery-curate.md        system prompt for LLM-curating YouTube search results
-  profile-refine.md          system prompt for feedback-driven profile suggestions
+    server.js           Express API + static serving + in-process daily scheduler
+    public/index.html   single-page UI: sources, podcasts, profile, inspector, ad-hoc URL
+modal_worker/           Python, deployed SEPARATELY to Modal. Called over HTTPS.
+  transcribe.py         GPU worker (large-v3 + alignment + pyannote) + FastAPI `web` endpoint
+  hello.py, whisperx_cpu_test.py   earlier-phase smoke tests
+prompts/                extract.md, rank.md (bundling rules), global-rank.md,
+                        discovery-curate.md, profile-refine.md  (load via loadPrompt)
 config/
-  sources.yaml               channels + podcasts (RSS) + individuals/companies list; web UI edits this
-  profile.md                 interest profile (tier hierarchy + themes); web UI edits this
-scripts/
-  ingest-podcasts.js         thin wrapper over ingestPodcastsDaily() for debugging RSS in isolation (the daily run calls the same function)
-  resolve-channels.js        one-time / on-demand: populate channel_id from @handle
-  recompose.js               re-render the current ranked pool (with optional --send)
-  rerank.js                  re-run rank pass on existing episodes (no re-extract)
-  discover.js                standalone discovery run (with --promote or test mode)
-  discovery-audit.js         inspect approve/reject/filtered decisions
-  inspect-window.js          dump candidates + transcript around a timestamp
-  inspect-bundles.js         dump bundle structure for an episode
-  test-canonicalize.js       sanity test for the term-canonicalization table
-  test-number-check.js       sanity test for the numeric-fidelity guard
-  test-modal-transcribe.js   smoke-test the Modal WhisperX HTTP client (no DB)
-data/                        gitignored. state.db, transcripts/, briefs/, cookies.txt
+  sources.yaml          channels + podcasts + individuals/companies; web UI edits this
+  profile.md            interest profile (tier hierarchy + themes); web UI edits this
+scripts/                ingest-podcasts, resolve-channels, recompose, rerank, discover,
+                        discovery-audit, inspect-window, inspect-bundles, test-*, etc.
+data/                   gitignored. state.db, transcripts/, briefs/, cookies.txt, backups/
 ```
 
 ---
 
 ## Path strategy: local vs Railway
 
-**Detection**: presence of `RAILWAY_VOLUME_MOUNT_PATH` env var. Set by Railway
-when a volume is mounted; absent locally.
+**Detection**: presence of `RAILWAY_VOLUME_MOUNT_PATH`. Seeding logic is
+top-level in `src/lib/config.js` (runs on import). Don't move config to env
+vars or the DB — the file workflow is intentional.
 
-**Local** (RAILWAY_VOLUME_MOUNT_PATH unset):
-- `DATA_DIR = ROOT/data` (gitignored)
-- `CONFIG_DIR = ROOT/config` (git-tracked — UI edits commit-friendly)
-- Web UI binds 127.0.0.1, auto-opens browser
-- DB, transcripts, briefs, cookies all in `./data/`
-
-**Railway** (RAILWAY_VOLUME_MOUNT_PATH = `/data`):
-- `DATA_DIR = /data` (persistent volume)
-- `CONFIG_DIR = /data/config` (writable, persists across deploys; seeded from
-  image's `ROOT/config` on first boot if empty)
-- Web UI binds 0.0.0.0, listens on `PORT` env var
-- DB, transcripts, briefs, cookies all in `/data/`
-
-The seeding logic is in `src/lib/config.js`'s top-level code (runs on import).
-Don't move config to env vars or to the DB; the file workflow is intentional.
+| | Local (unset) | Railway (`/data`) |
+|---|---|---|
+| `DATA_DIR` | `ROOT/data` (gitignored) | `/data` (volume) |
+| `CONFIG_DIR` | `ROOT/config` (git-tracked) | `/data/config` (writable, seeded from image on first empty boot) |
+| Web bind | 127.0.0.1, auto-opens browser | 0.0.0.0, listens on `PORT` |
 
 ---
 
 ## Database — schema invariants
 
-Tables (all migrations via `safeAlter` in `src/lib/db.js#migrate`):
+Tables (all migrations via `safeAlter` in `db.js#migrate` — never raw
+`ALTER TABLE`; the helper swallows duplicate-column errors):
 
-- `episodes` — one row per video OR podcast episode. `status` flows
+- `episodes` — one row per video OR podcast episode. `status`:
   `new → transcribed → extracted → ranked → delivered`, plus `skipped`
-  (with `skip_reason`). `source` is `subscribed` or `discovery`;
-  `discovered_for` is the individual name if from discovery. `medium` is
-  `youtube` (default) or `podcast`. For `medium='podcast'`: `feed_url`,
-  `audio_url`, and `episode_page_url` are populated (NULL for YouTube),
-  `channel_name` holds the show name, and `video_id` is `pod_<16 hex>`
-  (a sha1 of normalized feed_url + guid|audio_url+pubdate — stable for
-  idempotent dedupe; can't collide with YouTube's 11-char IDs).
-- `transcripts` — one row per episode. `cues_json` is JSON
-  `[{start, end, text, speaker?}]` (`speaker` present for diarized
-  WhisperX output, absent for YouTube captions). `source` is `captions`,
-  `transcript-io`, or `whisperx-modal`.
-- `candidates` — many per video. Output of extract pass. **IDs are unstable
-  across re-extracts** (saveCandidates DELETEs and re-INSERTs); anything
-  referencing candidate_id (rankings, feedback, bundle_members) cascades.
-- `rankings` — one per brief item. `candidate_id` is the primary; bundles
-  store extras in `ranking_bundle_members`. `label` is the bundle headline
-  (NULL for singles).
-- `ranking_bundle_members` — junction for bundles. ON DELETE CASCADE from
-  both rankings and candidates.
-- `feedback` — per-candidate thumbs (`up` | `down`). ON DELETE CASCADE
-  from candidates, so re-extract loses feedback.
-- `discoveries` — every YouTube search result ever seen + the LLM curation
-  decision. Audit trail; survives even when not promoted.
-- `runs` + `cost_ledger` — telemetry. Every Claude call records tokens + $
-  with `{run_id, video_id, stage, model, ...}`.
+  (`skip_reason`). `source` is `subscribed`|`discovery`; `discovered_for` is the
+  individual name. `medium` is `youtube` (default) or `podcast`. For podcasts:
+  `feed_url`/`audio_url`/`episode_page_url` populated (NULL for YouTube),
+  `channel_name` = show name, `video_id` = `pod_<16 hex>` (sha1 of normalized
+  feed_url + guid|audio_url+pubdate — stable dedupe, can't collide with
+  YouTube's 11-char IDs).
+- `transcripts` — one per episode. `cues_json` = `[{start, end, text, speaker?}]`
+  (`speaker` only for diarized WhisperX). `source` is `captions`|`transcript-io`|
+  `whisperx-modal`.
+- `candidates` — many per video. **IDs unstable across re-extracts**
+  (saveCandidates DELETEs + re-INSERTs); referencing rows cascade.
+- `rankings` — one per brief item. `candidate_id` primary; bundles store extras
+  in `ranking_bundle_members`; `label` = bundle headline (NULL for singles).
+- `ranking_bundle_members` — junction, ON DELETE CASCADE from both parents.
+- `feedback` — per-candidate thumbs (`up`|`down`), CASCADE from candidates (so
+  re-extract loses feedback).
+- `discoveries` — every YouTube search result + LLM curation decision. Audit
+  trail; survives non-promotion.
+- `runs` + `cost_ledger` — telemetry. Every Claude call records tokens + $.
 
-**Critical**: `PRAGMA foreign_keys = ON;` is set on every connection. Code
-that deletes parent rows must clear child rows first OR rely on the cascade.
-`saveCandidates` explicitly deletes rankings first because candidate_id
-isn't cascade'd in that direction (rankings.candidate_id is a regular FK,
-not CASCADE).
-
-**Schema changes**: use `safeAlter(d, 'ALTER TABLE ...')` (the helper
-swallows duplicate-column errors), never raw `ALTER TABLE` — existing
-databases need the column-already-exists tolerance.
+**`PRAGMA foreign_keys = ON` on every connection.** Deletes of parent rows must
+clear children first OR rely on cascade. `saveCandidates` explicitly deletes
+rankings first because `rankings.candidate_id` is a regular FK, not CASCADE.
 
 ---
 
@@ -183,524 +143,316 @@ databases need the column-already-exists tolerance.
 
 ```
 runDaily()                                 runEpisode({url, markDeliveredOnSend})
-   ├─ ingestDaily()                            ├─ ingestEpisode(url)
-   ├─ discoverIndividuals()                    │
+   ├─ backupDatabase()  (try/catch)            ├─ ingestEpisode(url)
+   ├─ ingestDaily()                            ├─ transcribeEpisode()
+   ├─ ingestPodcastsDaily()  (non-fatal)       ├─ extractEpisode()
+   ├─ discoverIndividuals()                    ├─ rankEpisode()
    └─ for each resumable episode:              │
-        ├─ transcribeEpisode()                 ├─ transcribeEpisode()
-        ├─ extractEpisode()    ← skipped if    ├─ extractEpisode()
-        │                        status        │
-        │                        already       │
-        │                        extracted/    │
-        │                        ranked        │
-        ├─ rankEpisode()       ← always reruns ├─ rankEpisode()
-        └─ →                                   │
-      composeBrief(eps) ─→ globalRank ─→ flat ─→ deliver({markDeliveredOnSend?})
+        transcribe → extract → rank            │
+      composeBrief(eps) → globalRank → flat → deliver({markDeliveredOnSend?})
 ```
+extract is skipped if status already `extracted`/`ranked`; rank always reruns on
+non-delivered episodes.
 
 Stage invariants:
 
-- **transcribe**: medium-aware router (`src/stages/2-transcribe.js`), Phase 3.
-  `medium='youtube'` → **youtube-transcript.io** (third-party API; sidesteps the
-  "yt-dlp from a Railway IP gets silently degraded for caption fetching" problem
-  by handing YouTube interaction to a vendor). `medium='podcast'` → the
-  **WhisperX-on-Modal** HTTPS worker via `src/lib/modal-transcribe.js` (audio has
-  no captions). Both write the same cue contract; only the `source` tag
-  (`transcript-io` vs `whisperx-modal`) and per-cue `speaker` (podcasts only)
-  differ. No fallback in either branch (Groq Whisper was considered and
-  explicitly rejected — caller accepts missed episodes); a failure marks the
-  episode `skipped` with a reason. Cached transcripts (already in DB) are reused
-  without refetch. Env: `YOUTUBE_TRANSCRIPT_IO_TOKEN` (YouTube; rate limit 5 req
-  / 10 sec, client retries on 429 honoring Retry-After) + `MODAL_TRANSCRIBE_URL`
-  / `MODAL_TRANSCRIBE_SECRET` (podcasts; client submits then polls `/result`
-  every 15s up to a 40-min ceiling — the GPU job is ~14 min).
-- **extract**: chunks long transcripts at ~240k chars with cue overlap.
-  Output filtered by `verifyNumericFidelity` (drops candidates whose claim
-  contains numbers not present in the supporting_quote — catches the
-  $75B-vs-$7.5B paraphrase-hallucination class). Skipped on re-runs when
-  status is already `extracted` or `ranked` (extract is deterministic-ish
-  and profile-independent — re-running burns tokens for the same output).
-- **rank**: cheap (~$0.03). Always re-runs on non-delivered episodes so
-  profile edits propagate. Output can be SINGLES `{candidate_id, rank,
-  why_matters}` or BUNDLES `{candidate_ids: [...], rank, why_matters, label}`.
-  rank.md tells the model when to bundle (text-signal driven, no fixed cap).
-- **compose**: always runs the global-rank pass for multi-episode briefs.
-  Single-episode briefs skip global-rank (per-episode rank is already
-  optimal). Renders as a flat top-down ordinal list. No item cap — reader
-  scans top-down and stops when done.
-- **deliver**: in real mode (not --dry-run) refuses to send if `episodes.length
-  === 0` (returns `{empty: true}`). Ad-hoc URL endpoint surfaces this as a
-  user-visible error rather than silently emailing a blank brief.
+- **transcribe** (medium router, `2-transcribe.js`): `youtube` →
+  youtube-transcript.io (vendor sidesteps "yt-dlp caption fetch silently
+  degraded from Railway IPs"). `podcast` → WhisperX-on-Modal HTTPS via
+  `modal-transcribe.js` (audio has no captions). Same cue contract; differ only
+  in `source` tag + per-cue `speaker`. **No fallback** (Groq Whisper rejected —
+  caller accepts missed episodes); failure marks episode `skipped`. Cached
+  transcripts reused. Env: `YOUTUBE_TRANSCRIPT_IO_TOKEN` (rate limit 5 req/10s,
+  retries 429 honoring Retry-After) + `MODAL_TRANSCRIBE_URL`/
+  `MODAL_TRANSCRIBE_SECRET` (submit then poll `/result` every 15s up to 40 min;
+  GPU job ~14 min).
+- **extract**: chunks long transcripts at ~240k chars with cue overlap. Filtered
+  by `verifyNumericFidelity` (drops candidates whose claim has numbers absent
+  from supporting_quote — the $75B-vs-$7.5B class). Skipped on re-runs when
+  already `extracted`/`ranked` (deterministic + profile-independent).
+- **rank**: cheap (~$0.03). Always reruns on non-delivered so profile edits
+  propagate. SINGLES `{candidate_id, rank, why_matters}` or BUNDLES
+  `{candidate_ids:[...], rank, why_matters, label}`. Bundling is text-signal
+  driven in rank.md, no fixed cap.
+- **compose**: runs global-rank for multi-episode briefs; single-episode skips
+  it. Flat top-down ordinal list, no item cap.
+- **deliver**: real mode refuses to send if `episodes.length === 0` (returns
+  `{empty:true}`); ad-hoc endpoint surfaces this rather than emailing blank.
 
-**markDeliveredOnSend semantics**:
-- `true` (default): after send, episodes get status `delivered`; won't appear
-  in future briefs. Used by daily run, CLI `--episode`, and `recompose --send`.
-- `false`: send but don't mark delivered. Episode stays in `ranked` state and
-  rolls up into the next daily brief alongside other content. Used by the
-  web UI's ad-hoc URL endpoint (the user explicitly wants both: immediate
-  brief AND inclusion in tomorrow's roundup).
+**markDeliveredOnSend**: `true` (default; daily, CLI `--episode`,
+`recompose --send`) flips episodes to `delivered` so they won't reappear.
+`false` (web ad-hoc URL) sends but keeps `ranked` so it also rolls into the next
+daily brief.
 
-**Ad-hoc URL semantics**: the `/api/summarize-url` endpoint **resets any
-non-`new` status to `new` before invoking the pipeline**. When the user pastes
-a URL, they're explicitly asking us to process it — prior `skipped` /
-`delivered` / `ranked` shouldn't short-circuit. The daily cron path is
-unchanged (it respects `delivered`/`skipped` to avoid wasted work). Don't
-change this without thinking about the retry-after-failure case.
+**Ad-hoc URL** (`/api/summarize-url`): resets any non-`new` status to `new`
+before the pipeline (user explicitly asked to process it — prior
+`skipped`/`delivered`/`ranked` shouldn't short-circuit). Daily cron path is
+unchanged (respects `delivered`/`skipped`). Don't change without considering
+retry-after-failure.
 
 ---
 
 ## Cost discipline
 
-- **Always cache the system prompt.** Pattern in `src/lib/claude.js#complete`:
-  `system: [{type: 'text', text: systemPrompt, cache_control: {type: 'ephemeral'}}]`.
-  This is non-negotiable for repeated calls (rank, global-rank, discovery-curate,
-  profile-refine all reuse the same system across calls in a run).
-- **Always log via `recordCost`.** `claude.complete()` does this automatically
-  when `telemetry.run_id` is provided; callers that don't have a run_id
-  (e.g. profile-refine, global-rank in some paths) just don't get cost logged
-  — that's a known gap, not a bug.
-- **Pricing (Sonnet 4.6, USD per million tokens)**: input $3.00, output $15.00,
-  cache_read $0.30, cache_write_5m $3.75. Hard-coded in `claude.js#MODEL_PRICING`.
-- **Typical per-episode cost** (steady state, single ~1hr episode):
-  extract $0.20 + rank $0.03 + global-rank $0.03 (amortized) ≈ $0.26.
-  Daily cron with 3-5 new episodes: ~$1-2 + discovery curation $0.05.
+- **Always cache the system prompt.** `src/lib/claude.js#complete`:
+  `system: [{type:'text', text:systemPrompt, cache_control:{type:'ephemeral'}}]`.
+  Non-negotiable for repeated calls (rank, global-rank, discovery-curate,
+  profile-refine).
+- **Always log via `recordCost`.** Automatic in `claude.complete()` when
+  `telemetry.run_id` is provided; callers without a run_id (profile-refine, some
+  global-rank paths) don't get cost logged — known gap, not a bug.
+- **Pricing (Sonnet 4.6, USD/M tokens)**: input $3.00, output $15.00, cache_read
+  $0.30, cache_write_5m $3.75. Hard-coded in `claude.js#MODEL_PRICING`.
+- **Typical per-episode** (~1hr): extract $0.20 + rank $0.03 + global-rank $0.03
+  ≈ $0.26. Daily with 3-5 episodes: ~$1-2 + discovery curation $0.05.
 
 ---
 
 ## Anthropic SDK conventions
 
-- Models live in `MODELS.SONNET` only (right now there's just one). When adding
-  a model, also add its pricing row to `MODEL_PRICING`.
-- All system prompts go through `loadPrompt('name')` which reads `prompts/name.md`.
-  Add new prompts as `prompts/<thing>.md`, never inline.
-- `parseJsonResponse(text)` strips markdown fences (```json ... ```) and finds
-  the first `{` or `[`. Use it on every model JSON output — models love adding
-  fences even when told not to.
-- Telemetry shape: `{run_id?, video_id?, stage}`. `stage` is the only required
-  field; if `run_id` is missing, cost isn't logged but the call still runs.
+- Models in `MODELS.SONNET` only. Adding a model → also add its `MODEL_PRICING` row.
+- System prompts via `loadPrompt('name')` → `prompts/name.md`. Never inline.
+- `parseJsonResponse(text)` strips markdown fences + finds first `{`/`[`. Use on
+  every model JSON output — models add fences even when told not to.
+- Telemetry shape `{run_id?, video_id?, stage}`; `stage` is the only required field.
 
 ---
 
-## node:sqlite — gotchas we've already hit
+## node:sqlite — gotchas already hit
 
-- **Strict type binding.** No auto-coerce of `undefined`, `NaN`, `BigInt`,
-  arrays, objects. Coerce before `.run()`. Pattern in `db.js`:
-  ```js
-  function asStringOrNull(v) {
-    if (v == null) return null;
-    if (typeof v === 'string') return v;
-    if (Array.isArray(v)) return v.join(' ');
-    if (typeof v === 'object') return JSON.stringify(v);
-    return String(v);
-  }
-  // numbers:
-  Number.isFinite(x) ? Math.floor(x) : null
-  ```
-  Applied in `saveCandidates` and `upsertEpisode` after we hit the
-  "Provided value cannot be bound to SQLite parameter N" class of bugs.
-- **Named params use `@field` syntax** (not `:field` or `$field`).
-- **Error messages say "parameter N"** for both positional AND named bindings —
-  to find which field N maps to, count positional `?`s OR named `@field`s in
-  the prepared statement.
-- **No CLOSE on the global db().** Module-level singleton; tests will need
-  manual handling if we ever add them.
+- **Strict binding.** No auto-coerce of `undefined`/`NaN`/`BigInt`/arrays/objects.
+  Coerce before `.run()`. `db.js` pattern: `asStringOrNull(v)` (null→null,
+  string→string, array→join, object→JSON.stringify, else String) and
+  `Number.isFinite(x) ? Math.floor(x) : null` for numbers. Applied in
+  `saveCandidates` + `upsertEpisode` — **load-bearing, don't simplify** (Claude
+  returns arrays for `supporting_quote`; yt-dlp returns null `duration` for live
+  streams).
+- **Named params use `@field`** (not `:field`/`$field`).
+- **"parameter N" errors** map to the Nth positional `?` OR Nth `@field` in the
+  prepared statement — count carefully.
+- **No CLOSE on the global db()** — module-level singleton.
 
 ---
 
 ## yt-dlp invocation patterns
 
-All yt-dlp calls go through `run()` in `src/lib/youtube.js` (and the parallel
-`runYtDlp()` in `src/lib/discovery-search.js`). Both prepend `commonArgs()`:
+All calls go through `run()` in `youtube.js` (+ `runYtDlp()` in
+`discovery-search.js`), both prepending `commonArgs()`:
+- `--cookies <DATA_DIR>/cookies.txt` if present (required on Railway for bot-detection)
+- `--ignore-no-formats-error` always (live/premiere/members-only first-on-channel
+  videos abort format selection otherwise)
 
-- `--cookies <DATA_DIR>/cookies.txt` if the file exists (required on Railway
-  for YouTube bot-detection)
-- `--ignore-no-formats-error` always (metadata operations don't need a
-  downloadable format; without this, live-stream/premieres/members-only
-  first-on-channel videos abort format selection)
-
-Other learned patterns:
-
-- **Channel ID resolution**: `--flat-playlist --playlist-end 1 --print
-  "playlist:%(channel_id)s"`. The `playlist:` scope prefix is critical —
-  the per-video `%(channel_id)s` field returns literal `"NA"` in flat mode.
-- **Channel uploads listing**: `--flat-playlist --playlist-end <N> --dump-json`
-  → parse line-by-line JSON, each line is one video's flat metadata.
-- **Full metadata for a single video**: `--dump-json --skip-download` (no flat).
-- **Captions**: `--write-subs --write-auto-subs --sub-langs "en.*,en"
-  --sub-format vtt --skip-download --convert-subs vtt`. Manual subs preferred;
-  auto fallback.
-- **Audio download / Whisper**: REMOVED. Transcripts come from youtube-transcript.io
-  (see `src/lib/transcript-io.js`). yt-dlp is no longer involved in transcription.
+Learned patterns:
+- **Channel ID**: `--flat-playlist --playlist-end 1 --print "playlist:%(channel_id)s"`.
+  The `playlist:` prefix is critical — per-video `%(channel_id)s` returns `"NA"`
+  in flat mode.
+- **Uploads listing**: `--flat-playlist --playlist-end <N> --dump-json` (line-by-line JSON).
+- **Single-video metadata**: `--dump-json --skip-download` (no flat).
+- **Captions** (used elsewhere, not transcription): `--write-subs --write-auto-subs`
+  both — auto-subs alone misses manual/creator subs.
+- **Audio download / Whisper: REMOVED.** yt-dlp is no longer involved in
+  transcription.
 
 ---
 
 ## Modal transcription worker (podcasts)
 
-Audio podcasts have no captions, so they're transcribed by a **WhisperX worker
-deployed to [Modal](https://modal.com)** — separate language (Python), separate
-cloud, separate deploy lifecycle from the Node app. The Node ingestion layer
-calls it over HTTPS (the Phase 2d endpoint); it never imports this code. Lives
-in `modal_worker/`.
+Audio podcasts have no captions → transcribed by a **WhisperX worker on
+[Modal](https://modal.com)** (Python, separate cloud + deploy lifecycle). Node
+calls it over HTTPS, never imports it. Lives in `modal_worker/`. **This does NOT
+reintroduce Whisper for YouTube** — different decision for a different medium.
 
-**This does NOT reintroduce Whisper for YouTube.** The "Whisper deliberately
-removed" rule below still holds for YouTube (captions via youtube-transcript.io).
-WhisperX-on-Modal is a *different decision for a different medium* — audio-only
-sources that have no captions at all.
-
-- **Run/deploy** (Windows): always prefix `$env:PYTHONUTF8=1` or Modal's `✓`
-  glyphs crash the console with a cp1252 `charmap` error (the function still
-  runs — it's purely a stdout-encoding issue). Invoke as `py -m modal ...`
-  (the `modal` script isn't on PATH). `py -m modal run modal_worker/transcribe.py`
-  runs it ephemerally; `py -m modal deploy modal_worker/transcribe.py` publishes
-  the Phase 2d HTTPS endpoint (the FastAPI `web` app in `transcribe.py`).
-- **Image recipe (load-bearing version pins):** `debian_slim(3.11)` + ffmpeg +
-  matched torch trio **torch 2.7.1 / torchaudio 2.7.1 / torchvision 0.22.1** +
-  **whisperx 3.7.2**. whisperx requires torch>=2.7.1; pinning the whole trio
-  stops the install from pulling a mismatched torch and breaking torchvision.
-- **nltk `punkt`/`punkt_tab` baked into the image (load-bearing).** whisperx's
-  alignment step sentence-splits via nltk, whose tokenizer data is NOT shipped
-  with the pip package. Without it, alignment raises `LookupError: Resource
-  'punkt_tab' not found` — but only on a COLD container (a warm one that already
-  fetched it survives, so the bug masquerades as flakiness). The image runs
-  `python -m nltk.downloader -d /usr/local/share/nltk_data punkt punkt_tab` so
-  every cold start has it. Download BOTH names: newer nltk renamed punkt →
-  punkt_tab, but whisperx still probes the old name first. Don't remove this.
-- **Two mandatory compatibility shims** (both in `transcribe.py`, must run
-  before any model load):
-  1. `torch.load` forced to `weights_only=False` — torch 2.7 defaults it to
-     True, which rejects pyannote's checkpoints (they embed omegaconf objects).
-     Trusted HF sources, so this is safe. Force it (don't `setdefault`):
-     `lightning_fabric` passes `weights_only=True` explicitly.
-  2. `hf_hub_download`/`snapshot_download` translate `use_auth_token=` → `token=`
-     — pyannote.audio 3.4 still passes the removed kwarg; the newer
-     huggingface_hub that transformers needs renamed it. **No single hf_hub
-     version satisfies both pyannote and transformers**, so we keep the new one
-     and translate at the call site. Do NOT "fix" this by pinning hf_hub.
-- **Model-weight caching:** a Modal **Volume** (`whisperx-cache`) mounted at
-  `/cache`, with `HF_HOME`/`TORCH_HOME` pointed into it, so large-v3 (~3GB) +
-  alignment + pyannote models download once and persist. `cache_vol.commit()`
-  after a run. Without this, every cold start re-downloads ~4GB on billed GPU.
-- **HF token:** the gated pyannote models (`speaker-diarization-3.1` +
-  `segmentation-3.0`, both must be license-accepted) need a token, supplied as
-  the Modal secret **`huggingface`** (key `HF_TOKEN`) — never in the repo.
-- **HTTPS endpoint (Phase 2d) — LIVE:** the `web` FastAPI app in `transcribe.py`,
-  published by `py -m modal deploy` and deployed at
-  `https://adambruton--podcast-transcribe-web.modal.run`. Job-queue pattern
-  (the GPU job is ~14 min, too long for one synchronous request):
-  `POST /transcribe {audio_url, clip_seconds?}` → `{call_id}`;
-  `GET /result/{call_id}` → `200`
-  `{status:"done", result:{...cues...}}` when finished, `202`
-  `{status:"pending"}` while running, `410` once Modal's result-retention
-  window lapses. Auth is a **shared bearer token** from the Modal secret
-  **`transcribe-auth`** (key `TRANSCRIBE_SECRET`), sent as
-  `Authorization: Bearer <token>` — never in the repo. The Node side reads the
-  URL + token from env as `MODAL_TRANSCRIBE_URL` / `MODAL_TRANSCRIBE_SECRET`
-  (Phase 3). The web container is fastapi-only (no torch) so it cold-starts
-  fast and scales to zero; the GPU image only spins up inside the spawned
-  `transcribe` call.
-- **Output contract:** cues `[{start, end, text, speaker}]`. `speaker` is an
-  anonymous `SPEAKER_NN` diarization label (no real names).
-- **Cost (grounded on a 5-min clip, L4):** ~47s GPU compute for 5 min audio →
-  ~14 min / **~$0.18 per 90-min episode**; ~15 episodes/week ≈ ~$11/mo, inside
-  the $30 free credit. GPU = L4 ($0.000222/s).
-- **Status:** 2a hello-world, 2b CPU/tiny, 2c GPU+diarization, 2d (HTTPS
-  endpoint + shared bearer-token secret) all done **and deployed**. 2d was
-  smoke-tested live against a 60s clip: bad token → 401, submit → poll
-  (pending → done), output contract correct (language=en, diarized cues with
-  4 speakers). The Node-side transcribe router (Phase 3) is the
-  remaining integration work.
+- **Run/deploy** (Windows): prefix `$env:PYTHONUTF8=1` (Modal's `✓` glyphs crash
+  cp1252 stdout — cosmetic). Invoke `py -m modal ...` (not on PATH).
+  `run` = ephemeral, `deploy` = publishes the FastAPI `web` endpoint.
+- **Image (load-bearing pins):** `debian_slim(3.11)` + ffmpeg + matched torch
+  trio **torch 2.7.1 / torchaudio 2.7.1 / torchvision 0.22.1** + **whisperx 3.7.2**
+  (whisperx needs torch≥2.7.1; pin the trio so install doesn't pull a mismatch).
+- **nltk `punkt` + `punkt_tab` baked in (load-bearing).** whisperx alignment
+  sentence-splits via nltk; data not shipped with the pip package. Missing →
+  `LookupError: punkt_tab` **only on cold containers** (masquerades as flakiness).
+  Image runs `nltk.downloader ... punkt punkt_tab`. Download BOTH names (nltk
+  renamed punkt→punkt_tab but whisperx probes the old name first).
+- **Two mandatory shims in `transcribe.py`, before any model load:**
+  1. `torch.load` forced `weights_only=False` (torch 2.7 defaults True, rejects
+     pyannote's omegaconf checkpoints). Force it, don't `setdefault` —
+     `lightning_fabric` passes True explicitly.
+  2. `hf_hub_download`/`snapshot_download` translate `use_auth_token=`→`token=`
+     (pyannote 3.4 passes the removed kwarg; newer huggingface_hub renamed it).
+     No single hf_hub satisfies both pyannote + transformers — don't "fix" by pinning.
+- **Model-weight caching:** Modal Volume `whisperx-cache` at `/cache`,
+  `HF_HOME`/`TORCH_HOME` pointed in; `cache_vol.commit()` after a run. Else every
+  cold start re-downloads ~4GB on billed GPU.
+- **HF token:** gated pyannote models (`speaker-diarization-3.1` +
+  `segmentation-3.0`, both license-accepted) via Modal secret `huggingface`
+  (key `HF_TOKEN`).
+- **HTTPS endpoint — LIVE** at `https://adambruton--podcast-transcribe-web.modal.run`.
+  Job-queue (GPU job ~14 min): `POST /transcribe {audio_url, clip_seconds?}` →
+  `{call_id}`; `GET /result/{call_id}` → 200 `{status:"done", result:{...}}` /
+  202 `{status:"pending"}` / 410 once retention lapses. Auth: shared bearer token
+  from Modal secret `transcribe-auth` (key `TRANSCRIBE_SECRET`). Node reads
+  `MODAL_TRANSCRIBE_URL`/`MODAL_TRANSCRIBE_SECRET`. Web container is fastapi-only
+  (cold-starts fast, scales to zero); GPU image spins up only in the spawned call.
+- **Output:** cues `[{start, end, text, speaker}]`; `speaker` is anonymous
+  `SPEAKER_NN` (no real names).
+- **Cost:** ~$0.18 per 90-min episode (L4 $0.000222/s); ~15 ep/week ≈ ~$11/mo,
+  inside the $30 free credit.
 
 ---
 
 ## Database backup & restore
 
-- **Snapshots**: `backupDatabase()` in `src/lib/backup.js` writes a gzipped
-  copy to `<DATA_DIR>/backups/state-<utc-ts>.db.gz` using `VACUUM INTO`.
-  That clones the live DB into a clean single-file artifact regardless of
-  WAL state, so we don't have to coordinate with readers or deal with
-  `-wal`/`-shm` sidecars.
-- **Schedule**: backup runs at the START of `runDaily` (before any new
-  writes for the day). Wrapped in try/catch — a failed backup must NOT
-  block the brief from going out. Since `runDaily` is now invoked from
-  in-process by the web server's scheduler, backups land on the same
-  volume the UI reads from.
-- **Rotation**: keep last 14 snapshots on disk, sorted by mtime. The
-  pre-restore snapshots (`state.pre-restore-<ts>.db`, uncompressed) are
-  NOT rotated — restores are rare and we want to keep all of them.
-- **Off-site**: on Sunday UTC, the daily snapshot is also emailed via
-  SendGrid as an attachment (≤ 20 MB compressed; current size ~3 KB so
-  there's huge headroom). If SendGrid env isn't set, off-site is silently
-  skipped. To restore: gunzip the attachment → upload via the web UI's
-  "Database backup & restore" section.
-- **Restore endpoint** (`POST /api/admin/restore-db`): accepts
-  `application/octet-stream`, validates SQLite magic bytes
-  (`Buffer.compare` against `SQLite format 3\0`), snapshots current DB to
-  `state.pre-restore-<ts>.db`, writes the upload to a tmp file, calls
-  `resetDb()` to close the singleton, deletes stale WAL/SHM sidecars,
-  atomically renames the tmp file over `DB_PATH`, then calls `db()` to
-  reopen against the new file (which surfaces any "bad upload" errors in
-  the response rather than the next unrelated request). The process keeps
-  running — important because Railway's `restartPolicyType=ON_FAILURE`
-  does NOT restart after a `process.exit(0)`; the old "exit and let
-  Railway restart" approach stranded the service.
-- **Cloudflare Access protects the admin endpoints in production.** Locally
-  the server binds 127.0.0.1 so no extra auth is needed. If you ever bind
-  to 0.0.0.0 outside of Railway, gate `/api/admin/*` behind a token first.
+- **Snapshots**: `backupDatabase()` in `backup.js` → gzipped
+  `<DATA_DIR>/backups/state-<ts>.db.gz` via `VACUUM INTO` (clean single file
+  regardless of WAL state).
+- **Schedule**: at the START of `runDaily`, try/catch (a failed backup must not
+  block the brief).
+- **Rotation**: keep last 14 snapshots by mtime. Pre-restore snapshots
+  (`state.pre-restore-<ts>.db`, uncompressed) are NOT rotated.
+- **Off-site**: Sunday UTC, daily snapshot also emailed via SendGrid (≤20 MB;
+  ~3 KB now). Silently skipped if SendGrid env unset.
+- **Restore** (`POST /api/admin/restore-db`): accepts `application/octet-stream`,
+  validates SQLite magic bytes, snapshots current to `state.pre-restore-<ts>.db`,
+  `resetDb()` closes singleton, deletes stale WAL/SHM, atomically renames upload
+  over `DB_PATH`, reopens via `db()` (surfaces bad-upload errors in the response).
+  Process keeps running — Railway `restartPolicyType=ON_FAILURE` does NOT restart
+  after `process.exit(0)` (the old exit-and-restart approach stranded the service).
+- **Cloudflare Access** protects admin endpoints in prod. If you ever bind
+  0.0.0.0 outside Railway, gate `/api/admin/*` behind a token first.
 
 ---
 
 ## Web UI conventions
 
-- **Errors flow through `setErr(elemId, message)`** in `index.html`. Auto-fade
-  after 6s, dismissible × button. Never use raw `el.textContent = err.message`.
-- **No build step.** Vanilla JS + inline `<style>` + inline `<script>`. Adding
-  a framework requires explicit discussion.
-- **Auth lives at Cloudflare**, not in the app. The Express server has no auth
-  middleware. Don't add one without first removing the Cloudflare Access
-  policy — otherwise duplication.
-- **Profile + sources edits**: web UI writes through `sources-store.js` /
-  `profile-store.js`, both of which round-trip via the yaml Document API
-  (preserves comments and key order). Don't `YAML.parse() → YAML.stringify()`
-  — that destroys all comments.
-- **Feedback workflow**: thumbs on each candidate in the episode inspector
-  → "Suggest refinements" button collects all feedback + current profile
-  → Claude proposes revised profile.md → user reviews diff (via `diff` npm
-  package, rendered as +/− lines) → applies or discards.
+- **Errors via `setErr(elemId, message)`** (auto-fade 6s, dismissible). Never
+  raw `el.textContent = err.message`.
+- **No build step.** Vanilla JS + inline `<style>`/`<script>`.
+- **Auth lives at Cloudflare**, not the app. No Express auth middleware — don't
+  add one without first removing the Cloudflare Access policy.
+- **Profile + sources edits** round-trip via the yaml Document API
+  (`sources-store.js`/`profile-store.js`) — preserves comments + key order.
+  Never `YAML.parse() → YAML.stringify()`.
+- **Podcasts** (`sources-store.js`): `addPodcast`/`removePodcast`/`patchPodcast`
+  keyed by feed **url** (names collide with channels); mutation routes carry the
+  url in the request **body** (encoded slashes break path params behind proxies).
+  `listEpisodesWithCounts({medium})` filters in SQL; `GET /api/episodes?medium=…`.
+- **Feedback workflow**: thumbs per candidate → "Suggest refinements" collects
+  feedback + profile → Claude proposes revised profile.md → user reviews diff
+  (`diff` npm pkg, +/− lines) → applies or discards. Profile editor itself is
+  behind an "Advanced: edit raw profile.md" `<details>`.
 
 ---
 
 ## Prompt-editing conventions
 
-- **profile.md is the bias function.** Its "Priority hierarchy" section
-  (Tier 1 / 2a / 2b / 3) is read by `rank.md` and `global-rank.md` as the
-  ranking rubric. Edits to the hierarchy ripple through both passes.
-- **Tune via the feedback loop**, not by hand-editing, when possible. The
-  LLM-driven refinement workflow is the intended path. Hand-edits are for
-  structural changes (adding/removing whole sections).
-- **Don't strip the tier hierarchy** when adding new themes. New themes go
-  inside `## Themes I care about` with a tier callout in their heading
-  (e.g. `### Cybersecurity, identity, edge compute  (Tier 1)`).
-- **Bundling instructions live in rank.md.** Text-signal driven, no fixed
-  count cap. If overproduction becomes a problem, tighten the "synthesis test"
-  language rather than reintroducing a numeric ceiling.
-- **The number-fidelity check** (`src/lib/number-check.js`) drops candidates
-  whose claim contains numbers not present in the supporting_quote. Catches
-  the $75B-paraphrased-as-$7.5B class. Don't remove this; the prompt's
-  "Numbers must match" rule is belt-and-suspenders with the code check.
+- **profile.md is the bias function.** Its "Priority hierarchy" (Tier 1/2a/2b/3)
+  is the ranking rubric read by rank.md + global-rank.md. Edits ripple through both.
+- **Tune via the feedback loop**, not hand-edits, when possible. Hand-edits are
+  for structural changes (whole sections).
+- **Don't strip the tier hierarchy** when adding themes. New themes go in
+  `## Themes I care about` with a tier callout in the heading.
+- **Bundling lives in rank.md** (text-signal driven, no count cap). If
+  overproduction appears, tighten the "synthesis test" language, don't add a ceiling.
+- **number-fidelity check** (`number-check.js`) drops candidates whose claim has
+  numbers absent from supporting_quote. Belt-and-suspenders with the prompt's
+  "Numbers must match" rule — don't remove.
 
 ---
 
 ## Operational notes
 
-- **Cookies file** lives at `data/cookies.txt` (local) or `/data/cookies.txt`
-  (Railway volume). Exported from a logged-in Chrome via the "Get cookies.txt
-  LOCALLY" extension. Required for production (YouTube blocks unauthenticated
-  datacenter IPs); optional locally on residential IPs.
-- **state.db survives Railway deploys** via the persistent volume. Don't
-  re-deploy code changes assuming state will be wiped.
-- **Daily brief runs in-process** in the web service via an in-process
-  scheduler (`scheduleDailyRun` in `src/web/server.js`) that fires at
-  08:00 UTC (= 4am EDT / 3am EST; moved earlier from 10:00 UTC to buffer
-  for podcast transcription). The hour is fixed in UTC, so it
-  drifts an hour vs ET across DST — acceptable for a morning brief.
-  The scheduler only starts when `PORT` is set (Railway mode); locally
-  use `npm run brief`. Manually trigger a daily on prod via
-  `POST /api/admin/run-daily` (Cloudflare Access protected,
-  fire-and-forget). There is NO separate Railway cron service — that
-  approach broke because Railway volumes are single-attach (each service
-  gets its own mount, so the cron and web volumes silently diverged).
-- **Ad-hoc URLs** flow through `POST /api/summarize-url` → `runEpisode({url,
-  markDeliveredOnSend: false})`. Intentionally NOT marked delivered so they
-  also appear in the next daily brief.
-- **The web UI's profile editor** is behind a `<details>` disclosure
-  ("Advanced: edit raw profile.md"). The primary tuning surface is the
-  Suggest-refinements button driven by thumbs feedback.
+- **Cookies** at `data/cookies.txt` (local) or `/data/cookies.txt` (Railway).
+  Exported from logged-in Chrome via "Get cookies.txt LOCALLY". Required in prod
+  (YouTube blocks datacenter IPs); optional locally on residential IPs.
+- **state.db survives Railway deploys** via the volume — don't assume wipe.
+- **Daily brief in-process** via `scheduleDailyRun` in `server.js`, fires 08:00
+  UTC (= 4am EDT / 3am EST; moved earlier from 10:00 to buffer podcast
+  transcription; drifts 1h vs ET across DST — acceptable). Scheduler only starts
+  when `PORT` is set (Railway); locally use `npm run brief`. Manual prod trigger:
+  `POST /api/admin/run-daily` (CF Access, fire-and-forget). No separate cron.
+- **Ad-hoc URLs**: `POST /api/summarize-url` → `runEpisode({url,
+  markDeliveredOnSend:false})` — intentionally not marked delivered.
 
 ---
 
-## Common pitfalls we've debugged (so future Claude doesn't relearn)
+## Common pitfalls (debugged — don't relearn)
 
-- **PowerShell eats `$1` in regex replacement strings** — wrap in single
-  quotes or use a temp file.
-- **PowerShell `Invoke-RestMethod -Method Post` without `-Body`** hangs
-  waiting for stdin. Always pass `-Body '{}'` for empty bodies.
-- **PowerShell stderr-redirect makes native commands look like they
-  failed** even when exit was 0. Don't add `2>&1` to npm calls.
-- **Bash tool sees a different PATH** than the project's interactive
-  PowerShell. Node/yt-dlp/ffmpeg are NOT on its PATH. Use PowerShell with
-  `$env:Path = ... + Machine + User` refresh for Node commands.
-- **node:sqlite parameter N errors** map to the Nth bound value in
-  positional binds, or to the Nth `@field` in the prepared statement for
-  named binds — count carefully when debugging.
-- **yt-dlp `--flat-playlist` returns "NA"** for per-video `channel_id`.
-  Use `--print "playlist:%(channel_id)s"` for the playlist-scoped value.
-- **yt-dlp `--write-auto-subs` alone misses manual / creator-uploaded
-  subs.** Use both `--write-subs --write-auto-subs`.
-- **Express 5 dropped regex route patterns** like `/:cat(channel|company)`.
-  Use simple `:param` and route per-path.
-- **Railway volumes are single-attach.** Each service mounts its own
-  volume; two services can't share one filesystem. We learned this the
-  hard way when a separate cron service silently wrote daily-run output
-  to its own `/data/state.db` while the web service kept reading from a
-  different volume. Fix: keep all work inside one service (the web
-  service schedules `runDaily` in-process — see "Operational notes").
-- **Cloudflare Access OTPs are single-use.** If a code "doesn't work", it's
-  because it was already redeemed; request a new one.
+- **PowerShell eats `$1`** in regex replacement strings — single-quote or temp file.
+- **`Invoke-RestMethod -Method Post` without `-Body` hangs** on stdin — pass `-Body '{}'`.
+- **PowerShell stderr-redirect makes native commands look failed** even on exit 0
+  — don't add `2>&1` to npm calls.
+- **Bash tool sees a different PATH** — Node/yt-dlp/ffmpeg NOT on it. Use
+  PowerShell with a `$env:Path` Machine+User refresh for Node commands.
+- **node:sqlite "parameter N"** → Nth positional `?` or Nth `@field`.
+- **yt-dlp `--flat-playlist` returns "NA"** for per-video channel_id — use
+  `--print "playlist:%(channel_id)s"`.
+- **Express 5 dropped regex routes** — use simple `:param`, route per-path.
+- **Railway volumes are single-attach** — two services can't share a filesystem.
+  Keep all work in one service.
+- **Cloudflare Access OTPs are single-use** — "doesn't work" = already redeemed.
 
 ---
 
-## Known issues / open work
+## What's STABLE — don't undo
 
-State of the world at last update. Re-evaluate these every few sessions —
-they're listed here so future Claude doesn't waste time rediscovering them
-or quietly re-introduce them.
-
-### Podcasts as a first-class medium (in progress)
-
-Multi-phase effort to add audio podcasts alongside YouTube, reusing the
-existing extract→rank→compose→deliver stages unchanged. The
-ingestion/intelligence boundary already in this codebase (stages 1-2 vs
-3-6) is the separation being preserved — podcasts add a parallel ingest +
-transcribe path and otherwise flow through the same intelligence layer.
-
-- **Phase 1 — DONE.** Schema gained `episodes.medium` + `feed_url` /
-  `audio_url` / `episode_page_url` (additive `safeAlter`, existing rows
-  default `medium='youtube'`). `src/lib/rss.js` parses feeds via
-  rss-parser and mints `pod_<16hex>` IDs. `config/sources.yaml` has a
-  `podcasts:` bucket. (Polling is now wired into `runDaily` — see Phase 4.)
-- **Phase 2 — DONE and DEPLOYED.** WhisperX-on-Modal transcription
-  worker (Python, deployed separately to Modal; the one genuinely
-  separate-language piece). 2a/2b/2c built the GPU worker; **2d** added the
-  deployable HTTPS endpoint (the FastAPI `web` app in `transcribe.py`) with a
-  shared bearer-token secret — see "Modal transcription worker" above for the
-  request contract + live URL. The `transcribe-auth` secret is created and the
-  app is deployed; 2d was smoke-tested live end-to-end. The Node side just
-  needs `MODAL_TRANSCRIBE_URL` / `MODAL_TRANSCRIBE_SECRET` in env (Phase 3).
-  The "Whisper deliberately removed" stable note below still holds **for
-  YouTube** — Phase 2 does not reintroduce Whisper for captions; it adds
-  WhisperX for audio-only podcast sources that have no captions at all.
-  Different decision, different medium.
-- **Phase 3 — DONE (2026-05-31).** Stage 2 (`2-transcribe.js`) is a medium
-  router: YouTube → transcript-io (unchanged), podcast → `audio_url` POSTed to
-  the Modal endpoint + poll `/result`, cues saved with `speaker` and
-  `source='whisperx-modal'`. Node client is `src/lib/modal-transcribe.js`
-  (mirrors `transcript-io.js`), reading `MODAL_TRANSCRIBE_URL` +
-  `MODAL_TRANSCRIBE_SECRET`. Smoke-test via `node scripts/test-modal-transcribe.js`.
-- **Phase 4 — DONE (2026-05-31).** Podcasts run end-to-end through `runDaily`:
-  - `ingestPodcastsDaily()` in `src/stages/1-ingest.js` polls RSS feeds and
-    inserts `medium='podcast'` rows; `runDaily` calls it right after
-    `ingestDaily()` (YouTube). Non-fatal — a feed failure can't block the brief.
-  - New podcast rows flow through the existing `resumableEpisodes()` loop
-    (status-based, medium-agnostic) → transcribe router → extract → rank,
-    **unmodified** (extract/rank read only episode + transcript).
-  - Compose (`5-compose.js`) is medium-aware: `episodeLink()` and `momentLink()`
-    build YouTube `?v=…&t=Ns` deep-links for videos, and `episode_page_url` +
-    `audio_url#t=<sec>` for podcasts. Verified both paths render correct links.
-  - **Back-catalog guard:** ingest uses `lookbackDays` (2 in the daily run) so a
-    newly-added feed admits only recent episodes — it won't flood the run with a
-    full back-catalog of billed GPU jobs. The standalone script's `--since-days`
-    (default 30) is separate and only for manual debugging.
-  - Podcasts transcribe **sequentially** like everything else (the daily loop is
-    a plain `for`). A morning with several podcasts can add 14+ min each; the
-    08:00 UTC start (moved earlier from 10:00) buffers for this. Revisit with a
-    cap or parallelism if mornings get slow.
-- **Phase 5 — DONE.** Web UI gained a **Podcasts** section (add/remove/enable
-  RSS feeds) and a **medium filter** (All/YouTube/Podcast) on the episode list,
-  plus a per-row medium badge. `sources-store.js` has
-  `addPodcast`/`removePodcast`/`patchPodcast` (keyed by feed **url** — names
-  collide with channels); podcast mutation routes carry the url in the request
-  **body** (encoded slashes break path params behind proxies).
-  `listEpisodesWithCounts({ medium })` filters in SQL; `GET
-  /api/episodes?medium=…` exposes it.
-- **Phases 6-8 — LATER.** Any remaining compose/deliver polish.
-
-### Not yet done (work the user has acknowledged but deferred)
-
-- **State migration to Railway: tooling is built, run it once.** Local
-  `state.db` is uploaded to the production volume via the web UI
-  ("Database backup & restore" → "Restore from file") or via
-  `npm run upload-state-db` with `ADMIN_UPLOAD_URL` +
-  `CF_ACCESS_CLIENT_ID/SECRET` set (Cloudflare service token for the
-  deployment's hostname). The endpoint snapshots the existing prod DB to
-  `/data/backups/state.pre-restore-<ts>.db`, swaps in the upload, and
-  resets the singleton DB handle so the next query opens the new file —
-  no service restart. After running it, delete this bullet.
-- **No failure alerting for the daily cron.** If `npm run brief` errors
-  out (rate limit, API outage, transcript-io down), no email goes out and
-  no notification fires. Possible fixes: wrap the brief command in a small
-  shell script that catches non-zero exit and POSTs to a notification
-  webhook; or have the brief subject always include episode count so
-  absence-of-mail becomes a tracking signal.
-- **6 disabled sources need handle fixes.** `sources.yaml` has
-  `enabled: false` on Sharp Tech, Logan Bartlett, Google DeepMind,
-  Fireworks AI, Baseten, Cloudflare. Wrong handles or no `/videos` tab.
-  Fix via the web UI when convenient.
-
-### Minor product gaps (nice-to-have, not blocking)
-
-- **Dropped candidates have no LLM rejection reason.** The rank pass only
-  emits `why_matters` for SELECTED items. The episode inspector shows
-  extract-time fields (category, novelty_score) for drops but no "why the
-  ranker dropped this" insight. Adding rejection reasons = extend
-  `rank.md` to emit a brief reason per non-selected item; ~+200 output
-  tokens per episode (~$0.003).
-- **No "re-rank this episode" button in the inspector UI.** Currently
-  requires CLI: `node scripts/rerank.js <video_id>`. A button per row
-  would let the user iterate on profile changes by re-ranking individual
-  episodes from the UI.
-
-### Hygiene / tokens to rotate
-
-These tokens appeared in earlier debugging chat logs (the user pasted them
-inline when working through CLI issues). Rotate at convenience:
-
-- `RAILWAY_API_TOKEN` — Railway → Account Settings → Tokens
-- `YOUTUBE_TRANSCRIPT_IO_TOKEN` — youtube-transcript.io → Profile
-- `TRANSCRIBE_SECRET` (Modal `transcribe-auth` secret) — pasted inline during
-  the 2d smoke test. Rotate via `py -m modal secret create transcribe-auth
-  TRANSCRIBE_SECRET=<new-hex> --force`, then update `MODAL_TRANSCRIBE_SECRET`
-  in `.env` / Railway.
-- (Anthropic + SendGrid keys are also in the repo's local `.env` which is
-  gitignored — not exposed, but rotate annually as standard practice.)
-
-### What's STABLE and shouldn't be undone
-
-- **Transcripts come from youtube-transcript.io.** yt-dlp's caption fetching
-  was silently degraded by YouTube when called from Railway's datacenter
-  IPs even with valid cookies. Don't reintroduce yt-dlp-based captions
-  thinking "this'll work" — it works locally but not in prod.
-- **Whisper fallback is deliberately removed.** It was considered and
-  explicitly rejected. The user accepts missed episodes over the operational
-  complexity of audio download + Groq integration + their own potential
-  reliability issues.
-- **Defensive type coercion in saveCandidates + upsertEpisode is load-
-  bearing.** node:sqlite refuses arrays/objects/NaN/undefined for binding;
-  Claude occasionally returns arrays for `supporting_quote`, yt-dlp returns
-  null/undefined `duration` for live streams. Don't simplify these helpers
-  back to direct binding "for cleanliness" — the gnarliness is the point.
-- **`markDelivered` updates BOTH `rankings.included_in_brief_at` AND
-  `episodes.status = 'delivered'`.** The status flip is the load-bearing
-  part: without it, `resumableEpisodes()` (which picks status IN
-  `('new','transcribed','extracted','ranked')`) re-picks the same episode
-  every day and the brief re-sends the same content indefinitely. There's
-  also an idempotent backfill in `migrate()` that flips any
-  `ranked`-but-already-emailed rows to `delivered` — for the historical
-  prod DB whose rows are stuck from before the fix. Leave both pieces in
-  place.
+- **Transcripts come from youtube-transcript.io.** yt-dlp caption fetch is
+  silently degraded from Railway datacenter IPs even with cookies — works
+  locally, fails in prod. Don't reintroduce it.
+- **Whisper fallback deliberately removed** (for YouTube). Considered and
+  rejected; user accepts missed episodes over audio-download + Groq complexity.
+  (WhisperX-on-Modal for podcasts is a separate decision — audio has no captions.)
+- **Defensive coercion in saveCandidates + upsertEpisode is load-bearing** (see
+  node:sqlite gotchas). Don't simplify "for cleanliness".
+- **`markDelivered` flips BOTH `rankings.included_in_brief_at` AND
+  `episodes.status='delivered'`.** The status flip is load-bearing — without it
+  `resumableEpisodes()` re-picks the episode daily and re-sends forever. An
+  idempotent backfill in `migrate()` flips historical `ranked`-but-emailed rows.
+  Leave both.
 
 ---
 
 ## When NOT to do things
 
-- Don't add a JS YouTube library to replace yt-dlp. yt-dlp tracks YouTube's
-  daily changes; libraries break in weeks.
-- Don't add a frontend framework. The single-page UI doesn't need React/Vue/
-  Svelte; the cost of a build pipeline isn't worth the abstraction.
-- Don't add a database migration framework. `safeAlter` in db.js is enough.
-- Don't add auth code to Express. Cloudflare Access handles it.
-- Don't commit `data/`, `.env`, or `cookies.txt`. Gitignored.
-- Don't rewrite saveCandidates / upsertEpisode to skip sanitization. node:sqlite
-  is strict; the coercion layers are load-bearing.
-- Don't bake state.db into the Docker image. Use volume + manual seed.
+- Don't replace yt-dlp with a JS YouTube library (libraries break in weeks).
+- Don't add a frontend framework or a DB migration framework (`safeAlter` is enough).
+- Don't add auth code to Express (Cloudflare Access handles it).
+- Don't commit `data/`, `.env`, or `cookies.txt` (gitignored).
+- Don't bake state.db into the Docker image (volume + manual seed).
+
+---
+
+## Status: podcasts as a first-class medium — DONE
+
+Phases 1-5 complete: schema (`medium` + feed/audio/page URLs, `pod_<hex>` IDs),
+WhisperX-on-Modal worker (deployed + live), medium-router transcribe, end-to-end
+through `runDaily` (`ingestPodcastsDaily` with a `lookbackDays=2` back-catalog
+guard; podcasts transcribe sequentially), and web UI (Podcasts section + medium
+filter/badge). Phases 6-8 (compose/deliver polish) are later/optional.
+
+Podcasts reuse the extract→rank→compose→deliver stages unmodified; only ingest +
+transcribe are medium-specific. Revisit sequential transcription with a cap or
+parallelism if mornings get slow.
+
+---
+
+## Open work / deferred
+
+- **State migration to Railway: tooling built, run once.** Upload local state.db
+  via web UI ("Database backup & restore" → "Restore from file") or
+  `npm run upload-state-db` with `ADMIN_UPLOAD_URL` + `CF_ACCESS_CLIENT_ID/SECRET`.
+  Snapshots prod DB, swaps upload, resets singleton — no restart.
+- **No failure alerting for the daily cron.** If the brief errors (rate limit,
+  API outage, transcript-io down) nothing fires. Possible: catch non-zero exit →
+  webhook, or always include episode count in subject so absent mail is a signal.
+- **6 disabled sources need handle fixes** in sources.yaml (`enabled:false`):
+  Sharp Tech, Logan Bartlett, Google DeepMind, Fireworks AI, Baseten, Cloudflare.
+- **Minor gaps**: dropped candidates have no LLM rejection reason (extend rank.md,
+  ~+$0.003/ep); no "re-rank this episode" button in the inspector (CLI only:
+  `node scripts/rerank.js <video_id>`).
+- **Tokens to rotate** (appeared inline in old debug logs): `RAILWAY_API_TOKEN`,
+  `YOUTUBE_TRANSCRIPT_IO_TOKEN`, `TRANSCRIBE_SECRET` (Modal `transcribe-auth`;
+  rotate via `py -m modal secret create transcribe-auth TRANSCRIBE_SECRET=<hex>
+  --force` then update env). Anthropic + SendGrid keys live in gitignored `.env`.
 
 ---
 
@@ -708,15 +460,15 @@ inline when working through CLI issues). Rotate at convenience:
 
 ```powershell
 # Local dev
-npm run web                                    # web UI on http://localhost:3000
+npm run web                                    # web UI (http://localhost:3000)
 npm run brief                                  # daily run, send email
 npm run brief:dry                              # daily run, write HTML to disk
 node src/cli.js --episode "<url>" --dry-run    # ad-hoc, no email
 
 # Inspection
-npm run discovery:audit [days] [decision]      # recent discoveries
-node scripts/inspect-bundles.js <video_id>     # bundle structure
-node scripts/inspect-window.js <video_id> <sec>  # candidates near a timestamp
+npm run discovery:audit [days] [decision]
+node scripts/inspect-bundles.js <video_id>
+node scripts/inspect-window.js <video_id> <sec>
 
 # Iteration
 npm run resolve-channels                       # populate channel_id from @handle
@@ -724,14 +476,11 @@ node scripts/rerank.js [<video_id>]            # re-rank without re-extract
 node scripts/recompose.js [--send]             # re-render brief from current state
 
 # Backup / restore
-npm run backup                                 # on-demand local snapshot (also via UI button)
-npm run backup -- --email                      # also email a copy if SendGrid configured
-$env:ADMIN_UPLOAD_URL="https://your-deployment.example.com/api/admin/restore-db"
-$env:CF_ACCESS_CLIENT_ID="...";  $env:CF_ACCESS_CLIENT_SECRET="..."
+npm run backup [-- --email]                    # local snapshot (also UI button)
+$env:ADMIN_UPLOAD_URL="https://<deploy>/api/admin/restore-db"
+$env:CF_ACCESS_CLIENT_ID="..."; $env:CF_ACCESS_CLIENT_SECRET="..."
 npm run upload-state-db                        # push local data/state.db to prod
 
 # Railway
-railway login
-railway link                                   # interactive: pick project + service
-railway ssh                                    # interactive shell on the running service
+railway login; railway link; railway ssh
 ```
