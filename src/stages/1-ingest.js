@@ -1,7 +1,8 @@
 // Stage 1: Ingest.
 //
 // Entry points:
-//   ingestEpisode(url)        — for --episode flag, single YouTube video
+//   ingestEpisode(url)        — ad-hoc single episode, medium-agnostic:
+//                               YouTube video URL OR podcast (audio/feed/page) URL
 //   ingestDaily(opts)         — daily run, polls all configured YouTube channels
 //   ingestPodcastsDaily(opts) — daily run, polls all configured podcast RSS feeds
 //
@@ -11,12 +12,18 @@ import { loadSources } from '../lib/config.js';
 import { upsertEpisode, getEpisode } from '../lib/db.js';
 import { fetchMetadata, listChannelUploads, videoIdFromUrl, resolveHandle } from '../lib/youtube.js';
 import { pollPodcasts } from '../lib/rss.js';
+import { resolvePodcastEpisode } from '../lib/podcast-resolve.js';
 import { log } from '../lib/log.js';
 
+// Ad-hoc single-episode ingest. Auto-detects medium: anything that parses as a
+// YouTube video ID goes the YouTube route; everything else is treated as a
+// podcast URL (direct audio, RSS feed, or an episode page we scrape).
 export async function ingestEpisode(url) {
   const video_id = videoIdFromUrl(url);
-  if (!video_id) throw new Error(`Could not parse YouTube video ID from: ${url}`);
+  return video_id ? ingestYouTubeEpisode(url, video_id) : ingestPodcastEpisode(url);
+}
 
+async function ingestYouTubeEpisode(url, video_id) {
   const existing = getEpisode(video_id);
   if (existing) {
     log.info(`episode already ingested`, { video_id, status: existing.status });
@@ -27,6 +34,18 @@ export async function ingestEpisode(url) {
   upsertEpisode(meta);
   log.ok(`ingested`, { video_id, title: meta.title.slice(0, 60) });
   return [getEpisode(video_id)];
+}
+
+// Resolve the pasted URL to a single podcast episode row (audio enclosure +
+// metadata) and upsert it. upsertEpisode is idempotent (ON CONFLICT DO NOTHING),
+// so re-pasting the same URL reuses the existing row; the ad-hoc caller resets
+// its status via runEpisode's forceReprocess.
+async function ingestPodcastEpisode(url) {
+  const ep = await resolvePodcastEpisode(url);
+  upsertEpisode(ep);
+  const existing = getEpisode(ep.video_id);
+  log.ok(`ingested podcast`, { video_id: ep.video_id, title: (ep.title || '').slice(0, 60) });
+  return [existing];
 }
 
 export async function ingestDaily({ lookbackDays = 2 } = {}) {
