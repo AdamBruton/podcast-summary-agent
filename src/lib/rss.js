@@ -12,8 +12,20 @@ import Parser from 'rss-parser';
 import crypto from 'node:crypto';
 import { log } from './log.js';
 
+// Browser-like User-Agent. rss-parser's default UA is literally "rss-parser",
+// which podcast CDNs (Simplecast, Megaphone, Transistor, Cloudflare-fronted
+// feeds) 403 from datacenter IPs — so the daily poll silently fetched nothing
+// from Railway while ad-hoc URLs (which already set this UA in
+// podcast-resolve.js) kept working. Mirror that header here. Accept advertises
+// feed content-types so hosts that content-negotiate don't hand back HTML.
+const FEED_HEADERS = {
+  'user-agent': 'Mozilla/5.0 (compatible; podcast-summary-agent/1.0)',
+  accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*',
+};
+
 const parser = new Parser({
   timeout: 20000,
+  headers: FEED_HEADERS,
 });
 
 function normalizeFeedUrl(url) {
