@@ -4,7 +4,7 @@
 //
 // Usage:
 //   node scripts/backup-db.js           # local snapshot only
-//   node scripts/backup-db.js --email   # also email a copy if SendGrid is set
+//   node scripts/backup-db.js --email   # also email a copy if Resend is set
 
 import { backupDatabase } from '../src/lib/backup.js';
 

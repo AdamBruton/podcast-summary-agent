@@ -18,7 +18,7 @@ Options:
   --episode <url>     Process a single YouTube URL (skips daily ingest).
                       Useful for testing or one-off briefs.
   --dry-run           Write the HTML brief to data/briefs/YYYY-MM-DD.html
-                      instead of sending via SendGrid.
+                      instead of sending via Resend.
   --lookback <days>   How many days back to consider as "new" for daily run.
                       Default: 2.
   --help, -h          Show this message.
@@ -26,9 +26,9 @@ Options:
 Env vars (see .env.example):
   ANTHROPIC_API_KEY              required
   YOUTUBE_TRANSCRIPT_IO_TOKEN    required — transcripts come from youtube-transcript.io
-  SENDGRID_API_KEY               required when not --dry-run
-  SENDGRID_FROM                  required when not --dry-run
-  SENDGRID_TO                    required when not --dry-run
+  RESEND_API_KEY                 required when not --dry-run
+  MAIL_FROM                      required when not --dry-run
+  MAIL_TO                        required when not --dry-run
 `;
 
 let parsed;

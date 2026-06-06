@@ -1,12 +1,12 @@
 // Stage 6: Deliver.
 //
 // --dry-run mode: writes HTML to data/briefs/YYYY-MM-DD.html and returns the path.
-// real mode: sends via SendGrid using SENDGRID_API_KEY/FROM/TO env vars.
+// real mode: sends via Resend using RESEND_API_KEY/MAIL_FROM/MAIL_TO env vars.
 
 import fs from 'node:fs';
 import path from 'node:path';
-import sgMail from '@sendgrid/mail';
 import { BRIEF_DIR, requireEnv } from '../lib/config.js';
+import { sendEmail } from '../lib/mailer.js';
 import { markDelivered } from '../lib/db.js';
 import { log } from '../lib/log.js';
 
@@ -35,9 +35,8 @@ export async function deliver(html, { dryRun, episodes, date = new Date(), markD
     return { delivered: false, empty: true };
   }
 
-  const { SENDGRID_API_KEY, SENDGRID_FROM, SENDGRID_TO } =
-    requireEnv('SENDGRID_API_KEY', 'SENDGRID_FROM', 'SENDGRID_TO');
-  sgMail.setApiKey(SENDGRID_API_KEY);
+  // Fail fast with a clear, combined message if the email env isn't set up.
+  requireEnv('RESEND_API_KEY', 'MAIL_FROM', 'MAIL_TO');
 
   // Smarter subject when there's exactly one episode — the title shows up
   // in the inbox preview instead of a generic date.
@@ -45,15 +44,10 @@ export async function deliver(html, { dryRun, episodes, date = new Date(), markD
     ? `Podcast Intel: ${episodes[0].title}`
     : `Podcast Intel — ${dateStr}`;
 
-  await sgMail.send({
-    to: SENDGRID_TO,
-    from: SENDGRID_FROM,
-    subject,
-    html,
-  });
+  const { to } = await sendEmail({ subject, html });
   if (markDeliveredOnSend) {
     for (const ep of episodes) markDelivered(ep.video_id);
   }
-  log.ok('email delivered', { to: SENDGRID_TO, markedDelivered: markDeliveredOnSend });
+  log.ok('email delivered', { to, markedDelivered: markDeliveredOnSend });
   return { delivered: true };
 }

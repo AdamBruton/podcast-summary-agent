@@ -36,7 +36,7 @@ Then run the pipeline:
 
 ```bash
 npm run brief:dry          # full daily run, writes HTML to data/briefs/, no email sent
-npm run brief              # same but emails via SendGrid
+npm run brief              # same but emails via Resend
 ```
 
 The web UI binds to `127.0.0.1` locally, so it's only reachable from your own
@@ -53,10 +53,11 @@ personal use.
 |---|---|---|---|
 | **Anthropic** | LLM (Claude) for extract + rank passes | `ANTHROPIC_API_KEY` | https://console.anthropic.com |
 | **youtube-transcript.io** | Fetching YouTube captions | `YOUTUBE_TRANSCRIPT_IO_TOKEN` | https://www.youtube-transcript.io |
-| **SendGrid** | Sending the daily brief email | `SENDGRID_API_KEY`, `SENDGRID_FROM`, `SENDGRID_TO` | https://sendgrid.com |
+| **Resend** | Sending the daily brief email | `RESEND_API_KEY`, `MAIL_FROM`, `MAIL_TO` | https://resend.com |
 
-SendGrid is optional if you only ever run `--dry-run` (the HTML lands in
-`data/briefs/` and you can open it directly).
+Resend is optional if you only ever run `--dry-run` (the HTML lands in
+`data/briefs/` and you can open it directly). `MAIL_FROM`'s domain must be
+verified in Resend before it will deliver.
 
 Typical per-day Anthropic spend with a handful of episodes is ~$1–2. See the
 "Cost discipline" section of CLAUDE.md.
@@ -101,9 +102,9 @@ brief is scheduled from inside the web service's Node process.
    ```
    ANTHROPIC_API_KEY=sk-ant-...
    YOUTUBE_TRANSCRIPT_IO_TOKEN=...
-   SENDGRID_API_KEY=SG....
-   SENDGRID_FROM=you@yourdomain.com
-   SENDGRID_TO=you@yourdomain.com
+   RESEND_API_KEY=re_...
+   MAIL_FROM=you@yourdomain.com
+   MAIL_TO=you@yourdomain.com
    ```
 
 5. **Expose the service** at a public domain. Settings → Networking →
@@ -163,9 +164,9 @@ allow database restore.
 |---|---|---|
 | `ANTHROPIC_API_KEY` | yes | Claude API key |
 | `YOUTUBE_TRANSCRIPT_IO_TOKEN` | yes | Transcript service token |
-| `SENDGRID_API_KEY` | for email | Omit to use `--dry-run` only |
-| `SENDGRID_FROM` | for email | Must be a SendGrid-verified sender |
-| `SENDGRID_TO` | for email | Recipient address |
+| `RESEND_API_KEY` | for email | Omit to use `--dry-run` only |
+| `MAIL_FROM` | for email | Domain must be verified in Resend |
+| `MAIL_TO` | for email | Recipient address |
 | `RAILWAY_VOLUME_MOUNT_PATH` | auto-set by Railway | Triggers production-paths mode when present |
 | `PORT` | auto-set by Railway | Web server binds `0.0.0.0:$PORT` when set |
 | `WEB_PORT` | optional, local only | Default 3000; binds `127.0.0.1` |
