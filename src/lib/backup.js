@@ -6,18 +6,18 @@
 // the directory is rotated to the last N files.
 //
 // Off-site: on the configured weekday (default Sunday UTC), the gzipped
-// snapshot is attached to an email via SendGrid. State.db is ~1-2 MB in
-// steady state, well under SendGrid's 30 MB attachment cap.
+// snapshot is attached to an email via Resend. State.db is ~1-2 MB in
+// steady state, well under the message-size cap.
 //
-// Backup runs are intentionally non-fatal: if SendGrid is down or the volume
+// Backup runs are intentionally non-fatal: if email is down or the volume
 // is full, the daily brief should still go out. Callers wrap in try/catch.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { pipeline } from 'node:stream/promises';
-import sgMail from '@sendgrid/mail';
 import { DATA_DIR, DB_PATH } from './config.js';
+import { sendEmail, emailConfigured } from './mailer.js';
 import { db } from './db.js';
 import { log } from './log.js';
 
@@ -30,8 +30,8 @@ const KEEP_LAST_N = 14;
 // Daily cron runs at 11:00 UTC, so this stays in sync regardless of TZ.
 const EMAIL_DOW = 0;
 
-// SendGrid hard caps attachments at 30 MB. Bail well below that so the
-// base64-encoded payload (≈ +33% size) still fits.
+// Resend caps total message size at ~40 MB. Bail well below that so the
+// base64-encoded payload (≈ +33% size) plus headers still fits.
 const EMAIL_MAX_BYTES = 20 * 1024 * 1024;
 
 function tsStamp() {
@@ -85,22 +85,19 @@ function rotateBackups() {
 }
 
 async function emailBackup(gzipPath, bytes) {
-  const { SENDGRID_API_KEY, SENDGRID_FROM, SENDGRID_TO } = process.env;
-  if (!SENDGRID_API_KEY || !SENDGRID_FROM || !SENDGRID_TO) {
-    log.info('email backup skipped: SendGrid env not configured');
+  if (!emailConfigured()) {
+    log.info('email backup skipped: email env not configured');
     return;
   }
   if (bytes > EMAIL_MAX_BYTES) {
     log.warn('backup too large to email; on-volume copy only', { bytes });
     return;
   }
-  sgMail.setApiKey(SENDGRID_API_KEY);
   const filename = path.basename(gzipPath);
   const dateStr = new Date().toISOString().slice(0, 10);
   const kb = Math.round(bytes / 1024);
-  await sgMail.send({
-    to: SENDGRID_TO,
-    from: SENDGRID_FROM,
+  // Resend base64-encodes the Buffer itself; pass raw bytes.
+  const { to } = await sendEmail({
     subject: `Podcast Intel: weekly DB backup ${dateStr} (${kb} KB)`,
     text: [
       `Weekly off-site copy of state.db is attached as ${filename}.`,
@@ -113,14 +110,9 @@ async function emailBackup(gzipPath, bytes) {
       `Local rotation keeps the last ${KEEP_LAST_N} snapshots on the volume at`,
       `${BACKUPS_DIR}.`,
     ].join('\n'),
-    attachments: [{
-      content: fs.readFileSync(gzipPath).toString('base64'),
-      filename,
-      type: 'application/gzip',
-      disposition: 'attachment',
-    }],
+    attachments: [{ filename, content: fs.readFileSync(gzipPath) }],
   });
-  log.ok('weekly backup emailed', { to: SENDGRID_TO, filename, bytes });
+  log.ok('weekly backup emailed', { to, filename, bytes });
 }
 
 // Used by the restore endpoint: take a one-off snapshot of the live DB before

@@ -12,7 +12,7 @@ A podcast intelligence agent. Polls curated YouTube channels + podcast RSS
 feeds, and searches YouTube for named individuals/companies daily. Transcribes
 YouTube via captions (youtube-transcript.io) and podcasts via WhisperX-on-Modal,
 runs two Claude passes (extract → rank, plus a cross-episode global rank),
-composes an HTML brief with timestamp deep-links, sends via SendGrid. Tuned by
+composes an HTML brief with timestamp deep-links, sends via Resend. Tuned by
 an editable `config/profile.md` + per-candidate thumbs feedback from the web UI.
 
 Runs in production on Railway as a single long-lived web service
@@ -65,6 +65,7 @@ src/
     number-check.js     numeric-fidelity guard
     transcript-io.js    youtube-transcript.io client (YouTube captions)
     modal-transcribe.js WhisperX-on-Modal client (podcast audio)
+    mailer.js           Resend email transport (shared by deliver + backup)
     backup.js           DB snapshot/restore (VACUUM INTO)
   stages/
     1-ingest.js         channel polling + ad-hoc URL ingest + ingestPodcastsDaily()
@@ -73,7 +74,7 @@ src/
     3-extract.js        chunked Claude pass → candidates
     4-rank.js           per-episode Claude pass (singles + bundles)
     5-compose.js        HTML render (medium-aware links, canonicalize, bundles)
-    6-deliver.js        SendGrid send (or write-to-disk on --dry-run)
+    6-deliver.js        Resend send (or write-to-disk on --dry-run)
   web/
     server.js           Express API + static serving + in-process daily scheduler
     public/index.html   single-page UI: sources, podcasts, profile, inspector, ad-hoc URL
@@ -332,8 +333,8 @@ reintroduce Whisper for YouTube** — different decision for a different medium.
   block the brief).
 - **Rotation**: keep last 14 snapshots by mtime. Pre-restore snapshots
   (`state.pre-restore-<ts>.db`, uncompressed) are NOT rotated.
-- **Off-site**: Sunday UTC, daily snapshot also emailed via SendGrid (≤20 MB;
-  ~3 KB now). Silently skipped if SendGrid env unset.
+- **Off-site**: Sunday UTC, daily snapshot also emailed via Resend (≤20 MB;
+  ~3 KB now). Silently skipped if email env unset.
 - **Restore** (`POST /api/admin/restore-db`): accepts `application/octet-stream`,
   validates SQLite magic bytes, snapshots current to `state.pre-restore-<ts>.db`,
   `resetDb()` closes singleton, deletes stale WAL/SHM, atomically renames upload
@@ -500,7 +501,7 @@ parallelism if mornings get slow.
 - **Tokens to rotate** (appeared inline in old debug logs): `RAILWAY_API_TOKEN`,
   `YOUTUBE_TRANSCRIPT_IO_TOKEN`, `TRANSCRIBE_SECRET` (Modal `transcribe-auth`;
   rotate via `py -m modal secret create transcribe-auth TRANSCRIBE_SECRET=<hex>
-  --force` then update env). Anthropic + SendGrid keys live in gitignored `.env`.
+  --force` then update env). Anthropic + Resend keys live in gitignored `.env`.
 
 ---
 

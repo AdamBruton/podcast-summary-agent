@@ -3,8 +3,8 @@
 //
 // Usage:
 //   node scripts/recompose.js           # write HTML to data/briefs/, dry-run
-//   node scripts/recompose.js --send    # ALSO send via SendGrid (requires
-//                                       # SENDGRID_API_KEY/FROM/TO in .env)
+//   node scripts/recompose.js --send    # ALSO send via Resend (requires
+//                                       # RESEND_API_KEY/MAIL_FROM/MAIL_TO in .env)
 //
 // On --send success, episodes are marked 'delivered' so they don't appear
 // in subsequent briefs.
