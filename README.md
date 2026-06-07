@@ -1,11 +1,13 @@
 # podcast-summary-agent
 
 A daily intelligence brief surfacing high-signal moments from tech/AI podcasts,
-biased by an editable interest profile. Polls a set of YouTube channels (and
-optionally searches YouTube for named people / companies), pulls transcripts,
-runs Claude over them to extract and rank notable claims, and emails an HTML
-brief with timestamp deep-links. Tune the bias by editing `config/profile.md`
-through the included web UI.
+biased by an editable interest profile. Polls a set of YouTube channels and
+podcast RSS feeds (and optionally searches YouTube for named people /
+companies), pulls transcripts (YouTube captions via youtube-transcript.io;
+podcast audio via a WhisperX-on-Modal GPU worker), runs Claude over them to
+extract and rank notable claims, and emails an HTML brief with timestamp
+deep-links. Tune the bias by editing `config/profile.md` through the included
+web UI.
 
 Architecture notes and design rules live in [`CLAUDE.md`](./CLAUDE.md). This
 README is just the "how do I run it?" guide.
@@ -46,7 +48,7 @@ machine. Nothing is shared with anyone else's deployment.
 
 ## Required accounts
 
-You need three third-party accounts. All have free tiers that are plenty for
+You need a few third-party accounts. All have free tiers that are plenty for
 personal use.
 
 | Service | What it's for | Env var | Sign up |
@@ -54,10 +56,19 @@ personal use.
 | **Anthropic** | LLM (Claude) for extract + rank passes | `ANTHROPIC_API_KEY` | https://console.anthropic.com |
 | **youtube-transcript.io** | Fetching YouTube captions | `YOUTUBE_TRANSCRIPT_IO_TOKEN` | https://www.youtube-transcript.io |
 | **Resend** | Sending the daily brief email | `RESEND_API_KEY`, `MAIL_FROM`, `MAIL_TO` | https://resend.com |
+| **Modal** | GPU transcription of **podcast** audio (WhisperX) | `MODAL_TRANSCRIBE_URL`, `MODAL_TRANSCRIBE_SECRET` | https://modal.com |
+| **Hugging Face** | Gated diarization models the Modal worker loads | (Modal secret, not a Node env var) | https://huggingface.co |
 
-Resend is optional if you only ever run `--dry-run` (the HTML lands in
-`data/briefs/` and you can open it directly). `MAIL_FROM`'s domain must be
-verified in Resend before it will deliver.
+Anthropic + youtube-transcript.io are the only hard requirements for a
+**YouTube-only** setup. The rest are conditional:
+
+- **Resend** is optional if you only ever run `--dry-run` (the HTML lands in
+  `data/briefs/` and you can open it directly). `MAIL_FROM`'s domain must be
+  verified in Resend before it will deliver.
+- **Modal + Hugging Face** are only needed if you ingest **podcast RSS feeds**.
+  Podcasts have no captions, so they're transcribed on a GPU worker — see
+  "Podcast transcription worker (Modal)" below. Skip both for a YouTube-only
+  brief.
 
 Typical per-day Anthropic spend with a handful of episodes is ~$1–2. See the
 "Cost discipline" section of CLAUDE.md.
@@ -79,6 +90,79 @@ You can usually skip this when running locally on a residential connection.
 
 ---
 
+## Podcast transcription worker (Modal)
+
+Audio podcasts have no captions, so podcast episodes are transcribed by a
+[WhisperX](https://github.com/m-bain/whisperX) worker running on
+[Modal](https://modal.com) (GPU). It's a **separate Python service** with its
+own deploy lifecycle — the Node app never imports it, only calls it over HTTPS.
+Lives in `modal_worker/transcribe.py`.
+
+**You only need this if you ingest podcast RSS feeds.** A YouTube-only setup can
+skip the whole section (those go through youtube-transcript.io instead). Without
+it, podcast episodes ingest fine but immediately fail to transcribe, get marked
+`skipped`, and never reach the brief.
+
+### One-time worker setup
+
+1. **Create a Modal account** (https://modal.com), install the CLI, and
+   authenticate:
+
+   ```bash
+   pip install modal
+   python -m modal token new
+   ```
+
+2. **Create a Hugging Face account** and accept the license on both gated
+   pyannote models (one click each, while logged in):
+   - https://huggingface.co/pyannote/speaker-diarization-3.1
+   - https://huggingface.co/pyannote/segmentation-3.0
+
+   Then create a **read** token at https://huggingface.co/settings/tokens.
+
+3. **Create the two Modal secrets** the worker expects:
+
+   ```bash
+   # HF token for the gated diarization models (injected into the worker as HF_TOKEN)
+   python -m modal secret create huggingface HF_TOKEN=hf_xxx
+
+   # Shared bearer token the Node app uses to authenticate to the worker.
+   # Use any long random hex — you'll reuse the SAME value as
+   # MODAL_TRANSCRIBE_SECRET when wiring up the Node app below.
+   python -m modal secret create transcribe-auth TRANSCRIBE_SECRET=<random-hex>
+   ```
+
+4. **Deploy the worker.** On Windows, prefix `$env:PYTHONUTF8=1` first (Modal's
+   `✓` glyphs crash cp1252 stdout — cosmetic, but it aborts the command):
+
+   ```bash
+   python -m modal deploy modal_worker/transcribe.py
+   ```
+
+   Modal prints the published endpoint, e.g.
+   `https://<your-username>--podcast-transcribe-web.modal.run`. That URL is your
+   `MODAL_TRANSCRIBE_URL`.
+
+### Wiring it to the Node app
+
+Set two env vars — locally in `.env`, and in production on Railway:
+
+```
+MODAL_TRANSCRIBE_URL=https://<your-username>--podcast-transcribe-web.modal.run
+MODAL_TRANSCRIBE_SECRET=<the same hex you used for the transcribe-auth secret>
+```
+
+`MODAL_TRANSCRIBE_SECRET` must match the `TRANSCRIBE_SECRET` value inside the
+`transcribe-auth` Modal secret, or the worker returns 401.
+
+The worker scales to zero between jobs; a 90-minute episode is ~14 min of GPU
+(~$0.18). Model weights are cached on a Modal volume so cold starts don't
+re-download ~4 GB each run. Deeper details (image pins, the two load-bearing
+shims, the job-queue contract) are in the "Modal transcription worker" section
+of [`CLAUDE.md`](./CLAUDE.md).
+
+---
+
 ## Production deployment (Railway)
 
 Railway is what's tested. Any host that can run Node 22 and persist a volume
@@ -91,8 +175,8 @@ brief is scheduled from inside the web service's Node process.
 2. **Add a single service** pointed at your fork of this repo. It uses
    `railway.json`, which runs `npm run web` and exposes a `/healthz`
    healthcheck. The service stays running 24/7 and serves both the web UI
-   and the daily brief (via an in-process `setTimeout` that fires at 10:00
-   UTC = 6am EDT / 5am EST — see `scheduleDailyRun` in `src/web/server.js`).
+   and the daily brief (via an in-process `setTimeout` that fires at 08:00
+   UTC = 4am EDT / 3am EST — see `scheduleDailyRun` in `src/web/server.js`).
 3. **Attach a persistent volume** to the service. Mount path: `/data`.
    Railway sets the env var `RAILWAY_VOLUME_MOUNT_PATH=/data` automatically,
    which switches the code into production-paths mode (state.db, transcripts,
@@ -105,7 +189,14 @@ brief is scheduled from inside the web service's Node process.
    RESEND_API_KEY=re_...
    MAIL_FROM=you@yourdomain.com
    MAIL_TO=you@yourdomain.com
+   # Only if you ingest podcasts (see "Podcast transcription worker" above):
+   MODAL_TRANSCRIBE_URL=https://<your-username>--podcast-transcribe-web.modal.run
+   MODAL_TRANSCRIBE_SECRET=<hex matching the transcribe-auth Modal secret>
    ```
+
+   > **Don't forget the two `MODAL_*` vars if you use podcasts.** They live on
+   > the Modal side too, so it's easy to deploy the Node app without them — in
+   > which case every podcast silently fails to transcribe.
 
 5. **Expose the service** at a public domain. Settings → Networking →
    Generate Domain (or attach a custom one). At this point the UI is reachable
@@ -121,7 +212,7 @@ brief is scheduled from inside the web service's Node process.
 ### Triggering a daily run manually
 
 Once deployed, the scheduler logs a line at startup like
-`daily brief scheduled {"at":"YYYY-MM-DDT10:00:00.000Z","in_hours":"N.NN"}`.
+`daily brief scheduled {"at":"YYYY-MM-DDT08:00:00.000Z","in_hours":"N.NN"}`.
 If you want to fire a run on demand (e.g. to test after a config change), POST
 to `/api/admin/run-daily`. Returns immediately; the pipeline runs in the
 background. Watch Railway service logs for `daily run finished {ms: NNNNN}`.
@@ -167,6 +258,8 @@ allow database restore.
 | `RESEND_API_KEY` | for email | Omit to use `--dry-run` only |
 | `MAIL_FROM` | for email | Domain must be verified in Resend |
 | `MAIL_TO` | for email | Recipient address |
+| `MODAL_TRANSCRIBE_URL` | for podcasts | Modal worker endpoint; see "Podcast transcription worker (Modal)" |
+| `MODAL_TRANSCRIBE_SECRET` | for podcasts | Must match the `transcribe-auth` Modal secret's `TRANSCRIBE_SECRET` |
 | `RAILWAY_VOLUME_MOUNT_PATH` | auto-set by Railway | Triggers production-paths mode when present |
 | `PORT` | auto-set by Railway | Web server binds `0.0.0.0:$PORT` when set |
 | `WEB_PORT` | optional, local only | Default 3000; binds `127.0.0.1` |
