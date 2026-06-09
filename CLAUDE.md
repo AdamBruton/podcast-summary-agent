@@ -173,7 +173,9 @@ Stage invariants:
 - **extract**: chunks long transcripts at ~240k chars with cue overlap. Filtered
   by `verifyNumericFidelity` (drops candidates whose claim has numbers absent
   from supporting_quote — the $75B-vs-$7.5B class). Skipped on re-runs when
-  already `extracted`/`ranked` (deterministic + profile-independent).
+  already `extracted`/`ranked` (deterministic + profile-independent). Model is
+  `EXTRACT_MODEL`-selectable (Sonnet default, `opus` to A/B); this is the recall
+  lever — extract sets the candidate ceiling rank can't recover from.
 - **rank**: cheap (~$0.03). Always reruns on non-delivered so profile edits
   propagate. SINGLES `{candidate_id, rank, why_matters, corrected_quote?}` or
   BUNDLES `{candidate_ids:[...], rank, why_matters, label, corrected_quotes?}`.
@@ -181,7 +183,8 @@ Stage invariants:
   `RANK_MODEL`-selectable (Sonnet default, `opus` to A/B). Also runs quote
   correction — see below.
 - **compose**: runs global-rank for multi-episode briefs; single-episode skips
-  it. Flat top-down ordinal list, no item cap.
+  it. Flat top-down ordinal list, no item cap. global-rank model is
+  `GLOBAL_RANK_MODEL`-selectable (Sonnet default, `opus` to A/B).
 - **deliver**: real mode refuses to send if `episodes.length === 0` (returns
   `{empty:true}`); ad-hoc endpoint surfaces this rather than emailing blank.
 
@@ -234,7 +237,10 @@ path fire-and-forget + poll episode status from the UI.
   Adding a model → also add its `MODEL_PRICING` row. **The Opus pricing row is
   best-known, NOT verified** — confirm current Opus rates before trusting its $
   ledger (a wrong row only skews telemetry; `calcCost` returns 0 for unknown
-  models, never blocks the call). `RANK_MODEL=opus` runs the rank pass on Opus.
+  models, never blocks the call). Three independent per-pass Opus A/B knobs,
+  each Sonnet by default, each `=opus` to flip: `EXTRACT_MODEL` (recall pass),
+  `RANK_MODEL` (per-episode selection/synthesis), `GLOBAL_RANK_MODEL`
+  (cross-episode ordering). Discovery curation stays Sonnet (no knob).
 - System prompts via `loadPrompt('name')` → `prompts/name.md`. Never inline.
 - `parseJsonResponse(text)` strips markdown fences + finds first `{`/`[`. Use on
   every model JSON output — models add fences even when told not to.

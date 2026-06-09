@@ -17,8 +17,15 @@ import { log } from '../lib/log.js';
 
 const SYSTEM = loadPrompt('extract');
 
+// A/B knob: EXTRACT_MODEL=opus runs the candidate-extraction pass on Opus
+// instead of Sonnet. Defaults to Sonnet. Extract is the recall pass (it sets
+// the candidate ceiling rank can't recover from), so this is the lever for
+// "the brief is MISSING things" — distinct from RANK_MODEL, which only
+// reorders/explains what extract already found.
+const EXTRACT_MODEL = process.env.EXTRACT_MODEL === 'opus' ? MODELS.OPUS : MODELS.SONNET;
+
 // Chunk transcripts that would otherwise dominate the context window.
-// ~240k chars ≈ 60k tokens, comfortable inside Sonnet's 200k window with
+// ~240k chars ≈ 60k tokens, comfortable inside the model's 200k window with
 // room for the system prompt + response.
 const MAX_CHUNK_CHARS  = 240_000;
 const CHUNK_OVERLAP    = 8;  // cues re-included at the head of each chunk
@@ -54,7 +61,7 @@ export async function extractEpisode(episode, { run_id }) {
     ].filter(Boolean).join('\n');
 
     const { text } = await complete({
-      model: MODELS.SONNET,
+      model: EXTRACT_MODEL,
       system: SYSTEM,
       max_tokens: 8192,
       messages: [{ role: 'user', content: userMsg }],

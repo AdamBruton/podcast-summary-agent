@@ -12,6 +12,12 @@ import { complete, parseJsonResponse, MODELS } from './claude.js';
 import { loadPrompt, loadProfile } from './config.js';
 import { log } from './log.js';
 
+// A/B knob: GLOBAL_RANK_MODEL=opus runs the cross-episode ordering pass on Opus
+// instead of Sonnet. Defaults to Sonnet. This is the purest judgment pass
+// (prioritizing the whole brief across episodes), so it's a strong Opus
+// candidate independent of RANK_MODEL / EXTRACT_MODEL.
+const GLOBAL_RANK_MODEL = process.env.GLOBAL_RANK_MODEL === 'opus' ? MODELS.OPUS : MODELS.SONNET;
+
 export async function globalRank(items, { telemetry = {} } = {}) {
   if (!Array.isArray(items) || items.length <= 1) return items;
 
@@ -46,7 +52,7 @@ export async function globalRank(items, { telemetry = {} } = {}) {
   let parsed;
   try {
     const { text } = await complete({
-      model: MODELS.SONNET,
+      model: GLOBAL_RANK_MODEL,
       system,
       messages: [{ role: 'user', content: userMsg }],
       max_tokens: Math.max(2048, items.length * 80),
