@@ -1,0 +1,1212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Train your brief</title>
+<style>
+  :root {
+    --fg: #111; --muted: #666; --line: #e5e5e5; --line-strong: #ccc;
+    --bg-soft: #f7f7f7; --accent: #1a73e8; --accent-soft: #e8f0fe;
+    --danger: #c0392b; --danger-soft: #fdecea;
+    --t1: #1a73e8; --t1-bg: #e8f0fe;
+    --t2: #b45309; --t2-bg: #fef3e2;
+    --dw: #8a8a8a; --dw-bg: #f0f0f0;
+    --good: #1a8800;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    max-width: 980px; margin: 0 auto; padding: 24px 20px 64px;
+    color: var(--fg); line-height: 1.5; background: #fff;
+  }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .lede { color: var(--muted); font-size: 13px; margin: 0 0 24px; }
+  h2.sec { font-size: 13px; margin: 28px 0 10px; padding-bottom: 6px;
+       border-bottom: 1px solid var(--line-strong); text-transform: uppercase;
+       letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+  button {
+    font-size: 13px; padding: 6px 12px; border: 1px solid var(--line-strong);
+    background: #fff; border-radius: 5px; cursor: pointer; color: var(--fg);
+    font-family: inherit;
+  }
+  button:hover { background: var(--bg-soft); }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button.primary:hover { background: #1761c4; }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary:disabled:hover { background: var(--accent); }
+  kbd {
+    font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 10px;
+    border: 1px solid var(--line-strong); border-bottom-width: 2px;
+    border-radius: 3px; padding: 0 4px; background: #fff; color: var(--muted);
+  }
+  .medium-badge {
+    font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 10px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .medium-badge.podcast { background: #f3e8ff; color: #7c3aed; }
+  .medium-badge.youtube { background: #fee2e2; color: #dc2626; }
+
+  .screen { display: none; }
+  .screen.active { display: block; animation: screenIn .3s ease; }
+  @keyframes screenIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  /* ---------- Intro ---------- */
+  #intro .hero {
+    margin-top: 36px; padding: 36px 32px; border: 1px solid var(--line);
+    border-radius: 12px; background: linear-gradient(180deg, #fafbfe, #fff);
+  }
+  #intro .hero h1 { font-size: 26px; }
+  #intro .hero p { font-size: 14px; color: #444; max-width: 560px; }
+  #intro .steps { display: flex; gap: 14px; margin: 26px 0 30px; flex-wrap: wrap; }
+  #intro .step {
+    flex: 1 1 160px; padding: 14px; border: 1px solid var(--line); border-radius: 8px;
+    background: #fff; font-size: 12.5px; color: #444;
+  }
+  #intro .step b { display: block; font-size: 13px; color: var(--fg); margin-bottom: 3px; }
+  #intro .step .n {
+    display: inline-flex; width: 20px; height: 20px; border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent); font-weight: 700;
+    font-size: 11px; align-items: center; justify-content: center; margin-bottom: 8px;
+  }
+  #intro .hint { font-size: 12px; color: var(--muted); margin-top: 10px; }
+
+  /* ---------- Rating layout ---------- */
+  .rate-grid { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 24px; align-items: start; }
+  @media (max-width: 860px) {
+    .rate-grid { grid-template-columns: 1fr; }
+    #panel { position: static !important; }
+  }
+
+  .progress-row { display: flex; align-items: baseline; gap: 12px; margin: 4px 0 14px; flex-wrap: wrap; }
+  .progress-row .label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .progress-track { flex: 1; min-width: 120px; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; align-self: center; }
+  .progress-fill { height: 100%; background: var(--accent); width: 0%; transition: width .35s ease; border-radius: 2px; }
+  #finish-btn { white-space: nowrap; }
+
+  /* ---------- Brief item card ---------- */
+  .card-stage { position: relative; }
+  .card-ghost {
+    position: absolute; left: 8px; right: 8px; top: 10px; bottom: -8px;
+    border: 1px solid var(--line); border-radius: 12px; background: var(--bg-soft);
+    z-index: 0;
+  }
+  .item-card {
+    position: relative; z-index: 1;
+    border: 1px solid var(--line); border-radius: 12px; background: #fff;
+    padding: 22px 24px 18px; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 6px 18px rgba(0,0,0,.05);
+  }
+  .item-card.leaving-up   { animation: leaveUp .26s ease forwards; }
+  .item-card.leaving-down { animation: leaveDown .26s ease forwards; }
+  .item-card.leaving-flat { animation: leaveFlat .26s ease forwards; }
+  .item-card.entering     { animation: enter .26s ease; }
+  @keyframes leaveUp   { to { opacity: 0; transform: translateY(-26px) rotate(-1deg); } }
+  @keyframes leaveDown { to { opacity: 0; transform: translateY(26px) rotate(1deg); } }
+  @keyframes leaveFlat { to { opacity: 0; transform: translateX(26px); } }
+  @keyframes enter { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; transform: none; } }
+
+  .item-src { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+  .item-src .show { font-weight: 600; color: #333; }
+  .item-src .ts {
+    color: var(--accent); font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 11.5px; text-decoration: none;
+  }
+  .item-claim { font-size: 16.5px; font-weight: 650; line-height: 1.4; margin: 10px 0 10px; letter-spacing: -0.01em; }
+  .item-quote {
+    font-size: 13px; color: #444; border-left: 3px solid var(--line-strong);
+    padding: 2px 0 2px 12px; margin: 0 0 6px; font-style: italic;
+  }
+  .item-quote .speaker { font-style: normal; color: var(--muted); font-size: 11.5px; display: block; margin-top: 4px; }
+
+  .react-row { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+  .react-btn {
+    flex: 1 1 120px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+    padding: 11px 10px 9px; font-size: 13.5px; font-weight: 600; border-radius: 8px;
+    border: 1px solid var(--line-strong); background: #fff; transition: transform .08s ease, background .12s, border-color .12s;
+  }
+  .react-btn small { font-weight: 400; font-size: 10.5px; color: var(--muted); }
+  .react-btn:active { transform: scale(.97); }
+  .react-btn.must:hover  { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .react-btn.fine:hover  { background: #fef3e2; border-color: #e0a64a; color: #92580a; }
+  .react-btn.skip:hover  { background: var(--bg-soft); border-color: #aaa; color: #555; }
+  .under-row { display: flex; justify-content: space-between; margin-top: 10px; font-size: 11.5px; color: var(--muted); }
+  .under-row a { color: var(--muted); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+  .under-row a:hover { color: var(--fg); }
+  .under-row .keys { display: flex; gap: 10px; }
+
+  /* ---------- Learning panel ---------- */
+  #panel { position: sticky; top: 16px; }
+  .panel-box { border: 1px solid var(--line); border-radius: 10px; background: #fff; overflow: hidden; }
+  .panel-head {
+    padding: 10px 14px; font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .07em; color: var(--muted); background: var(--bg-soft);
+    border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center;
+  }
+  .panel-head .dot { width: 7px; height: 7px; border-radius: 50%; background: #ccc; }
+  .panel-head .dot.live { background: var(--good); animation: pulse 1.6s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+
+  .infer-box {
+    margin: 12px; padding: 10px 12px; font-size: 12.5px; line-height: 1.45;
+    background: var(--accent-soft); border-left: 3px solid var(--accent);
+    border-radius: 0 6px 6px 0; color: #1c3d6e;
+  }
+  .infer-box.flash { animation: inferFlash .5s ease; }
+  @keyframes inferFlash { from { background: #cfe0fc; } to { background: var(--accent-soft); } }
+  .infer-box .sub { display: block; margin-top: 4px; font-size: 11px; color: #4a6da8; }
+  .infer-box.empty { background: var(--bg-soft); border-left-color: var(--line-strong); color: var(--muted); font-style: italic; }
+
+  .tier-block { padding: 4px 14px 10px; }
+  .tier-block + .tier-block { border-top: 1px dashed var(--line); padding-top: 10px; }
+  .tier-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 6px; }
+  .tier-title.t1 { color: var(--t1); } .tier-title.t2 { color: var(--t2); } .tier-title.dw { color: var(--dw); }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 6px; min-height: 22px; }
+  .chip {
+    font-size: 11.5px; padding: 3px 9px; border-radius: 12px; line-height: 1.3;
+    animation: chipIn .3s ease; border: 1px solid transparent;
+  }
+  @keyframes chipIn { from { opacity: 0; transform: scale(.8); } to { opacity: 1; transform: none; } }
+  .chip.t1 { background: var(--t1-bg); color: #174ea6; }
+  .chip.t2 { background: var(--t2-bg); color: #92580a; }
+  .chip.dw { background: var(--dw-bg); color: #555; text-decoration: line-through; text-decoration-color: #999; text-decoration-thickness: 1px; }
+  .chip.tentative { border: 1px dashed #9bbcf2; background: #f3f8ff; }
+  .chip .conf { font-size: 9.5px; opacity: .75; margin-left: 3px; }
+  .chip-empty { font-size: 11px; color: #bbb; font-style: italic; }
+
+  .feed { padding: 8px 14px 12px; border-top: 1px solid var(--line); max-height: 180px; overflow-y: auto; }
+  .feed-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin: 4px 0 6px; }
+  .feed-item { font-size: 11px; color: var(--muted); padding: 3px 0; border-bottom: 1px dotted var(--line); line-height: 1.4; }
+  .feed-item:last-child { border-bottom: none; }
+  .feed-item .fi-ico { display: inline-block; width: 14px; }
+
+  /* ---------- Review ---------- */
+  .review-grid { display: grid; grid-template-columns: minmax(0,1fr); gap: 0; max-width: 760px; }
+  .theme-card {
+    border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px;
+    margin-bottom: 10px; background: #fff; display: grid;
+    grid-template-columns: minmax(0,1fr) auto; gap: 4px 16px; align-items: start;
+  }
+  .theme-card.dimmed { opacity: .5; }
+  .theme-card .t-name { font-weight: 650; font-size: 14px; }
+  .theme-card .t-evidence { font-size: 11.5px; color: var(--muted); margin-top: 2px; grid-column: 1; }
+  .theme-card .t-evidence b { color: #444; font-weight: 600; }
+  .theme-card .t-bullets { font-size: 12px; color: #555; margin: 8px 0 0; padding-left: 16px; grid-column: 1; }
+  .theme-card .t-bullets li { margin: 2px 0; }
+  .seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 6px; overflow: hidden; grid-row: 1 / span 3; align-self: start; }
+  .seg button { border: none; border-radius: 0; padding: 5px 9px; font-size: 11px; border-left: 1px solid var(--line); }
+  .seg button:first-child { border-left: none; }
+  .seg button.on.s1 { background: var(--t1); color: #fff; }
+  .seg button.on.s2 { background: var(--t2); color: #fff; }
+  .seg button.on.sd { background: #777; color: #fff; }
+  .seg button.on.sx { background: #ddd; color: #333; }
+
+  .dw-list { list-style: none; margin: 0 0 4px; padding: 0; max-width: 760px; }
+  .dw-list li {
+    font-size: 12.5px; color: #555; padding: 7px 12px; border: 1px solid var(--line);
+    border-radius: 7px; margin-bottom: 6px; background: var(--bg-soft);
+    display: flex; justify-content: space-between; gap: 10px; align-items: baseline;
+  }
+  .dw-list .src-note { font-size: 10.5px; color: #999; white-space: nowrap; }
+
+  details.adv { margin: 18px 0 6px; max-width: 760px; }
+  details.adv summary { cursor: pointer; font-size: 12px; color: var(--muted); user-select: none; }
+  details.adv pre {
+    margin-top: 10px; padding: 14px; background: var(--bg-soft); border: 1px solid var(--line);
+    border-radius: 6px; font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 11px; line-height: 1.55; white-space: pre-wrap; max-height: 420px; overflow: auto;
+  }
+  .adv-actions { margin-top: 8px; }
+
+  .src-card {
+    border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px;
+    display: flex; gap: 12px; align-items: center; max-width: 760px; background: #fff;
+    transition: border-color .15s, background .15s;
+  }
+  .src-card.on { border-color: #b6cff5; background: #fbfdff; }
+  .src-card .s-main { flex: 1; min-width: 0; }
+  .src-card .s-name { font-weight: 650; font-size: 13.5px; display: flex; align-items: center; gap: 8px; }
+  .src-card .s-why { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .src-card .s-why b { color: #444; font-weight: 600; }
+  .add-toggle { min-width: 86px; text-align: center; }
+  .add-toggle.added { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+  .save-bar {
+    position: sticky; bottom: 0; margin-top: 26px; padding: 14px 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0), #fff 30%);
+    display: flex; gap: 12px; align-items: center; max-width: 760px;
+  }
+  .save-bar .summary { font-size: 12px; color: var(--muted); }
+  .save-bar button.primary { padding: 9px 18px; font-size: 14px; }
+
+  .empty-note {
+    max-width: 760px; padding: 14px 16px; border: 1px dashed var(--line-strong);
+    border-radius: 8px; color: var(--muted); font-size: 13px; background: var(--bg-soft);
+  }
+
+  /* ---------- Done ---------- */
+  #done .done-box {
+    margin-top: 48px; text-align: center; padding: 48px 24px;
+    border: 1px solid var(--line); border-radius: 12px; max-width: 620px;
+    margin-left: auto; margin-right: auto; background: linear-gradient(180deg,#fafdf9,#fff);
+  }
+  #done .check {
+    width: 52px; height: 52px; border-radius: 50%; background: #d6f5d6; color: #1a8800;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 14px;
+  }
+  #done h2 { font-size: 20px; margin: 0 0 6px; }
+  #done p { font-size: 13.5px; color: var(--muted); max-width: 420px; margin: 6px auto; }
+  #done .stats { display: flex; gap: 10px; justify-content: center; margin: 22px 0; flex-wrap: wrap; }
+  #done .stat { padding: 10px 18px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+  #done .stat b { display: block; font-size: 20px; color: var(--fg); }
+  #done .stat span { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- ============================ INTRO ============================ -->
+<section id="intro" class="screen active">
+  <div class="hero">
+    <h1>Train your brief by example</h1>
+    <p>Every morning this agent reads hours of podcasts and YouTube and emails you the few claims
+       worth your time. To know what's worth <em>your</em> time, it needs taste — yours.</p>
+    <p>Instead of filling in a form, react to a sample brief. Each card is the kind of item the agent
+       finds: a claim, a quote, a source. Tell it what you'd want in your inbox.</p>
+    <div class="steps">
+      <div class="step"><span class="n">1</span><b>React to sample items</b>Must&nbsp;have, fine, or don't care. Takes about two minutes.</div>
+      <div class="step"><span class="n">2</span><b>Watch it learn</b>Your interest profile builds itself live as you go — every inference explained.</div>
+      <div class="step"><span class="n">3</span><b>Review &amp; start</b>Approve the profile and a starter set of shows matched to what you loved.</div>
+    </div>
+    <button class="primary" id="start-btn" style="padding:10px 22px;font-size:14px;">Show me the sample brief</button>
+    <div class="hint">No wrong answers — the items deliberately span very different territory.</div>
+  </div>
+</section>
+
+<!-- ============================ RATING ============================ -->
+<section id="rate" class="screen">
+  <h1>Sample brief — react to each item</h1>
+  <p class="lede">Would you want this in tomorrow's email? <b style="color:#444">★ Must have</b> lifts a theme,
+     <b style="color:#444">Don't care</b> teaches it what to mute. Your profile builds on the right.</p>
+
+  <div class="progress-row">
+    <span class="label" id="progress-label">1 of ~16</span>
+    <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+    <button id="finish-btn" disabled title="Rate at least 8 items first">Finish &amp; review →</button>
+  </div>
+
+  <div class="rate-grid">
+    <div>
+      <div class="card-stage">
+        <div class="card-ghost"></div>
+        <div class="item-card" id="item-card">
+          <div class="item-src" id="item-src"></div>
+          <div class="item-claim" id="item-claim"></div>
+          <blockquote class="item-quote" id="item-quote"></blockquote>
+          <div class="react-row">
+            <button class="react-btn must" data-react="must">★ Must have <small>front of my brief</small></button>
+            <button class="react-btn fine" data-react="fine">Fine <small>worth a glance</small></button>
+            <button class="react-btn skip" data-react="dont">Don't care <small>mute this stuff</small></button>
+          </div>
+        </div>
+      </div>
+      <div class="under-row">
+        <span class="keys"><span><kbd>1</kbd> must</span> <span><kbd>2</kbd> fine</span> <span><kbd>3</kbd> don't care</span></span>
+        <a id="undo-link" style="visibility:hidden">↩ undo last</a>
+      </div>
+    </div>
+
+    <aside id="panel">
+      <div class="panel-box">
+        <div class="panel-head">Profile — learning live <span class="dot" id="live-dot"></span></div>
+        <div class="infer-box empty" id="infer-box">React to your first item and I'll start inferring what you care about.</div>
+        <div class="tier-block">
+          <div class="tier-title t1">Tier 1 — always lift</div>
+          <div class="chip-row" id="chips-t1"><span class="chip-empty">nothing yet</span></div>
+        </div>
+        <div class="tier-block">
+          <div class="tier-title t2">Tier 2 — secondary</div>
+          <div class="chip-row" id="chips-t2"><span class="chip-empty">nothing yet</span></div>
+        </div>
+        <div class="tier-block">
+          <div class="tier-title dw">Down-weight — mute</div>
+          <div class="chip-row" id="chips-dw"><span class="chip-empty">nothing yet</span></div>
+        </div>
+        <div class="feed" id="feed" hidden>
+          <div class="feed-title">How it got here</div>
+          <div id="feed-items"></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<!-- ============================ REVIEW ============================ -->
+<section id="review" class="screen">
+  <h1>Your inferred profile</h1>
+  <p class="lede" id="review-lede">Built from your reactions. Adjust anything — move themes between tiers, drop what's wrong. This becomes the ranking rubric for every brief.</p>
+
+  <h2 class="sec">Tier 1 — always lift</h2>
+  <div id="rev-t1" class="review-grid"></div>
+
+  <h2 class="sec">Tier 2 — secondary lift</h2>
+  <div id="rev-t2" class="review-grid"></div>
+
+  <h2 class="sec">Down-weight — rank lower or drop</h2>
+  <ul class="dw-list" id="rev-dw"></ul>
+
+  <details class="adv">
+    <summary>Advanced: view as <code>profile.md</code> markdown</summary>
+    <pre id="md-pre"></pre>
+    <div class="adv-actions"><button id="copy-md">Copy markdown</button> <span id="copy-ok" style="font-size:11px;color:var(--good);visibility:hidden">copied</span></div>
+  </details>
+
+  <h2 class="sec">Suggested starter sources</h2>
+  <p class="lede" style="margin-bottom:12px" id="src-lede">Shows that reliably cover your Tier 1 themes. Toggle off any you don't want — you can always add more later.</p>
+  <div id="rev-sources"></div>
+
+  <div class="save-bar">
+    <button class="primary" id="save-btn">Save profile</button>
+    <span class="summary" id="save-summary"></span>
+  </div>
+</section>
+
+<!-- ============================ DONE ============================ -->
+<section id="done" class="screen">
+  <div class="done-box">
+    <div class="check">✓</div>
+    <h2>Your brief is trained</h2>
+    <p id="done-line">Profile saved.</p>
+    <div class="stats" id="done-stats"></div>
+    <p>The first daily brief lands at <b>08:00 UTC</b>. Thumbs-up/down items in any brief to keep sharpening the profile.</p>
+    <p style="margin-top:18px"><button id="restart-btn">Start over (demo)</button></p>
+  </div>
+</section>
+
+<script>
+'use strict';
+
+/* ================================================================
+   THEMES — each maps reactions to profile structure (tiers, bullets)
+   ================================================================ */
+const THEMES = {
+  'ai-econ': {
+    label: 'AI cost economics & tokenomics',
+    chip: 'AI cost economics',
+    t1line: 'AI tokenomics — cost-per-token and $/Mtok trajectories, inference margins, cache and batch pricing tiers',
+    bullets: [
+      'Cost-per-token / $/Mtok trajectories — input, output, cached, batch tiers; year-on-year reductions',
+      'Inference economics: tokens/sec per chip per dollar, prefill vs decode cost split, KV-cache reuse efficiency',
+      'Token-pricing-tier launches and lab pricing changes (OpenAI, Anthropic, Google, xAI)',
+    ],
+    down: 'AI pricing and inference-cost discussion',
+  },
+  'gpu-capex': {
+    label: 'Compute capex & GPU supply',
+    chip: 'Compute capex',
+    t1line: 'hyperscaler capex pace, GPU supply/demand, and depreciation-schedule changes',
+    bullets: [
+      'Hyperscaler AI capex commitments, pace, and guidance changes',
+      'GPU allocation, lead times, and depreciation schedule changes that move earnings',
+      'Power, datacenter siting, and grid constraints — capacity & cost framing',
+    ],
+    down: 'Datacenter capex and GPU supply chatter',
+  },
+  'saas': {
+    label: 'SaaS competitive dynamics',
+    chip: 'SaaS dynamics',
+    t1line: 'SaaS competitive dynamics — AI-native displacement of incumbents, seat compression from agents, pricing-model transitions',
+    bullets: [
+      'AI-native displacement of incumbent SaaS: named lost-deal disclosures and customer migrations',
+      'Seat compression from AI agents; per-seat → per-outcome repricing, quantified',
+      'ARR growth, NRR, and revenue-quality disclosures (consumption vs subscription)',
+    ],
+    down: 'Enterprise SaaS vendor dynamics',
+  },
+  'security': {
+    label: 'Cybersecurity industry dynamics',
+    chip: 'Cybersecurity',
+    t1line: 'cybersecurity industry dynamics — breach economics, AI-driven offense/defense shifts, security M&A and vendor consolidation',
+    bullets: [
+      'Breach / incident disclosures with customer-count or cost figures; ransomware payout trends',
+      'AI on offense and defense: model-found vulnerabilities, SOC automation, quantified efficacy',
+      'Security M&A, platform consolidation, and CISO budget signals',
+    ],
+    down: 'Security-industry coverage',
+  },
+  'fintech': {
+    label: 'Fintech & payments economics',
+    chip: 'Fintech & payments',
+    t1line: 'fintech and payments economics — settlement volumes, take rates, credit-cycle signals',
+    bullets: [
+      'Stablecoin and real-time settlement volume vs card networks; take-rate compression',
+      'Consumer-credit signals: BNPL delinquencies, charge-off trends, cohort data',
+      'Interchange, processing margin, and embedded-finance unit economics',
+    ],
+    down: 'Fintech and payments coverage',
+  },
+  'biotech': {
+    label: 'Biotech & AI drug discovery',
+    chip: 'Biotech / AI-bio',
+    t1line: 'AI drug discovery milestones and biotech platform economics',
+    bullets: [
+      'AI-designed molecules hitting clinical milestones — timelines vs industry baseline',
+      'Platform economics: cost-per-candidate, partnership and milestone deal structures',
+      'Manufacturing-capacity constraints as the binding market limit (e.g. GLP-1s)',
+    ],
+    down: 'Biotech and drug-discovery coverage',
+  },
+  'energy': {
+    label: 'Energy, power & datacenter siting',
+    chip: 'Energy & power',
+    t1line: 'energy economics where they meet compute — PPAs, $/MWh trends, nuclear deals tied to AI',
+    bullets: [
+      'Nuclear and firmed-renewable PPAs tied to datacenters — $/MWh and term disclosures',
+      'Solar+storage and gas cost crossover points; interconnection-queue dynamics',
+      'Grid constraints as a gating factor on AI buildout',
+    ],
+    down: 'Energy and climate-tech coverage',
+  },
+  'macro': {
+    label: 'Markets & macro',
+    chip: 'Markets & macro',
+    t1line: 'market-structure and credit signals that touch tech — spreads, issuance, IPO-window dynamics',
+    bullets: [
+      'Credit-market signals around tech capex: spreads, issuance volumes, neocloud leverage',
+      'IPO window: S-1 pipeline, filing financials, pricing vs last private rounds',
+      'Rate and liquidity shifts framed through their effect on growth assets',
+    ],
+    down: 'General markets and macro commentary',
+  },
+  'consumer': {
+    label: 'Consumer, media & creator economy',
+    chip: 'Consumer & media',
+    t1line: 'consumer subscription and creator-economy unit economics',
+    bullets: [
+      'Streaming churn, bundling economics, CAC vs LTV disclosures',
+      'Creator monetization: RPM trends, platform take-rate changes',
+      'Consumer-subscription pricing power and retention data',
+    ],
+    down: 'Consumer media and creator-economy coverage',
+  },
+  'geo': {
+    label: 'Semiconductors & AI geopolitics',
+    chip: 'Chips & geopolitics',
+    t1line: 'chip export controls and their real-world impact, TSMC/Taiwan concentration risk, sovereign AI buildouts',
+    bullets: [
+      'Export controls on advanced chips — actual impact vs intended impact, enforcement gaps',
+      'Taiwan / TSMC concentration risk; fab cost and yield deltas across geographies',
+      'Sovereign AI buildouts and the access regimes they negotiate',
+    ],
+    down: 'Chip-policy and geopolitics coverage',
+  },
+  'eng': {
+    label: 'Engineering deep dives',
+    chip: 'Engineering internals',
+    t1line: 'engineering internals — but only when tied to a cost or competitive outcome',
+    bullets: [
+      'Architecture and systems internals when the speaker quantifies the cost or performance consequence',
+      'Benchmark and efficiency claims with reproducible numbers',
+    ],
+    down: 'Pure engineering walkthroughs ("here\'s how it works") with no cost or competitive outcome attached',
+  },
+  'hype': {
+    label: 'Big-vision quotes & hype',
+    chip: 'Big-vision quotes',
+    t1line: 'big-picture vision statements from credible operators, even when unquantified',
+    bullets: [
+      'Sweeping directional claims from founders/operators with real skin in the game',
+    ],
+    // when negative this expands into the classic noise list:
+    downList: [
+      'Generic "AI will change everything" framing',
+      'Vague predictions without timeframes or numbers',
+      'Hype quotes about partnership announcements without substance',
+      '"We\'re really excited about..." filler',
+    ],
+    down: 'Unquantified hype and excitement filler',
+  },
+};
+
+/* ================================================================
+   SAMPLE BRIEF ITEMS — deliberately spanning very different territory
+   ================================================================ */
+const ITEMS = [
+  // --- AI infra economics ---
+  { id:'tok1', theme:'ai-econ', facet:'the $/Mtok item',
+    claim:'Serving GPT-4-class output now costs ~$0.40/Mtok — a 40x decline in 18 months, and the curve hasn’t flattened',
+    quote:'People haven’t internalized this. The tokens we sold for sixty dollars a million in early ’23 — we can serve a strictly better model today for under fifty cents. And there is nothing in the data that says that curve is bending.',
+    speaker:'Infra lead, frontier lab', show:'BG2 Pod', medium:'youtube', ts:'41:22' },
+  { id:'tok2', theme:'ai-econ', facet:'the cached-token margin item',
+    claim:'Cached-input pricing is the quiet margin lever: 90% discounts that still carry ~70% gross margin',
+    quote:'Everyone watches the headline price per million. The actual business is in cache hits — you re-serve the same prefix at a tenth of the price and your margin on that token goes up, not down.',
+    speaker:'AI infra investor', show:'No Priors', medium:'podcast', ts:'28:05' },
+  { id:'tok3', theme:'ai-econ', facet:'the batch-pricing item',
+    claim:'Batch-tier tokens are commoditizing first — three labs now priced within 8% of each other',
+    quote:'On the batch tier there’s effectively no differentiation left. Three labs within eight percent on price. The premium real-time tier is where the pricing power still lives.',
+    speaker:'Guest', show:'Latent Space', medium:'podcast', ts:'52:40' },
+
+  // --- Compute capex ---
+  { id:'capex1', theme:'gpu-capex', facet:'the hyperscaler-capex item',
+    claim:'Combined hyperscaler AI capex guided to $480B for 2026 — up 55% year on year',
+    quote:'Add up the four prints: four hundred and eighty billion dollars. The market’s question is no longer "can they spend it" — it’s what the depreciation schedule does to 2028 earnings.',
+    speaker:'Guest', show:'BG2 Pod', medium:'youtube', ts:'12:31' },
+  { id:'capex2', theme:'gpu-capex', facet:'the GPU-depreciation item',
+    claim:'Quietly stretching GPU depreciation from 4 to 6 years is worth ~$30B of 2026 hyperscaler earnings',
+    quote:'Two extra years of useful life across that fleet is thirty billion dollars of earnings that didn’t come from selling anything. Auditors signed off, but the second-hand H100 market will tell us if it was true.',
+    speaker:'Analyst guest', show:'Odd Lots', medium:'podcast', ts:'33:18' },
+
+  // --- SaaS ---
+  { id:'saas1', theme:'saas', facet:'the seat-compression item',
+    claim:'A Fortune-100 insurer renewed at 40% fewer support seats after deploying agents — and forced per-resolution pricing',
+    quote:'They didn’t churn, and that’s what should scare the vendor. They renewed — at forty percent fewer seats — and demanded to be billed per resolved ticket. That contract structure is the whole story of the next five years of SaaS.',
+    speaker:'Enterprise software CEO', show:'20VC', medium:'podcast', ts:'58:47' },
+  { id:'saas2', theme:'saas', facet:'the AI-displacement item',
+    claim:'Cursor displaced GitHub Copilot at three of the ten largest US banks this quarter',
+    quote:'These are not startups experimenting. Three of the ten biggest banks in the country ripped out the incumbent this quarter. Distribution was supposed to be the moat.',
+    speaker:'Guest', show:'Lenny’s Podcast', medium:'youtube', ts:'1:04:12' },
+  { id:'saas3', theme:'saas', facet:'the NRR item',
+    claim:'Public SaaS median NRR slipped to 104% — the first sub-105 print since 2017',
+    quote:'One-oh-four median net retention. That’s not a demand story, that’s a structural story — expansion revenue was the engine of every model in the sector and it is decelerating in plain sight.',
+    speaker:'Guest', show:'Acquired', medium:'podcast', ts:'1:21:30' },
+
+  // --- Security ---
+  { id:'sec1', theme:'security', facet:'the ransomware-economics item',
+    claim:'Average ransomware recovery cost hit $4.7M while actual payouts fell 35% — insurers are forcing refusal to pay',
+    quote:'Recovery cost is up, payment rate is down by a third. The insurers did what regulation couldn’t — they just stopped covering the ransom, and the attackers’ unit economics broke.',
+    speaker:'Host', show:'Risky Business', medium:'podcast', ts:'22:48' },
+  { id:'sec2', theme:'security', facet:'the AI-found-zero-days item',
+    claim:'An autonomous red-team model found 14 exploitable zero-days in shipped enterprise software in a single quarter',
+    quote:'Fourteen real, exploitable vulnerabilities in one quarter, found by a model running unattended. The asymmetry question is no longer theoretical — patching cadence was designed for human-speed discovery.',
+    speaker:'Guest, security researcher', show:'Risky Business', medium:'podcast', ts:'41:09' },
+  { id:'sec3', theme:'security', facet:'the security-consolidation item',
+    claim:'Palo Alto’s platform bundling pushed three point-solution vendors below 90% gross retention',
+    quote:'When the platform guy gives away your category as a bundle line-item, your gross retention tells the story. Three public point vendors are now under ninety. The consolidation wave is here, it’s just unevenly distributed.',
+    speaker:'Guest CISO', show:'Security Weekly', medium:'youtube', ts:'36:55' },
+
+  // --- Fintech ---
+  { id:'fin1', theme:'fintech', facet:'the stablecoin-settlement item',
+    claim:'Stablecoin settlement crossed $12T annualized — more than Visa and Mastercard combined',
+    quote:'Twelve trillion dollars of annualized settlement. Most of it is exchange flow, fine — but even the conservative cut of real commerce is growing 80% a year, and the card networks’ take rate is the bullseye.',
+    speaker:'Guest', show:'Fintech Takes', medium:'podcast', ts:'18:26' },
+  { id:'fin2', theme:'fintech', facet:'the BNPL-credit item',
+    claim:'BNPL delinquencies doubled in six months in the subprime cohort — the sector’s first real credit-cycle test',
+    quote:'These books have never seen a cycle. Subprime delinquency doubled in two quarters and the originate-to-hold players are about to learn why credit cards price the way they do.',
+    speaker:'Guest', show:'Odd Lots', medium:'podcast', ts:'45:02' },
+
+  // --- Biotech ---
+  { id:'bio1', theme:'biotech', facet:'the AI-antibody item',
+    claim:'First AI-designed antibody cleared Phase 2 — nine months from target to IND vs the industry’s 4.5-year average',
+    quote:'Nine months from target selection to IND filing. The industry average is fifty-four months. If the Phase 3 reads out, the cost structure of the entire discovery industry is wrong.',
+    speaker:'Biotech founder', show:'The Long Run', medium:'podcast', ts:'27:14' },
+  { id:'bio2', theme:'biotech', facet:'the GLP-1-capacity item',
+    claim:'GLP-1 supply, not demand, caps the market — Novo’s manufacturing capex now rivals a mid-size chip fab',
+    quote:'Demand is functionally infinite at this price point. The binding constraint is fill-finish capacity, and Novo is spending fab-scale money — eight billion a year — to build it.',
+    speaker:'Guest analyst', show:'Business Breakdowns', medium:'podcast', ts:'31:40' },
+
+  // --- Energy / climate ---
+  { id:'enr1', theme:'energy', facet:'the nuclear-PPA item',
+    claim:'Microsoft’s Three Mile Island PPA pencils to ~$110/MWh — 2.5x grid rate, signed for 20 years',
+    quote:'Run the math on the restart cost and the term: they’re paying something like a hundred and ten dollars a megawatt-hour for twenty years. That’s not an energy trade, that’s a statement that firm power is the scarce input.',
+    speaker:'Host', show:'Catalyst with Shayle Kann', medium:'podcast', ts:'14:53' },
+  { id:'enr2', theme:'energy', facet:'the solar-storage-cost item',
+    claim:'Solar-plus-storage cleared at $38/MWh in Texas — under new-build gas, without subsidies',
+    quote:'Thirty-eight dollars a megawatt-hour, firmed, in ERCOT, no ITC in that number. New gas can’t get under forty-five with current turbine lead times. The crossover already happened; the market just hasn’t repriced it.',
+    speaker:'Guest developer', show:'Volts', medium:'podcast', ts:'49:21' },
+
+  // --- Macro / markets ---
+  { id:'mac1', theme:'macro', facet:'the credit-spread item',
+    claim:'High-yield spreads at 280bps aren’t pricing an AI-capex credit cycle — neocloud debt issuance tripled this year',
+    quote:'GPU-backed lending tripled and spreads barely moved. Either the collateral is better than anyone thinks, or credit is making the same mistake it made with telecom fiber in 1999.',
+    speaker:'Guest', show:'Odd Lots', medium:'podcast', ts:'08:44' },
+  { id:'mac2', theme:'macro', facet:'the IPO-window item',
+    claim:'The IPO window is reopening: 14 enterprise software S-1s on file, median ARR $400M',
+    quote:'Fourteen S-1s in the pipeline, median four hundred million of ARR, median growth thirty-eight percent. The interesting part is the accumulated-deficit lines — some of these are records.',
+    speaker:'Guest banker', show:'20VC', medium:'podcast', ts:'24:17' },
+
+  // --- Consumer / media ---
+  { id:'con1', theme:'consumer', facet:'the streaming-churn item',
+    claim:'Streaming churn hit 5.5% monthly — bundles are back because CAC now exceeds LTV in a third of subs',
+    quote:'At five and a half percent monthly churn, a third of your subscriber adds never pay back their acquisition cost. That’s why every service is suddenly in a bundle — it’s not strategy, it’s arithmetic.',
+    speaker:'Guest', show:'The Town', medium:'podcast', ts:'19:38' },
+  { id:'con2', theme:'consumer', facet:'the creator-RPM item',
+    claim:'Median short-form creator RPM fell 22% this year as AI-generated content floods feeds',
+    quote:'Supply of watchable content just went vertical, and the ad pool didn’t. Median RPM down twenty-two percent. Mid-tier creators are the ones getting squeezed out first.',
+    speaker:'Host', show:'Colin and Samir', medium:'youtube', ts:'42:55' },
+
+  // --- Geopolitics ---
+  { id:'geo1', theme:'geo', facet:'the export-control-loophole item',
+    claim:'H20-class chips reached China at 3x reported volume via Malaysia transshipment, per customs-data analysis',
+    quote:'Match the export manifests against Malaysian import data and there’s a three-x gap. The controls aren’t failing at the policy level, they’re failing at the freight-forwarder level.',
+    speaker:'Guest researcher', show:'ChinaTalk', medium:'podcast', ts:'37:42' },
+  { id:'geo2', theme:'geo', facet:'the TSMC-Arizona item',
+    claim:'TSMC Arizona yields are now within 4 points of Hsinchu — at 30% higher cost per wafer',
+    quote:'The yield story is basically solved — four points off the mothership. The cost story is not: thirty percent more per wafer, and that delta is structural, not a learning curve.',
+    speaker:'Guest', show:'Sharp Tech', medium:'podcast', ts:'26:09' },
+  { id:'geo3', theme:'geo', facet:'the sovereign-AI item',
+    claim:'The UAE’s 5GW AI campus comes with a US-controlled access regime — compute is becoming foreign policy',
+    quote:'Read the terms: American cloud providers operate the clusters, American export rules govern who touches them. Five gigawatts of sovereignty that isn’t actually sovereign. That template is the interesting part.',
+    speaker:'Guest', show:'ChinaTalk', medium:'podcast', ts:'1:02:33' },
+
+  // --- Pure engineering ---
+  { id:'eng1', theme:'eng', facet:'the attention-internals item',
+    claim:'Deep dive: how sliding-window attention with summary tokens keeps gradient flow across an 8x-smaller KV cache',
+    quote:'You keep a rolling window per head, re-derive global context through learned summary tokens, and the elegant bit is the gradient still flows through the summaries during training. Let me walk through the masking.',
+    speaker:'Research guest', show:'Latent Space', medium:'podcast', ts:'1:11:05' },
+  { id:'eng2', theme:'eng', facet:'the Postgres-internals item',
+    claim:'Inside Postgres’ new async I/O: the io_uring rewrite that doubles sequential scan throughput',
+    quote:'The executor used to block on every read-ahead miss. With io_uring you queue the next eight extents before the scan needs them — here’s how the buffer manager changed to make that safe.',
+    speaker:'Core contributor', show:'The Changelog', medium:'podcast', ts:'54:30' },
+
+  // --- Hype / fluff ---
+  { id:'hyp1', theme:'hype', facet:'the “AI changes everything” quote',
+    claim:'“AI is the new electricity — every company on earth becomes an AI company”',
+    quote:'I just think we’re so early. This changes literally everything about how every business operates. The opportunity is just massive — bigger than the internet, bigger than mobile, bigger than anything we’ve seen.',
+    speaker:'Guest investor', show:'All-In Podcast', medium:'youtube', ts:'1:32:18' },
+  { id:'hyp2', theme:'hype', facet:'the partnership-hype quote',
+    claim:'A “transformative strategic alliance” announced — no terms, numbers, or timeline disclosed',
+    quote:'We’re incredibly excited about this partnership. Two amazing teams with completely aligned visions. I can’t share specifics yet, but the synergies really speak for themselves.',
+    speaker:'Guest CEO', show:'20VC', medium:'podcast', ts:'06:12' },
+  { id:'hyp3', theme:'hype', facet:'the “agents bigger than the internet” quote',
+    claim:'“Agents will be bigger than the internet” — undated, unquantified',
+    quote:'Mark my words, agents are going to be bigger than the internet itself. Every workflow, every job function. I don’t want to put a date on it, but it’s coming faster than anyone thinks.',
+    speaker:'Guest founder', show:'All-In Podcast', medium:'youtube', ts:'47:50' },
+];
+
+/* Serving order: maximize territory contrast early on. */
+const DIVERSITY_ORDER = [
+  'tok1','saas1','hyp1','sec1','enr1','eng1','fin1','geo1','con1','mac1','bio1',
+  'capex1','hyp2','eng2','tok2','saas3','sec3','fin2','geo3','con2','mac2','bio2',
+  'enr2','capex2','tok3','saas2','sec2','geo2','hyp3',
+];
+const MAX_ROUNDS = 16;
+const MIN_TO_FINISH = 8;
+
+/* ================================================================
+   STARTER SOURCES — suggested from what the user loved
+   ================================================================ */
+const SOURCES = [
+  { name:'BG2 Pod',                medium:'youtube', themes:['ai-econ','gpu-capex','macro'], why:'Capital-markets lens on AI infra — capex, token pricing, margins.' },
+  { name:'No Priors',              medium:'podcast', themes:['ai-econ','saas'],              why:'Operator-grade interviews on AI economics and AI-native software.' },
+  { name:'Dwarkesh Podcast',       medium:'youtube', themes:['ai-econ','geo'],               why:'Long-form depth on compute scaling and AI strategy.' },
+  { name:'20VC',                   medium:'podcast', themes:['saas','macro'],                why:'SaaS founders and investors disclosing real numbers.' },
+  { name:'Acquired',               medium:'podcast', themes:['saas','consumer'],             why:'Deep business-model and competitive-dynamics breakdowns.' },
+  { name:'Lenny’s Podcast',   medium:'youtube', themes:['saas'],                        why:'Product and growth detail from operators inside the companies.' },
+  { name:'Risky Business',         medium:'podcast', themes:['security'],                    why:'The sharpest weekly read on security-industry economics.' },
+  { name:'Security Weekly',        medium:'youtube', themes:['security'],                    why:'Vendor-landscape and CISO-budget coverage.' },
+  { name:'Fintech Takes',          medium:'podcast', themes:['fintech'],                     why:'Payments and credit unit economics, weekly.' },
+  { name:'Odd Lots',               medium:'podcast', themes:['macro','fintech','energy'],    why:'Markets and plumbing — credit, commodities, market structure.' },
+  { name:'The Long Run',           medium:'podcast', themes:['biotech'],                     why:'Biotech founders on platform economics and clinical milestones.' },
+  { name:'Catalyst with Shayle Kann', medium:'podcast', themes:['energy'],                   why:'Energy economics where they meet compute and climate.' },
+  { name:'Volts',                  medium:'podcast', themes:['energy'],                      why:'Grid, storage, and power-market detail with numbers.' },
+  { name:'ChinaTalk',              medium:'podcast', themes:['geo'],                         why:'Export controls and US-China chip policy, primary-source driven.' },
+  { name:'Sharp Tech',             medium:'podcast', themes:['geo','consumer'],              why:'Strategy-first tech analysis (Stratechery adjacent).' },
+  { name:'The Town',               medium:'podcast', themes:['consumer'],                    why:'Streaming and media economics from the inside.' },
+  { name:'Colin and Samir',        medium:'youtube', themes:['consumer'],                    why:'Creator-economy data and platform monetization shifts.' },
+  { name:'Latent Space',           medium:'podcast', themes:['eng','ai-econ'],               why:'AI engineering internals, benchmark and efficiency claims.' },
+  { name:'The Changelog',          medium:'podcast', themes:['eng'],                         why:'Software internals and infrastructure deep dives.' },
+];
+
+/* ================================================================
+   STATE
+   ================================================================ */
+let state;
+function freshState() {
+  return {
+    served: [],            // item ids shown (incl. current)
+    history: [],           // [{id, reaction}]
+    counts: {},            // theme -> {must,fine,dont}
+    evidence: {},          // theme -> [{facet, reaction}]
+    confirmQueue: [],      // item ids to serve next (adaptive)
+    currentId: null,
+    feed: [],              // inference strings (newest first)
+    overrides: {},         // theme -> '1'|'2'|'down'|'off'  (review edits)
+    srcSelected: {},       // source name -> bool
+  };
+}
+
+const $ = id => document.getElementById(id);
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function show(screenId) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  $(screenId).classList.add('active');
+  window.scrollTo({ top: 0 });
+}
+
+/* ================================================================
+   ADAPTIVE SERVING
+   ================================================================ */
+function unservedOfTheme(theme) {
+  return ITEMS.filter(i => i.theme === theme && !state.served.includes(i.id));
+}
+function nextItem() {
+  while (state.confirmQueue.length) {
+    const id = state.confirmQueue.shift();
+    if (!state.served.includes(id)) return ITEMS.find(i => i.id === id);
+  }
+  for (const id of DIVERSITY_ORDER) {
+    if (!state.served.includes(id)) return ITEMS.find(i => i.id === id);
+  }
+  return null;
+}
+
+/* ================================================================
+   INFERENCE (visible intelligence over simple tag scoring)
+   ================================================================ */
+function countsFor(theme) { return state.counts[theme] || { must:0, fine:0, dont:0 }; }
+
+function themeStatus(theme) {
+  const c = countsFor(theme);
+  const rated = c.must + c.fine + c.dont;
+  if (!rated) return null;
+  if (theme === 'hype') {
+    if (c.must >= 1 && c.dont === 0) return { tier:'2', note:'you like big-vision quotes' };
+    if (c.dont >= 1 && c.must === 0) return { tier:'down', sure:c.dont >= 2 };
+    if (c.must >= 1 && c.dont >= 1) return { tier:'down', mixed:true };
+    return null; // 'fine' on hype = no signal
+  }
+  if (c.must >= 2) return { tier:'1', sure:true };
+  if (c.must === 1 && c.dont === 0) return { tier:'1', sure:false };
+  if (c.must >= 1 && c.dont >= 1) return { tier:'2', mixed:true };
+  if (c.fine >= 1 && c.dont === 0) return { tier:'2' };
+  if (c.dont >= 1 && c.fine >= 1) return { tier:'off' };  // weak/conflicting: leave out
+  return { tier:'down', sure:c.dont >= 2 };
+}
+
+function inferenceText(item, reaction) {
+  const t = THEMES[item.theme];
+  const c = countsFor(item.theme);
+  const more = unservedOfTheme(item.theme).length > 0;
+
+  if (item.theme === 'hype') {
+    if (reaction === 'dont') {
+      if (c.dont === 1) return { main:`You passed on ${item.facet} → filtering <b>unquantified hype</b> into Down-weight.`,
+        sub: more ? 'Serving one more hype-style quote to confirm.' : null, confirm: more };
+      return { main:`Second pass on a hype quote — <b>vague, numberless claims</b> locked into Down-weight.` };
+    }
+    if (reaction === 'must') return { main:`Interesting — you starred a big-vision quote. Keeping <b>${t.chip}</b> as a Tier 2 theme instead of muting it.` };
+    return { main:`Noted ${item.facet} as fine — no strong signal either way.` };
+  }
+
+  if (reaction === 'must') {
+    if (c.must === 1 && c.dont === 0)
+      return { main:`Because you starred ${item.facet} → <b>${t.label}</b> → Tier 1 <i>(tentative)</i>.`,
+        sub: more ? `Queuing a second ${t.chip.toLowerCase()} item to confirm.` : null, confirm: more };
+    if (c.must >= 2)
+      return { main:`Second ★ on ${t.chip.toLowerCase()} — <b>${t.label}</b> locked into Tier 1.` };
+    return { main:`★ on ${item.facet} despite an earlier pass → settling <b>${t.chip}</b> at Tier 2 (mixed signal).` };
+  }
+  if (reaction === 'fine') {
+    if (c.dont > 0) return { main:`Mixed signal on <b>${t.chip}</b> — leaving it out of the profile for now.` };
+    if (c.must > 0) return { main:`Another mild positive on <b>${t.chip}</b> — staying Tier 1.` };
+    return { main:`${item.facet[0].toUpperCase() + item.facet.slice(1)} is fine-but-not-essential → <b>${t.chip}</b> → Tier 2.` };
+  }
+  // dont
+  if (c.must > 0) return { main:`You passed on ${item.facet}, but starred this area earlier → demoting <b>${t.chip}</b> to Tier 2.` };
+  if (c.fine > 0) return { main:`Conflicting reads on <b>${t.chip}</b> — dropping it from the profile.` };
+  return { main:`You passed on ${item.facet} → down-weighting <b>${t.chip}</b>.` };
+}
+
+/* ================================================================
+   RATING SCREEN RENDERING
+   ================================================================ */
+function renderItem(item) {
+  state.currentId = item.id;
+  $('item-src').innerHTML =
+    `<span class="medium-badge ${item.medium}">${item.medium}</span>` +
+    `<span class="show">${esc(item.show)}</span><span>·</span>` +
+    `<a class="ts" href="javascript:void(0)" title="In the real brief this deep-links to the moment">▶ ${item.ts}</a>`;
+  $('item-claim').textContent = item.claim;
+  $('item-quote').innerHTML = `“${esc(item.quote)}”<span class="speaker">— ${esc(item.speaker)}</span>`;
+  const card = $('item-card');
+  card.classList.remove('leaving-up','leaving-down','leaving-flat');
+  card.classList.add('entering');
+  setTimeout(() => card.classList.remove('entering'), 280);
+}
+
+function renderProgress() {
+  const n = state.history.length;
+  const total = Math.min(MAX_ROUNDS, n + remainingPossible());
+  $('progress-label').textContent = `${Math.min(n + 1, total)} of ~${total}`;
+  $('progress-fill').style.width = `${Math.min(100, (n / MAX_ROUNDS) * 100)}%`;
+  const fin = $('finish-btn');
+  if (n >= MIN_TO_FINISH) {
+    fin.disabled = false;
+    fin.title = 'Enough signal — review your profile';
+    fin.classList.add('primary');
+  } else {
+    fin.disabled = true;
+    fin.title = `Rate at least ${MIN_TO_FINISH} items first (${MIN_TO_FINISH - n} to go)`;
+    fin.classList.remove('primary');
+  }
+  $('undo-link').style.visibility = n > 0 ? 'visible' : 'hidden';
+}
+function remainingPossible() {
+  // current (unrated) card + everything not yet served
+  return 1 + ITEMS.filter(i => !state.served.includes(i.id)).length;
+}
+
+function renderPanel(latest) {
+  const box = $('infer-box');
+  if (latest) {
+    box.classList.remove('empty');
+    box.innerHTML = latest.main + (latest.sub ? `<span class="sub">↳ ${latest.sub}</span>` : '');
+    box.classList.remove('flash'); void box.offsetWidth; box.classList.add('flash');
+    $('live-dot').classList.add('live');
+  }
+  const groups = { '1':[], '2':[], 'down':[] };
+  for (const key of Object.keys(state.counts)) {
+    const st = themeStatus(key);
+    if (!st || st.tier === 'off') continue;
+    if (groups[st.tier]) groups[st.tier].push({ key, st });
+  }
+  fillChips('chips-t1', groups['1'], 't1');
+  fillChips('chips-t2', groups['2'], 't2');
+  fillChips('chips-dw', groups['down'], 'dw');
+
+  if (state.feed.length) {
+    $('feed').hidden = false;
+    $('feed-items').innerHTML = state.feed.slice(1, 8).map(f =>
+      `<div class="feed-item"><span class="fi-ico">${f.icon}</span>${f.plain}</div>`).join('');
+    if (state.feed.length <= 1) $('feed').hidden = true;
+  } else {
+    $('feed').hidden = true;
+  }
+}
+function fillChips(elId, list, cls) {
+  const el = $(elId);
+  if (!list.length) { el.innerHTML = '<span class="chip-empty">nothing yet</span>'; return; }
+  el.innerHTML = list.map(({ key, st }) => {
+    const t = THEMES[key];
+    const tent = (st.tier === '1' && !st.sure) || (st.tier === 'down' && key === 'hype' && !st.sure);
+    return `<span class="chip ${cls}${tent ? ' tentative' : ''}">${esc(t.chip)}${tent ? '<span class="conf">?</span>' : ''}</span>`;
+  }).join('');
+}
+
+/* ================================================================
+   REACTION HANDLING
+   ================================================================ */
+let reactLock = false;
+function react(reaction) {
+  if (reactLock) return;
+  const item = ITEMS.find(i => i.id === state.currentId);
+  if (!item) return;
+  reactLock = true;
+
+  state.history.push({ id: item.id, reaction });
+  state.counts[item.theme] = state.counts[item.theme] || { must:0, fine:0, dont:0 };
+  state.counts[item.theme][reaction] += 1;
+  state.evidence[item.theme] = state.evidence[item.theme] || [];
+  state.evidence[item.theme].push({ facet: item.facet, reaction });
+
+  const inf = inferenceText(item, reaction);
+  if (inf.confirm) {
+    const candidates = unservedOfTheme(item.theme);
+    if (candidates.length) state.confirmQueue.unshift(candidates[0].id);
+  }
+  const icon = reaction === 'must' ? '★' : reaction === 'fine' ? '·' : '✕';
+  state.feed.unshift({ icon, plain: inf.main.replace(/<[^>]+>/g, ''), main: inf.main });
+
+  // animate card out, then advance
+  const card = $('item-card');
+  card.classList.add(reaction === 'must' ? 'leaving-up' : reaction === 'dont' ? 'leaving-down' : 'leaving-flat');
+  renderPanel(inf);
+
+  setTimeout(() => {
+    reactLock = false;
+    if (state.history.length >= MAX_ROUNDS) { buildReview(); show('review'); return; }
+    const next = nextItem();
+    if (!next) { buildReview(); show('review'); return; }
+    state.served.push(next.id);
+    renderItem(next);
+    renderProgress();
+  }, 270);
+  renderProgress();
+}
+
+function undo() {
+  if (reactLock) return;
+  const last = state.history.pop();
+  if (!last) return;
+  const item = ITEMS.find(i => i.id === last.id);
+  state.counts[item.theme][last.reaction] -= 1;
+  state.evidence[item.theme].pop();
+  state.feed.shift();
+  // remove current (unrated) item from served so it can reappear later
+  if (state.currentId && state.currentId !== last.id) {
+    state.served = state.served.filter(id => id !== state.currentId);
+    state.confirmQueue.unshift(state.currentId);
+  }
+  renderItem(item);
+  renderPanel(state.feed[0] || null);
+  if (!state.feed.length) {
+    const box = $('infer-box');
+    box.classList.add('empty');
+    box.innerHTML = 'React to your first item and I’ll start inferring what you care about.';
+  }
+  renderProgress();
+}
+
+/* ================================================================
+   REVIEW
+   ================================================================ */
+function effectiveTier(theme) {
+  if (state.overrides[theme]) return state.overrides[theme];
+  const st = themeStatus(theme);
+  if (!st) return 'off';
+  return st.tier === 'off' ? 'off' : st.tier;
+}
+
+function evidenceLine(theme) {
+  const ev = state.evidence[theme] || [];
+  const stars = ev.filter(e => e.reaction === 'must');
+  const fines = ev.filter(e => e.reaction === 'fine');
+  const passes = ev.filter(e => e.reaction === 'dont');
+  const bits = [];
+  if (stars.length) bits.push(`${stars.length} ★ — <b>${stars.map(e => e.facet).join('</b>, <b>')}</b>`);
+  if (fines.length) bits.push(`${fines.length} fine`);
+  if (passes.length) bits.push(`${passes.length} pass`);
+  return 'From your reactions: ' + bits.join(' · ');
+}
+
+function buildReview() {
+  // theme cards
+  const t1 = [], t2 = [];
+  for (const key of Object.keys(THEMES)) {
+    const tier = effectiveTier(key);
+    if (tier === '1') t1.push(key);
+    else if (tier === '2') t2.push(key);
+  }
+  $('rev-t1').innerHTML = t1.length ? t1.map(k => themeCardHtml(k, '1')).join('')
+    : '<div class="empty-note">No Tier 1 themes yet — promote one below, or go back and star a few more items.</div>';
+  $('rev-t2').innerHTML = t2.length ? t2.map(k => themeCardHtml(k, '2')).join('')
+    : '<div class="empty-note">Nothing at Tier 2.</div>';
+
+  // down-weight list
+  const dwRows = [];
+  for (const key of Object.keys(THEMES)) {
+    if (effectiveTier(key) !== 'down') continue;
+    const t = THEMES[key];
+    if (key === 'hype') {
+      for (const b of t.downList) dwRows.push({ text: b, src: 'from your hype-quote passes' });
+    } else {
+      dwRows.push({ text: t.down, src: `you passed on ${(state.evidence[key] || []).filter(e => e.reaction === 'dont').map(e => e.facet)[0] || 'it'}` });
+    }
+  }
+  $('rev-dw').innerHTML = dwRows.length
+    ? dwRows.map(r => `<li><span>${esc(r.text)}</span><span class="src-note">${esc(r.src)}</span></li>`).join('')
+    : '<li style="background:#fff;border-style:dashed"><span style="color:#bbb;font-style:italic">Nothing muted — pass on items you don’t care about to build this list.</span></li>';
+
+  // markdown + sources + summary
+  $('md-pre').textContent = generateMarkdown();
+  buildSources();
+  updateSaveSummary();
+}
+
+function themeCardHtml(key, tier) {
+  const t = THEMES[key];
+  const ov = effectiveTier(key);
+  const seg = (val, cls, label) =>
+    `<button class="${ov === val ? 'on ' + cls : ''}" data-theme="${key}" data-tier="${val}" title="${label}">${label}</button>`;
+  return `<div class="theme-card">
+    <div class="t-name">${esc(t.label)}</div>
+    <div class="seg">
+      ${seg('1','s1','Tier 1')}${seg('2','s2','Tier 2')}${seg('down','sd','Mute')}${seg('off','sx','✕')}
+    </div>
+    <div class="t-evidence">${evidenceLine(key)}</div>
+    <ul class="t-bullets">${t.bullets.slice(0,2).map(b => `<li>${esc(b)}</li>`).join('')}</ul>
+  </div>`;
+}
+
+/* ================================================================
+   MARKDOWN GENERATION — mirrors config/profile.md structure
+   ================================================================ */
+function generateMarkdown() {
+  const t1 = [], t2 = [], dw = [];
+  for (const key of Object.keys(THEMES)) {
+    const tier = effectiveTier(key);
+    if (tier === '1') t1.push(key);
+    else if (tier === '2') t2.push(key);
+    else if (tier === 'down') dw.push(key);
+  }
+  const L = [];
+  L.push('# Interest Profile');
+  L.push('');
+  L.push('This file is the bias function for the ranking stage. The model reads it');
+  L.push('verbatim and uses it to filter and rank extracted candidates.');
+  L.push('Generated from onboarding reactions on ' + new Date().toISOString().slice(0,10) + ' — edit freely.');
+  L.push('');
+  L.push('---');
+  L.push('');
+  L.push('## Priority hierarchy');
+  L.push('');
+  L.push('Apply this hierarchy when choosing among candidates. Items in a higher');
+  L.push('tier should beat items in a lower tier.');
+  L.push('');
+  L.push('**TIER 1 — always lift:**');
+  L.push(t1.length
+    ? t1.map(k => '**' + THEMES[k].t1line + '**').join('; ') + '.'
+    : '(none selected yet — promote themes from Tier 2 as signal accrues.)');
+  if (t1.length) L.push('Specific quantitative disclosures in these areas beat everything else.');
+  L.push('');
+  L.push('**TIER 2 — secondary lift:**');
+  L.push(t2.length
+    ? t2.map(k => THEMES[k].t1line).join('; ') + '. Important context, but should not displace Tier 1 items.'
+    : '(none.)');
+  L.push('');
+  L.push('**TIER 3 — mention only if exceptional:**');
+  L.push('Everything outside the themes above. Skip unless the disclosure is');
+  L.push('genuinely first-of-its-kind.');
+  L.push('');
+  L.push('---');
+  L.push('');
+  L.push('## Themes I care about');
+  L.push('');
+  for (const k of t1.concat(t2)) {
+    const t = THEMES[k];
+    L.push('### ' + t.label + '  (Tier ' + (t1.includes(k) ? '1' : '2') + ')');
+    for (const b of t.bullets) L.push('- ' + b);
+    const stars = (state.evidence[k] || []).filter(e => e.reaction === 'must');
+    if (stars.length) L.push('- Seeded by onboarding reactions to: ' + stars.map(e => e.facet).join('; '));
+    L.push('');
+  }
+  L.push('## Down-weight');
+  L.push('');
+  L.push('These are noise — rank lower or drop entirely:');
+  const dwLines = [];
+  for (const k of dw) {
+    const t = THEMES[k];
+    if (k === 'hype') dwLines.push(...t.downList);
+    else dwLines.push(t.down);
+  }
+  if (!dw.includes('hype')) dwLines.push('Recycled talking points the guest has said in 5+ other interviews');
+  for (const b of dwLines) L.push('- ' + b);
+  L.push('');
+  return L.join('\n');
+}
+
+/* ================================================================
+   SOURCES
+   ================================================================ */
+function suggestedSources() {
+  const weight = k => ({ '1': 2, '2': 1 }[effectiveTier(k)] || 0);
+  return SOURCES
+    .map(s => {
+      const score = s.themes.reduce((a, t) => a + weight(t), 0);
+      const top = s.themes.filter(t => weight(t) > 0).sort((a, b) => weight(b) - weight(a))[0];
+      return { ...s, score, top };
+    })
+    .filter(s => s.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 7);
+}
+
+function buildSources() {
+  const list = suggestedSources();
+  if (!list.length) {
+    $('rev-sources').innerHTML = '<div class="empty-note">No suggestions yet — promote at least one theme to Tier 1 or 2.</div>';
+    $('src-lede').textContent = 'Shows are suggested from your Tier 1 and Tier 2 themes.';
+    return;
+  }
+  for (const s of list) if (!(s.name in state.srcSelected)) state.srcSelected[s.name] = s.score >= 2;
+  $('rev-sources').innerHTML = list.map(s => {
+    const on = !!state.srcSelected[s.name];
+    return `<div class="src-card ${on ? 'on' : ''}">
+      <div class="s-main">
+        <div class="s-name">${esc(s.name)} <span class="medium-badge ${s.medium}">${s.medium}</span></div>
+        <div class="s-why">${esc(s.why)} <b>Matches: ${esc(THEMES[s.top].chip)}.</b></div>
+      </div>
+      <button class="add-toggle ${on ? 'added' : ''}" data-src="${esc(s.name)}">${on ? '✓ Adding' : 'Add'}</button>
+    </div>`;
+  }).join('');
+}
+
+function updateSaveSummary() {
+  const t1 = Object.keys(THEMES).filter(k => effectiveTier(k) === '1').length;
+  const t2 = Object.keys(THEMES).filter(k => effectiveTier(k) === '2').length;
+  const dw = Object.keys(THEMES).filter(k => effectiveTier(k) === 'down').length;
+  const srcs = Object.entries(state.srcSelected).filter(([n, v]) => v && suggestedSources().some(s => s.name === n)).length;
+  $('save-summary').textContent =
+    `${t1} Tier-1 theme${t1 === 1 ? '' : 's'} · ${t2} Tier-2 · ${dw} muted · ${srcs} source${srcs === 1 ? '' : 's'} to add`;
+  $('save-btn').textContent = srcs ? `Save profile & add ${srcs} source${srcs === 1 ? '' : 's'}` : 'Save profile';
+}
+
+/* ================================================================
+   DONE
+   ================================================================ */
+function finishSave() {
+  const t1 = Object.keys(THEMES).filter(k => effectiveTier(k) === '1');
+  const t2 = Object.keys(THEMES).filter(k => effectiveTier(k) === '2');
+  const dwN = Object.keys(THEMES).filter(k => effectiveTier(k) === 'down').length;
+  const srcs = Object.entries(state.srcSelected).filter(([n, v]) => v && suggestedSources().some(s => s.name === n));
+  $('done-line').textContent = t1.length
+    ? `Your brief will lead with ${t1.map(k => THEMES[k].chip.toLowerCase()).slice(0,3).join(', ')}${t1.length > 3 ? ' and more' : ''}.`
+    : 'Profile saved — it will sharpen as you react to real briefs.';
+  $('done-stats').innerHTML =
+    `<div class="stat"><b>${t1.length}</b><span>Tier 1 themes</span></div>` +
+    `<div class="stat"><b>${t2.length}</b><span>Tier 2 themes</span></div>` +
+    `<div class="stat"><b>${dwN}</b><span>muted</span></div>` +
+    `<div class="stat"><b>${srcs.length}</b><span>sources added</span></div>`;
+  show('done');
+}
+
+/* ================================================================
+   WIRING
+   ================================================================ */
+$('start-btn').addEventListener('click', () => {
+  state = freshState();
+  const first = nextItem();
+  state.served.push(first.id);
+  renderItem(first);
+  renderProgress();
+  renderPanel(null);
+  show('rate');
+});
+
+document.querySelectorAll('.react-btn').forEach(b =>
+  b.addEventListener('click', () => react(b.dataset.react)));
+
+document.addEventListener('keydown', e => {
+  if (!$('rate').classList.contains('active')) return;
+  if (e.key === '1') react('must');
+  else if (e.key === '2') react('fine');
+  else if (e.key === '3') react('dont');
+  else if (e.key.toLowerCase() === 'z') undo();
+});
+
+$('undo-link').addEventListener('click', undo);
+$('finish-btn').addEventListener('click', () => { buildReview(); show('review'); });
+
+// review: tier segment + source toggles (delegated)
+document.addEventListener('click', e => {
+  const segBtn = e.target.closest('.seg button');
+  if (segBtn) {
+    state.overrides[segBtn.dataset.theme] = segBtn.dataset.tier;
+    buildReview();
+    return;
+  }
+  const srcBtn = e.target.closest('.add-toggle');
+  if (srcBtn) {
+    state.srcSelected[srcBtn.dataset.src] = !state.srcSelected[srcBtn.dataset.src];
+    buildSources();
+    updateSaveSummary();
+  }
+});
+
+$('copy-md').addEventListener('click', () => {
+  const ta = document.createElement('textarea');
+  ta.value = $('md-pre').textContent;
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); } catch (_) {}
+  document.body.removeChild(ta);
+  $('copy-ok').style.visibility = 'visible';
+  setTimeout(() => { $('copy-ok').style.visibility = 'hidden'; }, 1500);
+});
+
+$('save-btn').addEventListener('click', finishSave);
+$('restart-btn').addEventListener('click', () => { state = freshState(); show('intro'); });
+
+state = freshState();
+</script>
+</body>
+</html>
