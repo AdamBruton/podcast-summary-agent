@@ -7,7 +7,7 @@
 <style>
   :root {
     --fg: #111; --muted: #666; --line: #e5e5e5; --line-strong: #ccc;
-    --bg-soft: #f7f7f7; --accent: #1a73e8; --danger: #c0392b;
+    --bg-soft: #f7f7f7; --accent: #1a73e8; --danger: #c0392b; --ok: #1e7e34;
     --t1: #1a73e8; --t1-bg: #eef4fe; --t1-line: #c4daf8;
     --t2: #b45309; --t2-bg: #fdf6ec; --t2-line: #f0ddbe;
     --mute: #5f6672; --mute-bg: #f2f3f5; --mute-line: #d9dce1;
@@ -20,13 +20,18 @@
     color: var(--fg); line-height: 1.5; background: #fff;
   }
   h1 { font-size: 22px; margin: 0 0 4px; }
-  .lede { color: var(--muted); font-size: 13px; margin: 0; max-width: 60ch; }
+  .lede { color: var(--muted); font-size: 13px; margin: 0; max-width: 64ch; }
   button { font-family: inherit; cursor: pointer; }
+  .step {
+    display: inline-flex; width: 18px; height: 18px; border-radius: 50%;
+    background: var(--fg); color: #fff; font-size: 11px; font-weight: 700;
+    align-items: center; justify-content: center; margin-right: 7px; flex: none;
+  }
 
   /* ---------- header ---------- */
   .top {
     display: flex; gap: 32px; align-items: flex-end; justify-content: space-between;
-    flex-wrap: wrap; margin-bottom: 20px;
+    flex-wrap: wrap; margin-bottom: 18px;
   }
   .strength { min-width: 260px; flex: 0 1 300px; }
   .strength-label {
@@ -45,8 +50,65 @@
     transition: width .45s cubic-bezier(.22,1,.36,1);
   }
 
+  /* ---------- "your shows" panel (step 1) ---------- */
+  .shows { border: 1px solid var(--line); border-radius: 10px; background: #fff; margin-bottom: 18px; overflow: hidden; }
+  .shows > header {
+    padding: 12px 16px 10px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  }
+  .shows h2 { font-size: 13px; margin: 0; font-weight: 700; display: flex; align-items: center; }
+  .shows .shows-note { font-size: 11.5px; color: var(--muted); }
+  .shows-body { display: flex; gap: 22px; padding: 12px 16px 14px; flex-wrap: wrap; }
+  .shows-picker { flex: 1 1 400px; min-width: 300px; }
+  #show-search {
+    width: 100%; padding: 8px 11px; font-size: 13px; font-family: inherit;
+    border: 1px solid var(--line-strong); border-radius: 6px;
+  }
+  #show-search:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .scan-note { font-size: 12px; margin-top: 7px; }
+  .scan-note.busy { color: var(--muted); }
+  .scan-note.ok { color: var(--ok); }
+  .scan-note.err { color: var(--danger); }
+  .show-results { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; max-height: 120px; overflow-y: auto; }
+  .show-btn {
+    font-size: 12px; padding: 5px 11px 5px 9px; border: 1px solid var(--line-strong);
+    border-radius: 14px; background: #fff; display: inline-flex; gap: 6px; align-items: center;
+  }
+  .show-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--t1-bg); }
+  .show-btn .sb-dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+  .show-btn .sb-dot.podcast { background: #7c3aed; }
+  .show-btn .sb-dot.youtube { background: #dc2626; }
+  .show-btn .sb-eps { color: var(--muted); font-size: 10.5px; }
+  .show-btn:hover .sb-eps { color: var(--accent); }
+  .scan-btn {
+    font-size: 12px; font-weight: 600; padding: 6px 14px; border-radius: 6px;
+    border: 1px solid var(--accent); color: var(--accent); background: #fff;
+  }
+  .scan-btn:hover { background: var(--t1-bg); }
+  .no-shows-match { font-size: 12px; color: var(--muted); font-style: italic; padding: 4px 0; }
+  .shows-mine { flex: 1 1 320px; min-width: 260px; }
+  .shows-mine-h {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); margin-bottom: 4px;
+  }
+  .shows-empty { font-size: 12px; color: var(--muted); font-style: italic; padding: 6px 0; }
+  ul.chips { list-style: none; padding: 0; margin: 0; }
+  ul.chips li {
+    display: inline-flex; align-items: center; margin: 4px 6px 0 0;
+    padding: 4px 5px 4px 11px; background: var(--bg-soft); border-radius: 14px; font-size: 12px;
+  }
+  ul.chips li .chip-type { font-size: 9px; margin-right: 5px; }
+  ul.chips li .chip-type.podcast { color: #7c3aed; }
+  ul.chips li .chip-type.youtube { color: #dc2626; }
+  ul.chips li .chip-eps { color: var(--muted); font-size: 10.5px; margin-left: 5px; }
+  ul.chips li button {
+    margin-left: 5px; padding: 0 5px; background: none; border: none;
+    color: var(--muted); font-size: 14px; line-height: 1;
+  }
+  ul.chips li button:hover { color: var(--danger); }
+
   /* ---------- workspace grid ---------- */
-  .workspace { display: grid; grid-template-columns: 318px 1fr; gap: 24px; align-items: start; }
+  .workspace { display: grid; grid-template-columns: 330px 1fr; gap: 24px; align-items: start; }
 
   /* ---------- library ---------- */
   .library {
@@ -57,14 +119,16 @@
   }
   .library.drop-target { outline: 2px dashed var(--line-strong); outline-offset: -6px; }
   .lib-head {
-    display: flex; align-items: baseline; justify-content: space-between;
-    padding: 14px 14px 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 14px 0; gap: 8px;
   }
   .lib-head h2 {
     font-size: 12px; margin: 0; text-transform: uppercase; letter-spacing: .07em;
-    color: var(--muted); font-weight: 700;
+    color: var(--muted); font-weight: 700; display: flex; align-items: center;
   }
-  .lib-count { font-size: 11px; color: var(--muted); }
+  .lib-head h2 .step { background: var(--muted); }
+  .lib-count { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .lib-sub { font-size: 11px; color: var(--muted); padding: 4px 14px 0; }
   .lib-tools { padding: 10px 14px 12px; border-bottom: 1px solid var(--line); }
   #lib-search {
     width: 100%; padding: 7px 10px; font-size: 13px; font-family: inherit;
@@ -83,6 +147,11 @@
   }
   .custom-row button:hover { background: var(--bg-soft); }
   #domains { overflow-y: auto; padding: 4px 8px 14px; flex: 1; }
+
+  .lib-onboard { padding: 26px 16px; text-align: center; }
+  .lib-onboard .lo-icon { font-size: 22px; }
+  .lib-onboard .lo-title { font-size: 13px; font-weight: 700; margin-top: 6px; }
+  .lib-onboard p { font-size: 12px; color: var(--muted); margin: 6px 0 0; line-height: 1.55; }
 
   .dom { margin-top: 4px; }
   .dom-head {
@@ -120,8 +189,25 @@
     font-size: 11px; color: #444; font-style: italic; margin-top: 6px;
     padding: 1px 0 1px 8px; border-left: 2px solid var(--line-strong); line-height: 1.4;
   }
-  .tc-ex::before { content: "would surface: "; font-style: normal; color: #999; font-size: 10px;
-                   text-transform: uppercase; letter-spacing: .04em; }
+  .tc-ex .tc-ex-label {
+    display: block; font-style: normal; color: #999; font-size: 10px;
+    text-transform: uppercase; letter-spacing: .04em;
+  }
+  details.tc-eps { margin-top: 6px; }
+  details.tc-eps summary {
+    list-style: none; cursor: pointer; font-size: 11px; color: var(--accent);
+    font-weight: 600; user-select: none;
+  }
+  details.tc-eps summary::-webkit-details-marker { display: none; }
+  details.tc-eps summary::before { content: "\25B8 "; }
+  details.tc-eps[open] summary::before { content: "\25BE "; }
+  details.tc-eps summary .prov-shows { color: var(--muted); font-weight: 400; }
+  details.tc-eps ul { margin: 5px 0 0; padding: 0; list-style: none; }
+  details.tc-eps li {
+    font-size: 11px; color: #555; padding: 2px 0 2px 8px; margin-top: 3px;
+    border-left: 2px solid var(--line); line-height: 1.4;
+  }
+  details.tc-eps li .ep-show { color: var(--muted); }
   .tc-actions {
     display: none; gap: 6px; margin-top: 9px; padding-top: 8px;
     border-top: 1px solid var(--line);
@@ -140,7 +226,18 @@
   .tc-actions .to-mute:hover    { background: var(--mute-bg); }
   .lib-empty { padding: 18px 10px; font-size: 12px; color: var(--muted); font-style: italic; text-align: center; }
 
+  /* beyond your shows */
+  .beyond { margin-top: 16px; border-top: 1px dashed var(--line-strong); padding-top: 8px; }
+  .beyond-head {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); padding: 0 6px;
+  }
+  .beyond-note { font-size: 10.5px; color: #999; padding: 1px 6px 2px; line-height: 1.45; }
+  .topic-card.beyond { background: var(--bg-soft); }
+  .topic-card.beyond .tc-note { font-size: 10px; color: #999; font-style: italic; margin-top: 4px; }
+
   /* ---------- board lanes ---------- */
+  .lanes-head { display: flex; align-items: center; font-size: 13px; font-weight: 700; margin: 0 0 8px; }
   .lanes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
   .lane { border-radius: 10px; border: 1px solid var(--line); overflow: hidden; background: #fff; }
   .lane header { padding: 11px 13px 9px; border-bottom: 1px solid var(--line); }
@@ -166,7 +263,7 @@
   .lane-hint b { color: #777; font-weight: 600; }
 
   .lane-card {
-    display: flex; align-items: center; gap: 6px; cursor: grab;
+    display: flex; align-items: center; gap: 6px; cursor: grab; flex-wrap: wrap;
     border: 1px solid; border-radius: 7px; padding: 7px 9px; margin-bottom: 7px;
     font-size: 12.5px; background: #fff; position: relative;
   }
@@ -176,6 +273,11 @@
   .lane[data-lane="context"] .lane-card { border-color: var(--t2-line); background: var(--t2-bg); }
   .lane[data-lane="mute"]    .lane-card { border-color: var(--mute-line); background: var(--mute-bg); color: var(--mute); }
   .lc-name { flex: 1; min-width: 0; font-weight: 600; line-height: 1.3; }
+  .lc-flag {
+    flex: none; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--t2); background: #fff; border: 1px solid var(--t2-line);
+    border-radius: 3px; padding: 0 4px; cursor: help;
+  }
   .lc-controls { display: flex; gap: 3px; opacity: 0; transition: opacity .12s; flex: none; }
   .lane-card:hover .lc-controls, .lane-card:focus-within .lc-controls { opacity: 1; }
   .lc-controls button {
@@ -210,6 +312,7 @@
   .brief-item.ctx .brief-ord { background: #fff; color: var(--t2); border: 1.5px solid var(--t2-line); }
   .brief-head { font-size: 13px; font-weight: 600; line-height: 1.35; }
   .brief-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .brief-meta .b-show { color: #444; font-weight: 600; }
   .brief-meta .ts { color: var(--accent); font-weight: 600; cursor: pointer; }
   .brief-meta .ctx-badge {
     font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
@@ -231,7 +334,7 @@
   .ghost-l2 { height: 7px; border-radius: 4px; background: var(--bg-soft); width: 45%; margin-top: 6px; }
   .brief-empty-note { font-size: 12px; color: var(--muted); font-style: italic; margin: 6px 0 0; }
 
-  /* sources */
+  /* adjacent shows */
   .src-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
   .src-row:last-of-type { border-bottom: none; }
   .src-type {
@@ -255,24 +358,6 @@
   }
   .src-btns .src-no:hover { color: var(--danger); background: #fbe9e6; }
   .src-empty { font-size: 12px; color: var(--muted); font-style: italic; padding: 4px 0; }
-  .my-sources { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
-  .my-sources-h {
-    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
-    color: var(--muted); margin-bottom: 4px;
-  }
-  ul.chips { list-style: none; padding: 0; margin: 0; }
-  ul.chips li {
-    display: inline-flex; align-items: center; margin: 4px 6px 0 0;
-    padding: 4px 5px 4px 11px; background: var(--bg-soft); border-radius: 14px; font-size: 12px;
-  }
-  ul.chips li .chip-type { font-size: 9px; margin-right: 5px; }
-  ul.chips li .chip-type.podcast { color: #7c3aed; }
-  ul.chips li .chip-type.youtube { color: #dc2626; }
-  ul.chips li button {
-    margin-left: 5px; padding: 0 5px; background: none; border: none;
-    color: var(--muted); font-size: 14px; line-height: 1;
-  }
-  ul.chips li button:hover { color: var(--danger); }
 
   /* markdown */
   details.md-details { margin-top: 14px; }
@@ -302,7 +387,7 @@
   /* ---------- responsive ---------- */
   @media (max-width: 980px) {
     .workspace { grid-template-columns: 1fr; }
-    .library { position: static; max-height: 420px; }
+    .library { position: static; max-height: 460px; }
     .lanes { grid-template-columns: 1fr; }
     .lane-body { min-height: 84px; }
     .panels { grid-template-columns: 1fr; }
@@ -316,8 +401,8 @@
   <div>
     <h1>Build your interest profile</h1>
     <p class="lede">
-      Pick topics from the library and sort them into lanes. The profile biases how your
-      daily brief is ranked &mdash; no markdown required.
+      Add the shows you actually listen to. We read their recent episodes, surface the topics
+      they cover, and you sort those into lanes &mdash; that biases how your daily brief is ranked.
     </p>
   </div>
   <div class="strength" aria-label="Profile strength">
@@ -329,15 +414,36 @@
   </div>
 </header>
 
+<!-- step 1: your shows -->
+<section class="shows" id="shows-panel">
+  <header>
+    <h2><span class="step">1</span> Your shows</h2>
+    <span class="shows-note">The topic library below is built from what these shows covered in their recent episodes &mdash; nothing generic.</span>
+  </header>
+  <div class="shows-body">
+    <div class="shows-picker">
+      <input id="show-search" type="text" autocomplete="off"
+             placeholder="Search shows &mdash; All-In, Acquired, Odd Lots&hellip; or paste an RSS / YouTube URL">
+      <div class="scan-note" id="show-scan" hidden></div>
+      <div class="show-results" id="show-results"></div>
+    </div>
+    <div class="shows-mine">
+      <div class="shows-mine-h">Selected shows (<span id="show-count">0</span>)</div>
+      <div id="show-chips"></div>
+    </div>
+  </div>
+</section>
+
 <div class="workspace">
 
   <aside class="library" id="library">
     <div class="lib-head">
-      <h2>Topic library</h2>
+      <h2><span class="step">2</span> Topic library</h2>
       <span class="lib-count" id="lib-count"></span>
     </div>
+    <div class="lib-sub" id="lib-sub">Derived from your shows&rsquo; recent episodes.</div>
     <div class="lib-tools">
-      <input id="lib-search" type="search" placeholder="Search topics &mdash; tokens, GLP-1, ransomware&hellip;" autocomplete="off">
+      <input id="lib-search" type="search" placeholder="Search topics from your shows&hellip;" autocomplete="off">
       <form class="custom-row" id="custom-form">
         <input id="custom-input" type="text" placeholder="Add your own topic&hellip;" autocomplete="off">
         <button type="submit">Add</button>
@@ -347,6 +453,7 @@
   </aside>
 
   <main class="board">
+    <div class="lanes-head"><span class="step">3</span> Sort topics into lanes</div>
     <div class="lanes">
       <section class="lane" data-lane="always">
         <header>
@@ -384,14 +491,14 @@
       <section class="panel">
         <header>
           <h2>Tomorrow&rsquo;s brief &mdash; preview</h2>
-          <span class="panel-note">sample items, updates live</span>
+          <span class="panel-note">drawn from your shows, updates live</span>
         </header>
         <div class="panel-body" id="preview-body"></div>
       </section>
       <section class="panel">
         <header>
-          <h2>Starter sources</h2>
-          <span class="panel-note">picked from your top lane</span>
+          <h2>Shows adjacent to yours</h2>
+          <span class="panel-note">cover the same topics you lifted</span>
         </header>
         <div class="panel-body" id="sources-body"></div>
       </section>
@@ -410,152 +517,245 @@
   </main>
 </div>
 
-<p class="footer">Prototype B &mdash; topic library + tier board &middot; all data mocked, nothing is saved</p>
+<p class="footer">Prototype B &mdash; shows-seeded topic library + tier board &middot; all data mocked, nothing is saved</p>
 
 <script>
 'use strict';
 
 /* ============================== data ============================== */
+/* Mock directory: each show carries 6-8 believable recent episodes,
+   each tagged with topic ids. This corpus is the ONLY seed for the library. */
 
-const SOURCES = {
-  bg:          { name: 'BG2 Pod',                   type: 'podcast' },
-  allin:       { name: 'All-In Podcast',            type: 'youtube' },
-  sharptech:   { name: 'Sharp Tech',                type: 'podcast' },
-  dwarkesh:    { name: 'Dwarkesh Podcast',          type: 'youtube' },
-  acq:         { name: 'Acquired',                  type: 'podcast' },
-  v20:         { name: 'The Twenty Minute VC',      type: 'podcast' },
-  asianometry: { name: 'Asianometry',               type: 'youtube' },
-  riskybiz:    { name: 'Risky Business',            type: 'podcast' },
-  darknet:     { name: 'Darknet Diaries',           type: 'podcast' },
-  secnow:      { name: 'Security Now',              type: 'podcast' },
-  odd:         { name: 'Odd Lots',                  type: 'podcast' },
-  compound:    { name: 'The Compound and Friends',  type: 'podcast' },
-  lex:         { name: 'Lex Fridman Podcast',       type: 'youtube' },
-  latent:      { name: 'Latent Space',              type: 'podcast' },
-  nopriors:    { name: 'No Priors',                 type: 'podcast' },
-  a16z:        { name: 'a16z Podcast',              type: 'podcast' },
-  equity:      { name: 'Equity',                    type: 'podcast' },
-  fintakes:    { name: 'Fintech Takes',             type: 'podcast' },
-  catalyst:    { name: 'Catalyst with Shayle Kann', type: 'podcast' },
-  volts:       { name: 'Volts',                     type: 'podcast' },
-  huberman:    { name: 'Huberman Lab',              type: 'youtube' },
-  attia:       { name: 'The Drive (Peter Attia)',   type: 'podcast' },
-  longrun:     { name: 'The Long Run',              type: 'podcast' },
-  wotr:        { name: 'War on the Rocks',          type: 'podcast' },
-  chinatalk:   { name: 'ChinaTalk',                 type: 'podcast' },
-  hardfork:    { name: 'Hard Fork',                 type: 'podcast' },
-  vergecast:   { name: 'The Vergecast',             type: 'podcast' },
-  pivot:       { name: 'Pivot',                     type: 'podcast' },
-  unchained:   { name: 'Unchained',                 type: 'podcast' },
-  bankless:    { name: 'Bankless',                  type: 'youtube' },
-  empire:      { name: 'Empire',                    type: 'podcast' },
-  meco:        { name: 'Main Engine Cut Off',       type: 'podcast' },
+const SHOWS = {
+  allin: { name: "All-In Podcast", short: "All-In", type: "youtube", m: ["allin","all-in"], eps: [
+    { t: "E231: NVIDIA's blowout quarter, the $80B capex arms race, and bubble math", k: ["ai-gpu","mk-earn"] },
+    { t: "E232: Tariff schedule drops — chips spared, server assemblies hit", k: ["ge-uschina","mk-comm"] },
+    { t: "E233: OpenAI restructures, Anthropic's enterprise run-rate, foundation-model endgame", k: ["ai-labs"] },
+    { t: "E234: The IPO window reopens + venture's DPI reckoning", k: ["sa-ipo","sa-vc"] },
+    { t: "E235: Anduril's $22B program of record and the new defense primes", k: ["ge-def"] },
+    { t: "E236: Fed signals two cuts; the long end isn't buying it", k: ["mk-rates","mk-fx"] },
+    { t: "E237: Waymo's 250k weekly rides — robotaxi unit economics get real", k: ["fr-av"] },
+    { t: "E238: The datacenter power crunch: nuclear PPAs, gas turbines, grid fights", k: ["ai-power","cl-nuke"] },
+  ]},
+  bg2: { name: "BG2 Pod", short: "BG2", type: "podcast", m: ["bg2"], eps: [
+    { t: "Hyperscaler capex: $300B and the depreciation question", k: ["ai-gpu","mk-earn"] },
+    { t: "Token economics — is inference pricing a race to zero?", k: ["ai-open","ai-labs"] },
+    { t: "Software in the agent era: seat compression is showing up in NRR", k: ["sa-saas","ai-agents"] },
+    { t: "Sovereign AI and the Gulf compute buildout", k: ["ai-gpu","ge-uschina"] },
+    { t: "The CUDA moat, priced: TPU and Trainium economics", k: ["ai-silicon"] },
+    { t: "Open weights and the margin question for model hosts", k: ["ai-open"] },
+    { t: "Megacap concentration and the AI trade", k: ["mk-earn","mk-rates"] },
+  ]},
+  acq: { name: "Acquired", short: "Acquired", type: "podcast", m: ["acquired"], eps: [
+    { t: "TSMC (Remastered): the most important company in the world", k: ["ge-taiwan","ai-silicon"] },
+    { t: "Visa: the original payments network", k: ["fi-rails"] },
+    { t: "Microsoft Volume III: Copilot and the AI pivot", k: ["ai-labs","sa-saas"] },
+    { t: "Stripe: rebuilding the internet's payment rails", k: ["fi-rails","fi-neo"] },
+    { t: "Lockheed Martin: how primes get built", k: ["ge-def"] },
+    { t: "NVIDIA Part IV: the datacenter decade", k: ["ai-gpu","ai-silicon"] },
+    { t: "Standard Oil Part I: the original commodity empire", k: ["mk-comm"] },
+  ]},
+  dwarkesh: { name: "Dwarkesh Podcast", short: "Dwarkesh", type: "youtube", m: ["dwarkesh"], eps: [
+    { t: "Lab CEO on scaling through 2027: compute, data, and the wall that isn't", k: ["ai-labs","ai-research"] },
+    { t: "Why AGI timelines moved: a debate", k: ["ai-research"] },
+    { t: "Inside China's open-weight surge", k: ["ge-uschina","ai-open"] },
+    { t: "The economics of superintelligence, with a skeptic", k: ["ai-research","ai-labs"] },
+    { t: "Robotics scaling laws: why manipulation is still hard", k: ["fr-robot","ai-research"] },
+    { t: "A history of export controls, from COCOM to HBM", k: ["ge-chips"] },
+    { t: "Gwern on the scaling hypothesis, anonymity, and writing", k: ["ai-research"] },
+  ]},
+  nopriors: { name: "No Priors", short: "No Priors", type: "podcast", m: ["nopriors","no-priors"], eps: [
+    { t: "The real cost of inference, with a GPU-cloud CEO", k: ["ai-gpu","ai-open"] },
+    { t: "Coding agents at scale: what 40% of merged code means", k: ["ai-agents"] },
+    { t: "AI drug discovery's first real readouts", k: ["bi-aidrug"] },
+    { t: "Robot foundation models and the data bottleneck", k: ["fr-robot"] },
+    { t: "Voice AI: the next consumer platform?", k: ["ai-consumer"] },
+    { t: "What's actually deployed: an enterprise AI adoption check", k: ["sa-saas","ai-agents"] },
+    { t: "Frontier lab roadmaps, decoded", k: ["ai-labs"] },
+  ]},
+  lex: { name: "Lex Fridman Podcast", short: "Lex Fridman", type: "youtube", m: ["lexfridman","lex-fridman"], eps: [
+    { t: "Neuroscientist on consciousness, psychedelics, and depression trials", k: ["bi-neuro"] },
+    { t: "SpaceX propulsion engineer: Starship's path to orbit-class reuse", k: ["fr-space"] },
+    { t: "AI researcher on AGI timelines and what scaling can't buy", k: ["ai-research"] },
+    { t: "Historian on US-China and the Thucydides trap", k: ["ge-uschina"] },
+    { t: "Neuralink update: second patient, CAD by thought", k: ["fr-bci","bi-neuro"] },
+    { t: "Quantum computing: error correction crosses the threshold", k: ["fr-quant"] },
+    { t: "Former NSA hacker on nation-state tradecraft", k: ["se-state"] },
+  ]},
+  a16z: { name: "a16z Podcast", short: "a16z", type: "podcast", m: ["a16z"], eps: [
+    { t: "The state of AI agents: frameworks, evals, and what's working", k: ["ai-agents"] },
+    { t: "American Dynamism: rebuilding the arsenal", k: ["ge-def"] },
+    { t: "Stablecoins go mainstream: payments' new rail", k: ["cr-stable","fi-rails"] },
+    { t: "Bio x AI: where models meet molecules", k: ["bi-aidrug"] },
+    { t: "Vertical software in the AI era", k: ["sa-saas"] },
+    { t: "Who wins consumer AI?", k: ["ai-consumer"] },
+    { t: "Regulating frontier models without killing open source", k: ["ge-aireg","ai-open"] },
+  ]},
+  sharptech: { name: "Sharp Tech with Ben Thompson", short: "Sharp Tech", type: "podcast", m: ["sharptech","sharp-tech"], eps: [
+    { t: "Apple's AI problem isn't the model, it's the business model", k: ["ai-consumer","mk-earn"] },
+    { t: "Google's antitrust remedies and the browser question", k: ["ge-aireg","me-social"] },
+    { t: "Waymo expands; Tesla responds — the robotaxi race", k: ["fr-av"] },
+    { t: "Streaming bundles, sports rights, and the cable-ization of everything", k: ["me-stream"] },
+    { t: "Meta's open-source gambit, revisited", k: ["ai-open","me-social"] },
+    { t: "Microsoft and OpenAI: the most expensive divorce in tech?", k: ["ai-labs","sa-saas"] },
+    { t: "The smartphone is the AI battleground", k: ["ai-consumer"] },
+  ]},
+  strat: { name: "Stratechery", short: "Stratechery", type: "podcast", m: ["stratechery"], eps: [
+    { t: "Aggregation theory in the AI era", k: ["ai-consumer","me-social"] },
+    { t: "NVIDIA's real moat is the ecosystem", k: ["ai-silicon","ai-gpu"] },
+    { t: "TSMC, Taiwan, and the geopolitics of the leading edge", k: ["ge-taiwan","ge-chips"] },
+    { t: "The end of per-seat software", k: ["sa-saas","sa-gtm"] },
+    { t: "YouTube: the quiet giant of streaming", k: ["me-creator","me-stream"] },
+    { t: "An interview with AMD's CEO on the inference market", k: ["ai-silicon"] },
+    { t: "Meta earnings and the open-source bet", k: ["mk-earn","ai-open"] },
+  ]},
+  odd: { name: "Odd Lots", short: "Odd Lots", type: "podcast", m: ["oddlots","odd-lots"], eps: [
+    { t: "Why the long end of the curve won't behave", k: ["mk-rates","mk-fx"] },
+    { t: "The copper squeeze behind the datacenter boom", k: ["mk-comm","ai-power"] },
+    { t: "How stablecoins became systemically important", k: ["cr-stable"] },
+    { t: "The uranium trade is back", k: ["mk-comm","cl-nuke"] },
+    { t: "Lessons from the office CMBS mess", k: ["mk-rates"] },
+    { t: "Tariffs, shipping rates, and rerouted supply chains", k: ["mk-comm","ge-uschina"] },
+    { t: "The interconnection queue, explained", k: ["cl-solar","ai-power"] },
+    { t: "Japan, the yen, and the great carry-trade unwind", k: ["mk-fx"] },
+  ]},
+  iltb: { name: "Invest Like the Best", short: "ILTB", type: "podcast", m: ["investlikethebest","invest-like","colossus"], eps: [
+    { t: "Building the picks and shovels of AI infrastructure", k: ["ai-gpu","sa-vc"] },
+    { t: "The capital cycle comes for semiconductors", k: ["ai-silicon","mk-earn"] },
+    { t: "Permanent capital and the future of private markets", k: ["sa-vc"] },
+    { t: "A multi-strategy CIO on positioning for the rate regime", k: ["mk-rates"] },
+    { t: "The business of sports: rights, franchises, and scarcity", k: ["me-stream"] },
+    { t: "Energy transition investing after the hype cycle", k: ["cl-solar","mk-comm"] },
+    { t: "Crypto market structure for institutions", k: ["cr-btc","cr-reg"] },
+  ]},
+  v20: { name: "The Twenty Minute VC", short: "20VC", type: "podcast", m: ["20vc","twentyminutevc"], eps: [
+    { t: "Why seed pricing is broken — and who breaks first", k: ["sa-vc"] },
+    { t: "Harvey's CEO on passing $100M ARR in legal AI", k: ["sa-saas","ai-agents"] },
+    { t: "The DPI crisis: LPs are done waiting", k: ["sa-vc"] },
+    { t: "Ten consumer AI bets for the next decade", k: ["ai-consumer"] },
+    { t: "Neobank margins and the fintech comeback", k: ["fi-neo"] },
+    { t: "Defense tech roundtable: the new primes", k: ["ge-def","sa-vc"] },
+    { t: "From S-1 to pop: an IPO postmortem with the CFO", k: ["sa-ipo"] },
+  ]},
+  riskybiz: { name: "Risky Business", short: "Risky Biz", type: "podcast", m: ["risky"], eps: [
+    { t: "Another MSP ransomware spree hits managed healthcare", k: ["se-ransom","se-breach"] },
+    { t: "Salt Typhoon fallout: telcos are still finding implants", k: ["se-state","se-breach"] },
+    { t: "Agentic SOC products: triage claims vs reality", k: ["se-ai","se-vend"] },
+    { t: "Model-found zero-days land in the wild", k: ["se-ai"] },
+    { t: "Identity is the new perimeter — Entra bundling bites", k: ["se-vend"] },
+    { t: "Cyber insurance hardens: average payouts down 35%", k: ["se-ransom"] },
+    { t: "This week's breaches: the telco edition", k: ["se-breach"] },
+  ]},
+  darknet: { name: "Darknet Diaries", short: "Darknet Diaries", type: "podcast", m: ["darknet"], eps: [
+    { t: "The Lazarus heist, revisited", k: ["se-state","cr-btc"] },
+    { t: "Confessions of a ransomware negotiator", k: ["se-ransom"] },
+    { t: "Inside a SIM-swap crew", k: ["se-breach"] },
+    { t: "The pentester who walked into the vault", k: ["se-breach"] },
+    { t: "Stuxnet: the first cyberweapon, fifteen years on", k: ["se-state"] },
+    { t: "Carding forums and the fraud supply chain", k: ["se-breach","fi-rails"] },
+  ]},
+  latent: { name: "Latent Space", short: "Latent Space", type: "podcast", m: ["latent"], eps: [
+    { t: "The coding-agent shakeout: who survives the platform shift", k: ["ai-agents"] },
+    { t: "Inference optimization, from speculative decoding to paged attention", k: ["ai-gpu","ai-open"] },
+    { t: "Evals are all you need", k: ["ai-research","ai-agents"] },
+    { t: "Open-model SOTA recap: the gap narrows again", k: ["ai-open"] },
+    { t: "The voice stack, end to end", k: ["ai-consumer"] },
+    { t: "Neoclouds and the GPU rental market", k: ["ai-gpu"] },
+    { t: "Agent memory: the unsolved problem", k: ["ai-agents","ai-research"] },
+  ]},
+  huberman: { name: "Huberman Lab", short: "Huberman", type: "youtube", m: ["huberman"], eps: [
+    { t: "Sleep toolkit: light, temperature, and timing", k: ["bi-sleep"] },
+    { t: "GLP-1s: mechanisms, myths, and muscle loss", k: ["bi-glp"] },
+    { t: "Dopamine and motivation: a protocol review", k: ["bi-neuro"] },
+    { t: "Exercise for longevity: zone 2, VO2 max, and strength", k: ["bi-long"] },
+    { t: "Circadian biology: morning light and shift work", k: ["bi-sleep","bi-neuro"] },
+    { t: "Supplements: separating evidence from marketing", k: ["bi-long"] },
+    { t: "Journaling, therapy, and mental-health protocols", k: ["bi-neuro"] },
+  ]},
+  volts: { name: "Volts", short: "Volts", type: "podcast", m: ["volts"], eps: [
+    { t: "The interconnection queue is the climate bottleneck", k: ["cl-solar","cl-policy"] },
+    { t: "SMRs: separating signal from hype", k: ["cl-nuke"] },
+    { t: "Heat pumps and the electrify-everything agenda", k: ["cl-policy"] },
+    { t: "Transmission politics: why we can't build wires", k: ["cl-policy","cl-solar"] },
+    { t: "The EV charging buildout, audited", k: ["cl-ev"] },
+    { t: "Datacenter load growth meets a creaking grid", k: ["ai-power","cl-solar"] },
+    { t: "Geothermal's moment: enhanced systems hit $70/MWh", k: ["cl-nuke","cl-solar"] },
+  ]},
+  attia: { name: "The Drive (Peter Attia)", short: "The Drive", type: "podcast", m: ["attia","peterattia"], eps: [
+    { t: "GLP-1s and muscle: protecting lean mass on the way down", k: ["bi-glp"] },
+    { t: "Rapamycin in healthy adults: the first RCT readout", k: ["bi-long"] },
+    { t: "VO2 max, training zones, and all-cause mortality", k: ["bi-long"] },
+    { t: "Liquid biopsy and the case for earlier cancer screening", k: ["bi-long"] },
+    { t: "Sleep apnea: the most underdiagnosed risk factor", k: ["bi-sleep"] },
+    { t: "ApoB, Lp(a), and cardiovascular risk done right", k: ["bi-long"] },
+    { t: "Metabolic psychiatry: ketones and mood", k: ["bi-neuro","bi-glp"] },
+  ]},
 };
 
-/* Each topic: id, n(ame), b(lurb), h(eadline it would surface), s(uggested source keys) */
-const DOMAINS = [
-  { id: 'ai', name: 'AI & compute economics', topics: [
-    { id: 'ai-tokens',  n: 'Token pricing & inference costs', b: 'Cost-per-token trajectories, $/Mtok tiers, batch and cache discounts.', h: 'OpenAI cuts o-series output pricing 60% as inference costs keep falling', s: ['latent','nopriors','bg'] },
-    { id: 'ai-gpu',     n: 'GPU supply & hyperscaler capex', b: 'NVIDIA allocation, lead times, capex guidance from the big clouds.', h: 'Microsoft guides to $80B AI capex; GB300 lead times stretch to 40 weeks', s: ['bg','allin','asianometry'] },
-    { id: 'ai-labs',    n: 'Foundation model labs', b: 'Lab revenue and ARR mix, training costs, talent moves, compute deals.', h: 'Anthropic enterprise ARR triples; API now half of the revenue mix', s: ['dwarkesh','nopriors','hardfork'] },
-    { id: 'ai-agents',  n: 'AI agents & dev tools', b: 'Coding agents and dev-tool adoption, seat economics, retention.', h: 'Cursor passes $500M ARR as agents write 40% of merged code', s: ['latent','lex','v20'] },
-    { id: 'ai-power',   n: 'Datacenters, power & grid', b: 'Siting, interconnect queues, nuclear PPAs, cost per megawatt.', h: 'xAI signs 1.2GW nuclear PPA to anchor its next cluster buildout', s: ['catalyst','volts','bg'] },
-    { id: 'ai-silicon', n: 'Custom silicon vs NVIDIA', b: 'TPU / Trainium / ASIC economics and what the CUDA moat costs to leave.', h: 'Google claims TPU v6 cuts training cost 2.5x versus an H100 fleet', s: ['asianometry','dwarkesh'] },
-    { id: 'ai-open',    n: 'Open vs closed model economics', b: 'Open-weight commoditization, hosting price wars, margin pressure.', h: 'Llama hosting price war squeezes inference margins to single digits', s: ['latent','a16z'] },
-    { id: 'ai-consumer',n: 'AI consumer apps & usage', b: 'Weekly actives, engagement depth, consumer subscription revenue.', h: 'ChatGPT hits 400M weekly users; consumer subs cross a $4B run-rate', s: ['hardfork','pivot'] },
-  ]},
-  { id: 'saas', name: 'Enterprise software & SaaS', topics: [
-    { id: 'sa-earn',   n: 'SaaS earnings & metrics', b: 'ARR, NRR, rule-of-40, RPO and backlog from public software cos.', h: 'Datadog NRR dips below 115% as cloud cost optimization bites', s: ['bg','equity'] },
-    { id: 'sa-disp',   n: 'AI-native displacement', b: 'AI-first products eating incumbent installed bases; named lost deals.', h: 'Glean cited in three lost-deal disclosures on enterprise search renewals', s: ['bg','v20'] },
-    { id: 'sa-seats',  n: 'Seat compression & pricing models', b: 'Per-outcome vs per-seat pricing as agents shrink seat counts.', h: 'ServiceNow pilots per-resolution pricing as AI agents cut seat counts', s: ['bg','acq'] },
-    { id: 'sa-vert',   n: 'Vertical SaaS land-grab', b: 'AI-first entrants in legal, medical, construction; ARR and customer counts.', h: 'Harvey hits $100M ARR as AmLaw 50 adoption accelerates', s: ['v20','equity'] },
-    { id: 'sa-ma',     n: 'Software M&A & take-privates', b: 'Announced and rumored deals, multiples, strategic rationale.', h: 'Thoma Bravo takes another security vendor private at 8x ARR', s: ['acq','equity'] },
-    { id: 'sa-plg',    n: 'PLG & go-to-market shifts', b: 'Self-serve revenue mix, usage-based transitions, time-to-paid.', h: 'Figma says self-serve is now 60% of new ARR post-IPO', s: ['v20','a16z'] },
-    { id: 'sa-cloud',  n: 'Cloud platform wars', b: 'AWS vs Azure vs GCP share shifts and AI revenue disclosure.', h: 'Azure AI services add 13 points to growth; AWS re-accelerates', s: ['bg','sharptech'] },
-    { id: 'sa-ipo',    n: 'Tech IPOs & late-stage privates', b: 'S-1 financials, accumulated deficits, secondaries, valuation resets.', h: 'Databricks S-1 shows 60% growth on a $6B accumulated deficit', s: ['equity','allin'] },
-  ]},
-  { id: 'sec', name: 'Cybersecurity', topics: [
-    { id: 'se-breach', n: 'Breaches & incident disclosures', b: 'Named breach costs, customer counts, dwell-time and pattern shifts.', h: 'UnitedHealth puts total breach cost at $2.9B in an updated filing', s: ['riskybiz','darknet'] },
-    { id: 'se-off',    n: 'AI on offense', b: 'Model-found vulnerabilities, autonomous pentesting, AI-scaled phishing.', h: 'Autonomous agent found 12 zero-days across an open-source stack, lab says', s: ['riskybiz','secnow'] },
-    { id: 'se-def',    n: 'AI on defense & SOC automation', b: 'Alert-triage reduction claims, MDR/XDR pricing, analyst productivity.', h: 'CrowdStrike claims a 70% alert-triage reduction from its agentic SOC', s: ['riskybiz','bg'] },
-    { id: 'se-ma',     n: 'Vendor consolidation & security M&A', b: 'Platform plays, SASE/CNAPP convergence, CIO budget consolidation.', h: 'Palo Alto platformization lands 90 eight-figure consolidation deals', s: ['bg','riskybiz'] },
-    { id: 'se-id',     n: 'Identity & zero trust', b: 'Workforce identity dynamics, bundling pressure, zero-trust adoption.', h: 'Okta workforce bookings slow as Microsoft Entra bundling bites', s: ['riskybiz','secnow'] },
-    { id: 'se-ransom', n: 'Ransomware economics', b: 'Payout trends, cyber-insurance terms, exclusions and premiums.', h: 'Average ransomware payout falls 35% as insurers harden terms', s: ['darknet','riskybiz'] },
-    { id: 'se-supply', n: 'Supply-chain & critical infrastructure', b: 'Software supply-chain compromises, OT and utility intrusions.', h: 'Water-utility OT compromise traced to unpatched VPN appliances', s: ['darknet','secnow'] },
-    { id: 'se-budget', n: 'CISO budget signals', b: 'Security spend as % of IT, line-item shifts, year-on-year growth.', h: 'Security budgets up 12% YoY; spend rotates from prevention to detection', s: ['riskybiz'] },
-  ]},
-  { id: 'fin', name: 'Fintech & payments', topics: [
-    { id: 'fi-rails',  n: 'Payment networks & interchange', b: 'Visa/Mastercard economics, routing rules, regulatory pressure.', h: 'DOJ suit targets debit routing; network take rates under scrutiny', s: ['fintakes','odd'] },
-    { id: 'fi-neo',    n: 'Neobanks & consumer fintech', b: 'Unit economics, ARPU, cross-sell, deposit growth.', h: 'Nubank crosses 100M customers with ARPU up 23% on cross-sell', s: ['fintakes','v20'] },
-    { id: 'fi-stable', n: 'Stablecoins & onchain payments', b: 'Settlement volume, issuer economics, merchant adoption.', h: 'Stablecoin settlement passes Visa quarterly volume for the first time', s: ['unchained','bankless'] },
-    { id: 'fi-credit', n: 'BNPL & consumer credit', b: 'Loss rates, funding costs, subprime mix shifts.', h: 'Affirm 30-day delinquencies tick down despite a subprime mix shift', s: ['fintakes','odd'] },
-    { id: 'fi-baas',   n: 'Banking-as-a-service & infrastructure', b: 'Sponsor-bank crackdowns, embedded finance economics.', h: 'Synapse fallout pushes BaaS deposits back to the top-20 banks', s: ['fintakes'] },
-    { id: 'fi-wealth', n: 'Wealth & trading platforms', b: 'Asset gathering, PFOF, subscription attach on brokerages.', h: 'Robinhood Gold hits 3M subscribers as asset inflows accelerate', s: ['compound','equity'] },
-    { id: 'fi-insur',  n: 'Insurtech & embedded insurance', b: 'Loss ratios, cyber premiums, parametric products.', h: 'Cyber insurance premiums fall 10% as underwriting competition returns', s: ['fintakes'] },
-  ]},
-  { id: 'mkt', name: 'Markets & macro', topics: [
-    { id: 'mk-rates',  n: 'Rates & central banks', b: 'Fed path, term premium, QT mechanics, global policy divergence.', h: 'Fed signals two cuts; the long end sells off on deficit worries', s: ['odd','compound'] },
-    { id: 'mk-earn',   n: 'Megacap tech earnings', b: 'Results, guidance, and the capex-to-revenue handoff that moves indexes.', h: 'NVIDIA guides data-center revenue above $50B for the quarter', s: ['compound','bg'] },
-    { id: 'mk-vc',     n: 'Venture & private markets', b: 'Fund returns, DPI, dry powder, mark-downs and secondaries.', h: 'VC distributions hit a decade low as the DPI gap widens', s: ['v20','allin'] },
-    { id: 'mk-comm',   n: 'Energy & commodities markets', b: 'Oil, uranium, copper supply-demand; datacenter-driven demand.', h: 'Copper squeeze: datacenter buildout adds 1Mt of annual demand', s: ['odd'] },
-    { id: 'mk-fx',     n: 'Currencies & sovereign debt', b: 'Dollar cycle, carry trades, fiscal sustainability scares.', h: 'Japan steps in as the yen breaks 165 and the carry trade unwinds', s: ['odd','compound'] },
-    { id: 'mk-re',     n: 'Housing & real assets', b: 'CRE stress, housing supply, REIT repricing.', h: 'Office CMBS delinquencies hit a post-GFC high', s: ['odd'] },
-    { id: 'mk-ipo',    n: 'Capital markets windows', b: 'IPO issuance, buybacks, convertible waves.', h: 'IPO window reopens: five tech listings price above range', s: ['equity','compound'] },
-  ]},
-  { id: 'geo', name: 'Geopolitics & policy', topics: [
-    { id: 'ge-chips',  n: 'Chip export controls', b: 'HBM and accelerator restrictions, actual vs intended impact.', h: 'New rules cap HBM sales to China; the H20 successor is blocked', s: ['chinatalk','asianometry'] },
-    { id: 'ge-uschina',n: 'US-China tech competition', b: 'Named CEO and policymaker disputes, domestic chip industry pace.', h: 'Huang warns Washington that export rules forfeit the China market', s: ['chinatalk','allin'] },
-    { id: 'ge-taiwan', n: 'Taiwan & semiconductor concentration', b: 'TSMC risk, CHIPS Act execution, fab buildouts outside Taiwan.', h: 'TSMC Arizona yields reach parity with its Taiwan fabs', s: ['asianometry','chinatalk'] },
-    { id: 'ge-aireg',  n: 'AI regulation & safety policy', b: 'EU AI Act, frontier-model bills, compute thresholds.', h: 'Revised frontier-model bill adds a training-compute threshold', s: ['hardfork','chinatalk'] },
-    { id: 'ge-sov',    n: 'Sovereign AI buildouts', b: 'UAE, Saudi, India, EU compute deals and the access regimes attached.', h: 'G42 secures 500k accelerators in a US-brokered access deal', s: ['bg','chinatalk'] },
-    { id: 'ge-def',    n: 'Defense tech & autonomy', b: 'Drones, procurement reform, new primes vs old primes.', h: 'Anduril wins a $22B program of record, beating legacy primes', s: ['wotr','allin'] },
-    { id: 'ge-trade',  n: 'Trade & industrial policy', b: 'Tariff schedules, reshoring subsidies, supply-chain rerouting.', h: 'New tariff schedule spares chips but hits server assemblies', s: ['odd','chinatalk'] },
-    { id: 'ge-energy', n: 'Energy as geopolitical leverage', b: 'Grid interconnects, petro-politics, nuclear diplomacy tied to AI.', h: 'Grid interconnect politics stall AI datacenter siting across Europe', s: ['wotr','volts'] },
-  ]},
-  { id: 'bio', name: 'Health & bio', topics: [
-    { id: 'bi-glp',    n: 'GLP-1s & metabolic health', b: 'Pricing, supply, oral formulations, expanding indications.', h: 'Lilly prices its oral GLP-1 40% below injectables at launch', s: ['attia','odd'] },
-    { id: 'bi-aidrug', n: 'AI in drug discovery', b: 'Pipeline milestones, partnership economics, first AI-designed assets.', h: 'Isomorphic signs a $3B milestone deal; first AI-designed asset hits phase 2', s: ['longrun','nopriors'] },
-    { id: 'bi-long',   n: 'Longevity & preventive medicine', b: 'Biomarkers, screening protocols, actual clinical evidence.', h: 'First rapamycin RCT in healthy adults reports biomarker shifts', s: ['attia','huberman'] },
-    { id: 'bi-fund',   n: 'Biotech funding & M&A', b: 'XBI cycles, licensing deals, pharma takeouts.', h: 'Pharma M&A reopens with three $5B-plus takeouts in a month', s: ['longrun','equity'] },
-    { id: 'bi-diag',   n: 'Diagnostics & early detection', b: 'Liquid biopsy readouts, screening economics, payer coverage.', h: 'Multi-cancer blood test readout cuts late-stage incidence 18%', s: ['attia','longrun'] },
-    { id: 'bi-payers', n: 'Healthcare systems & payers', b: 'Value-based care, PBM reform, hospital economics.', h: 'PBM reform bill caps spread pricing; pharmacy stocks rally', s: ['odd'] },
-    { id: 'bi-neuro',  n: 'Neuroscience & mental health', b: 'Psychedelics trials, neuro devices, sleep and cognition science.', h: 'FDA clears the first closed-loop neurostimulation device for depression', s: ['huberman'] },
-  ]},
-  { id: 'clim', name: 'Climate & energy', topics: [
-    { id: 'cl-nuke',   n: 'Nuclear renaissance', b: 'SMRs, plant restarts, AI-driven power purchase agreements.', h: 'Three Mile Island restart inks a 20-year deal with Microsoft', s: ['volts','catalyst'] },
-    { id: 'cl-solar',  n: 'Solar, storage & the grid', b: 'Battery cost curves, interconnection queues, grid-scale economics.', h: 'Grid-scale battery costs fall below $100/kWh installed', s: ['volts','catalyst'] },
-    { id: 'cl-geo',    n: 'Geothermal & next-gen energy', b: 'Enhanced geothermal wins, fusion milestones, levelized costs.', h: 'Fervo&rsquo;s Utah site hits its 500MW phase at $70/MWh', s: ['catalyst','volts'] },
-    { id: 'cl-ev',     n: 'EVs & batteries', b: 'Chemistry shifts, charging curves, China cost leadership.', h: 'BYD&rsquo;s 5-minute-charge platform resets the EV cost curve', s: ['catalyst','asianometry'] },
-    { id: 'cl-carbon', n: 'Carbon markets & removal', b: 'DAC cost trajectories, offtake deals, credit quality.', h: 'Frontier signs a $500M offtake; DAC costs guide below $300/t', s: ['catalyst'] },
-    { id: 'cl-risk',   n: 'Climate risk & insurance', b: 'Wildfire and flood repricing, insurer exits, parametric cover.', h: 'State Farm&rsquo;s California pullback spreads; parametric products fill the gap', s: ['odd','catalyst'] },
-    { id: 'cl-indus',  n: 'Hydrogen & industrial decarbonization', b: 'Green steel, ammonia, process-heat economics.', h: 'First commercial green-steel plant ships at a €100/t premium', s: ['catalyst','volts'] },
-  ]},
-  { id: 'media', name: 'Media & consumer', topics: [
-    { id: 'me-stream', n: 'Streaming economics', b: 'Churn, ad tiers, bundling, sports rights inflation.', h: 'Netflix ad tier hits 80M MAUs as sports-rights bids escalate', s: ['pivot','vergecast'] },
-    { id: 'me-creator',n: 'Creator economy & platforms', b: 'Monetization splits, creator payouts, studio-scale creators.', h: 'YouTube discloses $70B paid to creators over three years', s: ['pivot','hardfork'] },
-    { id: 'me-gaming', n: 'Gaming', b: 'Engagement, UGC platform payouts, console cycle economics.', h: 'Roblox DAUs hit 100M; creator payouts top $1B annually', s: ['vergecast','equity'] },
-    { id: 'me-social', n: 'Social platforms & attention', b: 'TikTok divestiture, ad-dollar rotation, engagement shifts.', h: 'TikTok divest deadline passes; ad dollars rotate to Reels and Shorts', s: ['pivot','hardfork'] },
-    { id: 'me-ip',     n: 'AI content & IP', b: 'Licensing deals, lawsuits, provenance and training-data economics.', h: 'News Corp&rsquo;s OpenAI deal reprices content licensing at $250M over 5 years', s: ['hardfork','vergecast'] },
-    { id: 'me-comm',   n: 'Commerce & retail media', b: 'Amazon ads, Shopify GMV, cross-border discounters.', h: 'Retail media crosses $60B as Amazon ads margin props up profits', s: ['pivot','equity'] },
-    { id: 'me-sports', n: 'Sports business', b: 'Franchise valuations, PE in leagues, media-rights resets.', h: 'NBA&rsquo;s $76B rights deal triples the annual take; the RSN model collapses', s: ['acq','compound'] },
-  ]},
-  { id: 'crypto', name: 'Crypto & web3', topics: [
-    { id: 'cr-btc',    n: 'Bitcoin & institutional adoption', b: 'ETF flows, corporate treasuries, sovereign positioning.', h: 'Spot ETF flows pass $60B; two S&P 500 firms add BTC to treasury', s: ['bankless','unchained'] },
-    { id: 'cr-rwa',    n: 'Tokenized assets & RWAs', b: 'Tokenized funds, T-bill yield onchain, settlement experiments.', h: 'BlackRock&rsquo;s tokenized fund crosses $2B in onchain T-bills', s: ['unchained','empire'] },
-    { id: 'cr-l2',     n: 'L1/L2 economics', b: 'Fee markets, sequencer revenue, blockspace pricing wars.', h: 'Base sequencer revenue annualizes at $200M as the L2 fee war intensifies', s: ['bankless','empire'] },
-    { id: 'cr-reg',    n: 'Crypto regulation', b: 'Market-structure bills, enforcement reversals, stablecoin law.', h: 'Market-structure bill clears the Senate; SEC drops two flagship suits', s: ['unchained','bankless'] },
-    { id: 'cr-defi',   n: 'DeFi & onchain finance', b: 'Perps volume, real yield, TVL quality.', h: 'Onchain perps volume tops $300B monthly, led by Hyperliquid', s: ['empire','bankless'] },
-    { id: 'cr-ai',     n: 'Crypto x AI', b: 'Decentralized compute markets, agent-to-agent payments.', h: 'Agent-to-agent stablecoin payments pilot clears 1M transactions', s: ['empire','latent'] },
-  ]},
-  { id: 'fron', name: 'Science, space & frontier tech', topics: [
-    { id: 'fr-space',  n: 'Launch & satellite economics', b: 'Starship cadence, constellation P&L, segment-level disclosures.', h: 'Starlink revenue passes $12B; the space division turns an operating profit', s: ['meco','allin'] },
-    { id: 'fr-robot',  n: 'Robotics & embodied AI', b: 'Humanoid pilots, BOM cost curves, factory deployments.', h: 'Figure&rsquo;s BMW pilot expands; humanoid BOM falls below $50k', s: ['lex','nopriors'] },
-    { id: 'fr-quant',  n: 'Quantum computing', b: 'Error-correction milestones, commercialization timelines.', h: 'Logical-qubit milestone: error rates cross threshold at scale', s: ['lex','asianometry'] },
-    { id: 'fr-av',     n: 'Autonomous vehicles', b: 'Robotaxi unit economics, expansion markets, per-mile costs.', h: 'Waymo hits 250k paid rides weekly; per-mile cost nears parity', s: ['sharptech','lex'] },
-    { id: 'fr-indspace',n: 'Space industrialization', b: 'In-space manufacturing, lunar economy, defense-space contracts.', h: 'Varda&rsquo;s third capsule returns with pharma crystallization contracts signed', s: ['meco'] },
-    { id: 'fr-bci',    n: 'Brain-computer interfaces', b: 'Implant trials, capability milestones, competitor progress.', h: 'Second Neuralink patient controls CAD software via implant', s: ['lex','huberman'] },
-    { id: 'fr-mat',    n: 'Materials & advanced manufacturing', b: 'Rare earths, additive manufacturing, reshoring economics.', h: 'MP Materials lands a DoD magnet deal; rare-earth pricing decouples', s: ['odd','asianometry'] },
-  ]},
+const GROUPS = [
+  { id: 'ai',    name: 'AI & compute' },
+  { id: 'soft',  name: 'Software, startups & venture' },
+  { id: 'mkt',   name: 'Markets & macro' },
+  { id: 'geo',   name: 'Geopolitics & policy' },
+  { id: 'sec',   name: 'Cybersecurity' },
+  { id: 'fin',   name: 'Fintech & crypto' },
+  { id: 'media', name: 'Media & consumer' },
+  { id: 'fron',  name: 'Frontier tech & space' },
+  { id: 'bio',   name: 'Health & bio' },
+  { id: 'clim',  name: 'Climate & energy' },
+];
+
+/* Topic catalog: only topics actually touched by selected shows ever appear in
+   the main library. id, g(roup), n(ame), b(lurb). */
+const TOPICS = [
+  { id: 'ai-labs',     g: 'ai', n: 'Foundation model labs', b: 'Lab revenue, training costs, talent moves, compute deals.' },
+  { id: 'ai-agents',   g: 'ai', n: 'AI agents & dev tools', b: 'Coding agents, seat economics, adoption and retention.' },
+  { id: 'ai-gpu',      g: 'ai', n: 'GPU supply & hyperscaler capex', b: 'NVIDIA allocation, lead times, cloud capex guidance.' },
+  { id: 'ai-power',    g: 'ai', n: 'Datacenters, power & grid', b: 'Siting, interconnect queues, nuclear PPAs, cost per MW.' },
+  { id: 'ai-silicon',  g: 'ai', n: 'Custom silicon vs NVIDIA', b: 'TPU / ASIC economics and the cost of leaving CUDA.' },
+  { id: 'ai-open',     g: 'ai', n: 'Open vs closed model economics', b: 'Open-weight commoditization, hosting price wars, margins.' },
+  { id: 'ai-research', g: 'ai', n: 'Frontier research & scaling', b: 'Scaling-law debates, new architectures, eval results.' },
+  { id: 'ai-consumer', g: 'ai', n: 'Consumer AI apps & platforms', b: 'Weekly actives, subscription revenue, platform fights.' },
+  { id: 'sa-saas',     g: 'soft', n: 'Enterprise software & SaaS', b: 'ARR, NRR, AI-native displacement, pricing-model shifts.' },
+  { id: 'sa-gtm',      g: 'soft', n: 'Pricing & go-to-market shifts', b: 'Per-outcome vs per-seat, self-serve mix, time-to-paid.' },
+  { id: 'sa-vc',       g: 'soft', n: 'Venture & private markets', b: 'Fund returns, DPI, dry powder, mark-downs, secondaries.' },
+  { id: 'sa-ipo',      g: 'soft', n: 'IPOs & late-stage privates', b: 'S-1 financials, valuation resets, secondaries.' },
+  { id: 'mk-rates',    g: 'mkt', n: 'Rates & central banks', b: 'Fed path, term premium, fiscal sustainability.' },
+  { id: 'mk-earn',     g: 'mkt', n: 'Megacap tech earnings', b: 'Results, guidance, the capex-to-revenue handoff.' },
+  { id: 'mk-comm',     g: 'mkt', n: 'Commodities & supply chains', b: 'Copper, uranium, shipping; datacenter-driven demand.' },
+  { id: 'mk-fx',       g: 'mkt', n: 'Currencies & sovereign debt', b: 'Dollar cycle, carry trades, deficit scares.' },
+  { id: 'ge-chips',    g: 'geo', n: 'Chip export controls', b: 'HBM / accelerator restrictions, actual vs intended impact.' },
+  { id: 'ge-uschina',  g: 'geo', n: 'US-China tech competition', b: 'Trade rerouting, domestic chip pace, CEO-policymaker fights.' },
+  { id: 'ge-taiwan',   g: 'geo', n: 'Taiwan & semiconductor concentration', b: 'TSMC risk, fab buildouts outside Taiwan.' },
+  { id: 'ge-aireg',    g: 'geo', n: 'Tech regulation & AI policy', b: 'Frontier-model bills, antitrust remedies, compute thresholds.' },
+  { id: 'ge-def',      g: 'geo', n: 'Defense tech & autonomy', b: 'Drones, procurement reform, new primes vs old primes.' },
+  { id: 'se-breach',   g: 'sec', n: 'Breaches & incident disclosures', b: 'Named breach costs, dwell time, pattern shifts.' },
+  { id: 'se-ransom',   g: 'sec', n: 'Ransomware & cyber insurance', b: 'Payout trends, insurer terms, negotiation economics.' },
+  { id: 'se-state',    g: 'sec', n: 'Nation-state operations', b: 'APT campaigns, telco intrusions, attribution fights.' },
+  { id: 'se-ai',       g: 'sec', n: 'AI on offense & defense', b: 'Model-found vulns, agentic SOC claims, AI-scaled phishing.' },
+  { id: 'se-vend',     g: 'sec', n: 'Security vendors & identity', b: 'Platform consolidation, identity, zero-trust adoption.' },
+  { id: 'fi-rails',    g: 'fin', n: 'Payments & interchange', b: 'Network economics, routing rules, regulatory pressure.' },
+  { id: 'fi-neo',      g: 'fin', n: 'Neobanks & consumer fintech', b: 'Unit economics, ARPU, deposit growth.' },
+  { id: 'cr-btc',      g: 'fin', n: 'Bitcoin & institutional crypto', b: 'ETF flows, corporate treasuries, sovereign positioning.' },
+  { id: 'cr-stable',   g: 'fin', n: 'Stablecoins & onchain payments', b: 'Settlement volume, issuer economics, merchant adoption.' },
+  { id: 'cr-reg',      g: 'fin', n: 'Crypto regulation & market structure', b: 'Bills, enforcement reversals, stablecoin law.' },
+  { id: 'me-stream',   g: 'media', n: 'Streaming & media rights', b: 'Churn, ad tiers, bundling, sports-rights inflation.' },
+  { id: 'me-social',   g: 'media', n: 'Social platforms & attention', b: 'Ad-dollar rotation, engagement shifts, divestitures.' },
+  { id: 'me-creator',  g: 'media', n: 'Creator economy & platforms', b: 'Monetization splits, payouts, studio-scale creators.' },
+  { id: 'fr-space',    g: 'fron', n: 'Launch & satellite economics', b: 'Starship cadence, constellation P&L.' },
+  { id: 'fr-robot',    g: 'fron', n: 'Robotics & embodied AI', b: 'Humanoid pilots, BOM cost curves, factory deployments.' },
+  { id: 'fr-av',       g: 'fron', n: 'Autonomous vehicles', b: 'Robotaxi unit economics, per-mile costs, expansion.' },
+  { id: 'fr-bci',      g: 'fron', n: 'Brain-computer interfaces', b: 'Implant trials, capability milestones.' },
+  { id: 'fr-quant',    g: 'fron', n: 'Quantum computing', b: 'Error-correction milestones, commercialization timelines.' },
+  { id: 'bi-glp',      g: 'bio', n: 'GLP-1s & metabolic health', b: 'Pricing, supply, mechanisms, expanding indications.' },
+  { id: 'bi-long',     g: 'bio', n: 'Longevity & preventive medicine', b: 'Biomarkers, screening, exercise protocols, actual evidence.' },
+  { id: 'bi-sleep',    g: 'bio', n: 'Sleep & performance', b: 'Circadian biology, sleep tools, apnea, recovery.' },
+  { id: 'bi-neuro',    g: 'bio', n: 'Neuroscience & mental health', b: 'Dopamine, depression treatments, neuro devices.' },
+  { id: 'bi-aidrug',   g: 'bio', n: 'AI in drug discovery', b: 'Pipeline milestones, partnership economics.' },
+  { id: 'cl-nuke',     g: 'clim', n: 'Nuclear & firm power', b: 'SMRs, restarts, AI-driven PPAs, geothermal.' },
+  { id: 'cl-solar',    g: 'clim', n: 'Grid, storage & renewables', b: 'Battery cost curves, interconnection queues.' },
+  { id: 'cl-ev',       g: 'clim', n: 'EVs & batteries', b: 'Chemistry shifts, charging buildout, China cost leadership.' },
+  { id: 'cl-policy',   g: 'clim', n: 'Climate & energy policy', b: 'Transmission politics, electrification incentives.' },
 ];
 
 const LANES = ['always', 'context', 'mute'];
@@ -564,22 +764,21 @@ const LANE_LABEL = { always: 'Always surface', context: 'Context', mute: 'Mute' 
 /* ============================== state ============================== */
 
 const state = {
-  placements: new Map(),      // topicId -> laneId (insertion order = lane order)
-  customTopics: [],           // topic objects in the 'custom' pseudo-domain
-  openDomains: new Set(['ai', 'saas']),
-  picked: null,               // topicId with action buttons open
+  shows: new Set(),            // selected show keys, insertion-ordered
+  placements: new Map(),       // topicId -> laneId (insertion order = lane order)
+  customTopics: [],            // user-added topic objects
+  closedGroups: new Set(),
+  picked: null,                // topicId with action buttons open
   search: '',
-  acceptedSources: new Set(), // source keys
-  dismissedSources: new Set(),
+  showQuery: '',
+  scanning: false,
+  scanMsg: null,               // {cls, text}
+  dismissedShows: new Set(),
 };
 
-const topicIndex = new Map();
-DOMAINS.forEach(d => d.topics.forEach(t => topicIndex.set(t.id, t)));
+const topicIndex = new Map(TOPICS.map(t => [t.id, t]));
+const groupIndex = new Map(GROUPS.map(g => [g.id, g]));
 
-function allDomains() {
-  if (!state.customTopics.length) return DOMAINS;
-  return [{ id: 'custom', name: 'Your topics', topics: state.customTopics }, ...DOMAINS];
-}
 function topicById(id) {
   return topicIndex.get(id) || state.customTopics.find(t => t.id === id) || null;
 }
@@ -587,6 +786,36 @@ function laneTopics(lane) {
   const out = [];
   for (const [id, l] of state.placements) if (l === lane) { const t = topicById(id); if (t) out.push(t); }
   return out;
+}
+
+/* ============================== derivation ============================== */
+/* The library is DERIVED from the selected shows' recent episodes. */
+
+function deriveSupport() {
+  const sup = new Map(); // topicId -> { count, showKeys:[], eps:[{key, title}] }
+  for (const key of state.shows) {
+    const show = SHOWS[key];
+    if (!show) continue;
+    for (const ep of show.eps) {
+      for (const tid of ep.k) {
+        let s = sup.get(tid);
+        if (!s) { s = { count: 0, showKeys: [], eps: [] }; sup.set(tid, s); }
+        s.count++;
+        s.eps.push({ key, title: ep.t });
+        if (!s.showKeys.includes(key)) s.showKeys.push(key);
+      }
+    }
+  }
+  return sup;
+}
+
+let SUP = new Map(); // refreshed by renderAll
+
+function provenanceText(s) {
+  const names = s.showKeys.map(k => SHOWS[k].short);
+  const head = names.slice(0, 3).join(', ');
+  const more = names.length > 3 ? ` +${names.length - 3} more` : '';
+  return `in ${s.count} recent episode${s.count === 1 ? '' : 's'} — ${head}${more}`;
 }
 
 /* ============================== helpers ============================== */
@@ -603,9 +832,51 @@ function fakeTs(id) {
   const m = Math.floor(total / 60), s = total % 60;
   return m + ':' + String(s).padStart(2, '0');
 }
-function htmlToText(s) { const d = document.createElement('div'); d.innerHTML = s; return d.textContent; }
+function isUrl(q) {
+  return /^https?:\/\//i.test(q) || /^www\./i.test(q) ||
+         /\.(com|fm|io|wtf|biz|space|net|org|tv|co|xml)(\/|$)/i.test(q);
+}
 
 /* ============================== actions ============================== */
+
+function addShow(key) {
+  if (!SHOWS[key]) return;
+  state.shows.add(key);
+  state.dismissedShows.delete(key);
+  state.showQuery = '';
+  const inp = $('#show-search'); if (inp) inp.value = '';
+  renderAll();
+}
+function removeShow(key) {
+  state.shows.delete(key);
+  renderAll();
+}
+function scanUrl(url) {
+  if (state.scanning || !url) return;
+  state.scanning = true;
+  state.scanMsg = { cls: 'busy', text: 'Scanning feed… ' + url };
+  renderShowsPanel();
+  setTimeout(() => {
+    state.scanning = false;
+    const q = url.toLowerCase();
+    const hit = Object.entries(SHOWS).find(([k, s]) => s.m.some(frag => q.includes(frag)));
+    if (hit) {
+      const [k, s] = hit;
+      const already = state.shows.has(k);
+      state.shows.add(k);
+      state.scanMsg = {
+        cls: 'ok',
+        text: `Feed scanned — found ${s.eps.length} recent episodes · matched ${s.name}${already ? ' (already in your shows)' : ''}`,
+      };
+      state.showQuery = '';
+      const inp = $('#show-search'); if (inp) inp.value = '';
+      renderAll();
+    } else {
+      state.scanMsg = { cls: 'err', text: "Scanned the URL but couldn't match it to the demo directory — try searching by show name." };
+      renderShowsPanel();
+    }
+  }, 700);
+}
 
 function placeTopic(id, lane) {
   if (!topicById(id)) return;
@@ -625,12 +896,9 @@ function addCustomTopic(name) {
   const slug = 'custom-' + clean.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   if (topicById(slug)) { state.picked = slug; renderAll(); return; }
   state.customTopics.push({
-    id: slug, n: clean, custom: true,
+    id: slug, n: clean, custom: true, g: 'custom',
     b: 'Your own topic — the ranker reads it verbatim.',
-    h: 'Any concrete claim or disclosure about ' + esc(clean.toLowerCase()),
-    s: [],
   });
-  state.openDomains.add('custom');
   state.picked = slug; // open lane buttons so the user immediately files it
   renderAll();
 }
@@ -638,67 +906,211 @@ function addCustomTopic(name) {
 /* ============================== rendering ============================== */
 
 function renderAll() {
+  SUP = deriveSupport();
+  renderShowsPanel();
   renderLibrary();
   renderLanes();
   renderPreview();
-  renderSources();
+  renderAdjacent();
   renderMarkdown();
   renderStrength();
 }
 
+/* ---------- step 1: shows panel ---------- */
+
+function filteredDirectory() {
+  const q = state.showQuery.trim().toLowerCase();
+  return Object.entries(SHOWS)
+    .filter(([k]) => !state.shows.has(k))
+    .filter(([k, s]) => !q || s.name.toLowerCase().includes(q) || s.m.some(f => f.includes(q.replace(/\s+/g,'-')) || f.includes(q.replace(/\s+/g,''))))
+    .map(([k]) => k);
+}
+
+function renderShowsPanel() {
+  // selected chips
+  const chipsEl = $('#show-chips');
+  $('#show-count').textContent = state.shows.size;
+  if (!state.shows.size) {
+    chipsEl.innerHTML = `<div class="shows-empty">No shows yet — pick from the directory or paste a feed URL.</div>`;
+  } else {
+    chipsEl.innerHTML = `<ul class="chips">` + [...state.shows].map(k => {
+      const s = SHOWS[k];
+      return `<li><span class="chip-type ${s.type}">&#9679;</span>${esc(s.name)}
+        <span class="chip-eps">${s.eps.length} eps</span>
+        <button type="button" data-rmshow="${k}" title="Remove show">&times;</button></li>`;
+    }).join('') + `</ul>`;
+  }
+
+  // scan note
+  const scanEl = $('#show-scan');
+  if (state.scanMsg) {
+    scanEl.hidden = false;
+    scanEl.className = 'scan-note ' + state.scanMsg.cls;
+    scanEl.textContent = state.scanMsg.text;
+  } else {
+    scanEl.hidden = true;
+  }
+
+  // results
+  const resEl = $('#show-results');
+  const q = state.showQuery.trim();
+  if (isUrl(q)) {
+    resEl.innerHTML = `<button type="button" class="scan-btn" data-scan="1" ${state.scanning ? 'disabled' : ''}>
+      ${state.scanning ? 'Scanning…' : 'Scan this feed'}</button>`;
+    return;
+  }
+  const keys = filteredDirectory();
+  if (!keys.length) {
+    resEl.innerHTML = `<div class="no-shows-match">${
+      Object.keys(SHOWS).every(k => state.shows.has(k))
+        ? 'Every show in the demo directory is already selected.'
+        : 'No directory match — paste its RSS or YouTube URL instead.'}</div>`;
+    return;
+  }
+  resEl.innerHTML = keys.map(k => {
+    const s = SHOWS[k];
+    return `<button type="button" class="show-btn" data-addshow="${k}" title="Add ${esc(s.name)}">
+      <span class="sb-dot ${s.type}"></span>+ ${esc(s.name)} <span class="sb-eps">${s.eps.length} eps</span></button>`;
+  }).join('');
+}
+
+/* ---------- step 2: derived library ---------- */
+
 function topicMatches(t, q) {
   if (!q) return true;
-  return (t.n + ' ' + t.b + ' ' + htmlToText(t.h)).toLowerCase().includes(q);
+  let hay = t.n + ' ' + t.b;
+  const s = SUP.get(t.id);
+  if (s) hay += ' ' + s.eps.map(e => e.title).join(' ');
+  return hay.toLowerCase().includes(q);
+}
+
+function topicCardHtml(t, opts = {}) {
+  const picked = state.picked === t.id;
+  const s = SUP.get(t.id);
+  let inner = `<div class="tc-name">${esc(t.n)}</div>
+    <div class="tc-blurb">${esc(t.b)}</div>`;
+  if (s) {
+    const ex = s.eps[0];
+    inner += `<div class="tc-ex"><span class="tc-ex-label">${esc(SHOWS[ex.key].short)} &middot; recent episode</span>&ldquo;${esc(ex.title)}&rdquo;</div>
+      <details class="tc-eps"><summary>${esc(provenanceText(s))} <span class="prov-shows">&middot; view</span></summary>
+        <ul>${s.eps.map(e => `<li>&ldquo;${esc(e.title)}&rdquo; <span class="ep-show">&mdash; ${esc(SHOWS[e.key].name)}</span></li>`).join('')}</ul>
+      </details>`;
+  } else if (t.custom) {
+    inner += `<div class="tc-ex"><span class="tc-ex-label">would surface</span>any concrete claim or disclosure about ${esc(t.n.toLowerCase())}</div>`;
+  } else if (opts.beyond) {
+    inner += `<div class="tc-note">No recent coverage in your shows — adjacent to what they discuss.</div>`;
+  }
+  inner += `<div class="tc-actions">
+      <button type="button" class="to-always"  data-place="always"  data-topic="${t.id}">Always</button>
+      <button type="button" class="to-context" data-place="context" data-topic="${t.id}">Context</button>
+      <button type="button" class="to-mute"    data-place="mute"    data-topic="${t.id}">Mute</button>
+    </div>`;
+  return `<div class="topic-card ${picked ? 'picked' : ''} ${opts.beyond ? 'beyond' : ''}" draggable="true" data-topic="${t.id}" tabindex="0">${inner}</div>`;
 }
 
 function renderLibrary() {
   const q = state.search.trim().toLowerCase();
   const root = $('#domains');
-  let total = 0, shown = 0;
+  const sub = $('#lib-sub');
+
+  if (!state.shows.size && !state.customTopics.length) {
+    root.innerHTML = `<div class="lib-onboard">
+      <div class="lo-icon">&#127911;</div>
+      <div class="lo-title">Add your shows first</div>
+      <p>The topic library isn&rsquo;t a generic taxonomy &mdash; it&rsquo;s built from what
+      <b>your</b> shows actually covered in their recent episodes.</p>
+      <p>Pick shows in <b>step 1</b> above (or paste an RSS / YouTube URL) and the
+      topics they discuss will appear here, ranked by coverage.</p>
+    </div>`;
+    $('#lib-count').textContent = '';
+    sub.textContent = 'Derived from your shows’ recent episodes.';
+    return;
+  }
+
+  sub.textContent = state.shows.size
+    ? `Derived from ${state.shows.size} show${state.shows.size === 1 ? '' : 's'}’ recent episodes — ranked by coverage.`
+    : 'Add shows in step 1 to seed topics here.';
+
   let html = '';
-  for (const dom of allDomains()) {
-    total += dom.topics.length;
-    const visible = dom.topics.filter(t => !state.placements.has(t.id) && topicMatches(t, q));
-    const placedHere = dom.topics.filter(t => state.placements.has(t.id)).length;
+  let shown = 0;
+
+  // custom topics first
+  const customVisible = state.customTopics.filter(t => !state.placements.has(t.id) && topicMatches(t, q));
+  const customPlaced = state.customTopics.filter(t => state.placements.has(t.id)).length;
+  if (state.customTopics.length && (!q || customVisible.length)) {
+    const open = q ? true : !state.closedGroups.has('custom');
+    shown += customVisible.length;
+    html += `<div class="dom ${open ? 'open' : ''} ${customPlaced ? 'has-placed' : ''}" data-dom="custom">
+      <button type="button" class="dom-head" data-domtoggle="custom">
+        <span class="tri"></span><span class="dom-n">Your topics</span>
+        <span class="dom-dot" title="Some topics from this group are on your board"></span>
+        <span class="dom-meta">${customVisible.length || 'all placed'}</span>
+      </button>
+      <div class="dom-body">${customVisible.length
+        ? customVisible.map(t => topicCardHtml(t)).join('')
+        : `<div class="lib-empty">All placed on the board.</div>`}</div>
+    </div>`;
+  }
+
+  // derived groups, ordered by total episode support
+  const groupRows = [];
+  for (const g of GROUPS) {
+    const topics = TOPICS.filter(t => t.g === g.id && SUP.has(t.id));
+    if (!topics.length) continue;
+    const total = topics.reduce((a, t) => a + SUP.get(t.id).count, 0);
+    groupRows.push({ g, topics, total });
+  }
+  groupRows.sort((a, b) => b.total - a.total);
+
+  for (const { g, topics, total } of groupRows) {
+    const visible = topics
+      .filter(t => !state.placements.has(t.id) && topicMatches(t, q))
+      .sort((a, b) => SUP.get(b.id).count - SUP.get(a.id).count);
+    const placedHere = topics.filter(t => state.placements.has(t.id)).length;
     if (q && !visible.length) continue;
-    const open = q ? true : state.openDomains.has(dom.id);
+    const open = q ? true : !state.closedGroups.has(g.id);
     shown += visible.length;
-    const meta = placedHere
-      ? `${visible.length} left &middot; ${placedHere} placed`
-      : `${visible.length}`;
-    html += `<div class="dom ${open ? 'open' : ''} ${placedHere ? 'has-placed' : ''}" data-dom="${dom.id}">
-      <button type="button" class="dom-head" data-domtoggle="${dom.id}">
-        <span class="tri"></span>
-        <span class="dom-n">${esc(dom.name)}</span>
-        <span class="dom-dot" title="Some topics from this domain are on your board"></span>
+    const meta = placedHere ? `${total} eps &middot; ${placedHere} placed` : `${total} eps`;
+    html += `<div class="dom ${open ? 'open' : ''} ${placedHere ? 'has-placed' : ''}" data-dom="${g.id}">
+      <button type="button" class="dom-head" data-domtoggle="${g.id}">
+        <span class="tri"></span><span class="dom-n">${esc(g.name)}</span>
+        <span class="dom-dot" title="Some topics from this group are on your board"></span>
         <span class="dom-meta">${meta}</span>
       </button>
-      <div class="dom-body">`;
-    if (!visible.length) {
-      html += `<div class="lib-empty">All placed on the board.</div>`;
-    }
-    for (const t of visible) {
-      const picked = state.picked === t.id;
-      html += `<div class="topic-card ${picked ? 'picked' : ''}" draggable="true" data-topic="${t.id}" tabindex="0">
-        <div class="tc-name">${esc(t.n)}</div>
-        <div class="tc-blurb">${esc(t.b)}</div>
-        <div class="tc-ex">&ldquo;${t.h}&rdquo;</div>
-        <div class="tc-actions">
-          <button type="button" class="to-always"  data-place="always"  data-topic="${t.id}">Always</button>
-          <button type="button" class="to-context" data-place="context" data-topic="${t.id}">Context</button>
-          <button type="button" class="to-mute"    data-place="mute"    data-topic="${t.id}">Mute</button>
-        </div>
+      <div class="dom-body">${visible.length
+        ? visible.map(t => topicCardHtml(t)).join('')
+        : `<div class="lib-empty">All placed on the board.</div>`}</div>
+    </div>`;
+  }
+
+  // beyond your shows: adjacent topics (same groups your shows touch, zero coverage)
+  if (state.shows.size && !q) {
+    const activeGroups = new Set(groupRows.map(r => r.g.id));
+    const beyond = TOPICS.filter(t =>
+      !SUP.has(t.id) && !state.placements.has(t.id) && activeGroups.has(t.g)
+    ).slice(0, 6);
+    if (beyond.length) {
+      html += `<div class="beyond">
+        <div class="beyond-head">Beyond your shows</div>
+        <div class="beyond-note">Adjacent topics your shows haven&rsquo;t covered recently &mdash; add them if you want the brief to look out for them anyway.</div>
+        ${beyond.map(t => topicCardHtml(t, { beyond: true })).join('')}
       </div>`;
     }
-    html += `</div></div>`;
   }
+
   if (q && !shown) {
-    html = `<div class="lib-empty">No topics match &ldquo;${esc(state.search)}&rdquo;.<br>
+    html = `<div class="lib-empty">Nothing in your shows&rsquo; recent episodes matches &ldquo;${esc(state.search)}&rdquo;.<br>
             Add it as your own topic above.</div>`;
   }
+
   root.innerHTML = html;
-  $('#lib-count').textContent = `${total} topics · ${state.placements.size} placed`;
+  const derivedCount = TOPICS.filter(t => SUP.has(t.id)).length;
+  $('#lib-count').textContent = state.shows.size
+    ? `${derivedCount} topics from ${state.shows.size} show${state.shows.size === 1 ? '' : 's'}`
+    : `${state.customTopics.length} custom`;
 }
+
+/* ---------- step 3: lanes ---------- */
 
 const LANE_HINTS = {
   always: '<b>Drag topics here</b> (or click a card and choose a lane).<br>These lead every brief — aim for 3–6.',
@@ -716,12 +1128,14 @@ function renderLanes() {
       continue;
     }
     body.innerHTML = topics.map(t => {
+      const unsupported = state.shows.size > 0 && !t.custom && !SUP.has(t.id);
       const others = LANES.filter(l => l !== lane);
       const moveBtns = others.map(l =>
         `<button type="button" data-move="${l}" data-topic="${t.id}" title="Move to ${LANE_LABEL[l]}">&rarr; ${LANE_LABEL[l].split(' ')[0]}</button>`
       ).join('');
       return `<div class="lane-card" draggable="true" data-topic="${t.id}" title="${esc(t.b)}">
         <span class="lc-name">${esc(t.n)}</span>
+        ${unsupported ? `<span class="lc-flag" title="None of your current shows covered this in recent episodes. It stays in your profile, but nothing will feed it until a show covers it.">no coverage</span>` : ''}
         <div class="lc-controls">${moveBtns}
           <button type="button" class="lc-x" data-remove="${t.id}" title="Remove from board">&times;</button>
         </div>
@@ -729,6 +1143,8 @@ function renderLanes() {
     }).join('');
   }
 }
+
+/* ---------- brief preview: items attributed to YOUR shows ---------- */
 
 function renderPreview() {
   const body = $('#preview-body');
@@ -754,12 +1170,16 @@ function renderPreview() {
   t2.slice(0, Math.max(0, 6 - items.length)).forEach(t => items.push({ t, ctx: true }));
 
   let html = items.map((it, i) => {
-    const src = it.t.s && it.t.s.length ? SOURCES[it.t.s[0]].name : 'your sources';
+    const s = SUP.get(it.t.id);
+    const ep = s ? s.eps[0] : null;
+    const head = ep ? esc(ep.title)
+      : `Any concrete claim or disclosure about ${esc(it.t.n.toLowerCase())}`;
+    const showName = ep ? SHOWS[ep.key].name : 'no current coverage in your shows';
     return `<div class="brief-item ${it.ctx ? 'ctx' : ''}">
       <div class="brief-ord">${i + 1}</div>
       <div>
-        <div class="brief-head">${it.t.h}</div>
-        <div class="brief-meta">${esc(it.t.n)} &middot; ${esc(src)} &middot; <span class="ts">&#9654; ${fakeTs(it.t.id)}</span>${it.ctx ? '<span class="ctx-badge">context</span>' : ''}</div>
+        <div class="brief-head">${head}</div>
+        <div class="brief-meta">${esc(it.t.n)} &middot; <span class="b-show">${esc(showName)}</span> &middot; <span class="ts">&#9654; ${fakeTs(it.t.id)}</span>${it.ctx ? '<span class="ctx-badge">context</span>' : ''}</div>
       </div>
     </div>`;
   }).join('');
@@ -774,52 +1194,59 @@ function renderPreview() {
   body.innerHTML = html;
 }
 
-function renderSources() {
+/* ---------- shows adjacent to yours ---------- */
+
+function renderAdjacent() {
   const body = $('#sources-body');
-  const t1 = laneTopics('always');
 
-  // accepted chips
-  const accepted = [...state.acceptedSources];
-  const chips = accepted.length ? `
-    <div class="my-sources">
-      <div class="my-sources-h">Your sources (${accepted.length})</div>
-      <ul class="chips">${accepted.map(k => `
-        <li><span class="chip-type ${SOURCES[k].type}">&#9679;</span>${esc(SOURCES[k].name)}
-            <button type="button" data-unsrc="${k}" title="Remove">&times;</button></li>`).join('')}
-      </ul>
-    </div>` : '';
-
-  if (!t1.length) {
-    body.innerHTML = `<div class="src-empty">Add topics to <b>Always surface</b> and starter podcasts &amp; channels show up here.</div>` + chips;
+  if (!state.shows.size) {
+    body.innerHTML = `<div class="src-empty">Add your shows in <b>step 1</b> — once you lift topics, we suggest other shows that cover the same ground.</div>`;
     return;
   }
 
-  // union of tier-1 topics' suggestions, keep first suggesting topic for the "why"
-  const suggestions = new Map(); // key -> topicName
-  for (const t of t1) for (const k of (t.s || [])) {
-    if (!suggestions.has(k) && !state.acceptedSources.has(k) && !state.dismissedSources.has(k)) {
-      suggestions.set(k, t.n);
+  // base topic set: lifted lanes if any, else everything your shows cover
+  const lifted = [...laneTopics('always'), ...laneTopics('context')].map(t => t.id);
+  const base = new Set(lifted.length ? lifted : [...SUP.keys()]);
+  const usingLanes = lifted.length > 0;
+
+  const scored = [];
+  for (const [k, s] of Object.entries(SHOWS)) {
+    if (state.shows.has(k) || state.dismissedShows.has(k)) continue;
+    const perTopic = new Map();
+    let total = 0;
+    for (const ep of s.eps) for (const tid of ep.k) if (base.has(tid)) {
+      perTopic.set(tid, (perTopic.get(tid) || 0) + 1);
+      total++;
     }
+    if (!total) continue;
+    const [bestTid, bestN] = [...perTopic.entries()].sort((a, b) => b[1] - a[1])[0];
+    scored.push({ k, total, bestTid, bestN });
   }
-  const rows = [...suggestions].slice(0, 6).map(([k, why]) => `
-    <div class="src-row">
-      <span class="src-type ${SOURCES[k].type}">${SOURCES[k].type === 'youtube' ? 'YouTube' : 'Podcast'}</span>
+  scored.sort((a, b) => b.total - a.total);
+
+  if (!scored.length) {
+    body.innerHTML = `<div class="src-empty">No adjacent shows left in the demo directory${usingLanes ? ' for your lifted topics' : ''}.</div>`;
+    return;
+  }
+
+  body.innerHTML = scored.slice(0, 5).map(({ k, bestTid, bestN }) => {
+    const s = SHOWS[k];
+    const tn = topicById(bestTid) ? topicById(bestTid).n : bestTid;
+    return `<div class="src-row">
+      <span class="src-type ${s.type}">${s.type === 'youtube' ? 'YouTube' : 'Podcast'}</span>
       <div class="src-info">
-        <div class="src-name">${esc(SOURCES[k].name)}</div>
-        <div class="src-why">Covers ${esc(why)}</div>
+        <div class="src-name">${esc(s.name)}</div>
+        <div class="src-why">Covers ${esc(tn)} in ${bestN} recent episode${bestN === 1 ? '' : 's'}</div>
       </div>
       <div class="src-btns">
-        <button type="button" class="src-add" data-addsrc="${k}">Add</button>
-        <button type="button" class="src-no" data-nosrc="${k}" title="Not interested">&times;</button>
+        <button type="button" class="src-add" data-addshow="${k}">Add</button>
+        <button type="button" class="src-no" data-noshow="${k}" title="Not interested">&times;</button>
       </div>
-    </div>`).join('');
-
-  body.innerHTML = (rows || `<div class="src-empty">No more suggestions — every match is already in your sources.</div>`) + chips;
+    </div>`;
+  }).join('');
 }
 
 /* ---------- profile.md generation (mirrors config/profile.md) ---------- */
-
-function topicLine(t) { return t.n; }
 
 function renderMarkdown() {
   const t1 = laneTopics('always');
@@ -831,6 +1258,11 @@ function renderMarkdown() {
   L.push('');
   L.push('This file is the bias function for the ranking stage. The model reads it');
   L.push('verbatim and uses it to filter and rank extracted candidates.');
+  if (state.shows.size) {
+    L.push('');
+    L.push(`_Topics seeded from ${state.shows.size} subscribed shows: ` +
+      [...state.shows].map(k => SHOWS[k].name).join(', ') + '._');
+  }
   L.push('');
   L.push('---');
   L.push('');
@@ -841,7 +1273,7 @@ function renderMarkdown() {
   L.push('');
   if (t1.length) {
     L.push('**TIER 1 — always lift:**');
-    L.push(t1.map(topicLine).join('; ') + '.');
+    L.push(t1.map(t => t.n).join('; ') + '.');
     L.push('Credible candidates in these themes beat everything else.');
   } else {
     L.push('**TIER 1 — always lift:**');
@@ -850,7 +1282,7 @@ function renderMarkdown() {
   L.push('');
   L.push('**TIER 2 — secondary lift:**');
   L.push(t2.length
-    ? t2.map(topicLine).join('; ') + '. Important context but should not displace Tier 1 items.'
+    ? t2.map(t => t.n).join('; ') + '. Important context but should not displace Tier 1 items.'
     : '_(empty — drag topics into "Context")_');
   L.push('');
   L.push('**TIER 3 — mention only if exceptional:**');
@@ -865,7 +1297,8 @@ function renderMarkdown() {
   for (const [t, tier] of themed) {
     L.push(`### ${t.n}  (Tier ${tier})`);
     L.push(`- ${t.b}`);
-    L.push(`- e.g. "${htmlToText(t.h)}"`);
+    const s = SUP.get(t.id);
+    if (s) L.push(`- e.g. "${s.eps[0].title}" (${SHOWS[s.eps[0].key].name})`);
     L.push('');
   }
   L.push('## Down-weight');
@@ -882,19 +1315,19 @@ function renderStrength() {
   const t1 = laneTopics('always').length;
   const t2 = laneTopics('context').length;
   const m = laneTopics('mute').length;
-  const s = state.acceptedSources.size;
+  const sh = state.shows.size;
   const pct = Math.min(100, Math.round(
-    Math.min(t1, 4) * 14 + Math.min(t2, 3) * 6 + Math.min(m, 3) * 5 + Math.min(s, 3) * 4 + (t1 > 4 ? 3 : 0)
+    Math.min(sh, 4) * 5 + Math.min(t1, 4) * 13 + Math.min(t2, 3) * 5 + Math.min(m, 3) * 4 + (t1 > 4 ? 3 : 0)
   ));
   $('#strength-fill').style.width = pct + '%';
-  let name = 'Empty — pick a few topics';
-  if (pct > 0)  name = 'Just started';
-  if (pct >= 30) name = 'Taking shape';
+  let name = 'Empty — add your shows';
+  if (sh > 0) name = 'Shows added — now pick topics';
+  if (t1 + t2 + m > 0) name = 'Taking shape';
   if (pct >= 60) name = 'Usable profile';
   if (pct >= 85) name = 'Sharp';
   $('#strength-name').textContent = name;
-  $('#strength-counts').textContent = (t1 + t2 + m)
-    ? `${t1} always · ${t2} context · ${m} muted · ${s} sources`
+  $('#strength-counts').textContent = (sh + t1 + t2 + m)
+    ? `${sh} shows · ${t1} always · ${t2} context · ${m} muted`
     : '';
 }
 
@@ -904,19 +1337,23 @@ document.addEventListener('click', e => {
   const btn = e.target.closest('button');
 
   if (btn) {
+    if (btn.dataset.addshow) { addShow(btn.dataset.addshow); return; }
+    if (btn.dataset.rmshow)  { removeShow(btn.dataset.rmshow); return; }
+    if (btn.dataset.scan)    { scanUrl(state.showQuery.trim()); return; }
+    if (btn.dataset.noshow)  { state.dismissedShows.add(btn.dataset.noshow); renderAdjacent(); return; }
     if (btn.dataset.domtoggle) {
       const id = btn.dataset.domtoggle;
-      state.openDomains.has(id) ? state.openDomains.delete(id) : state.openDomains.add(id);
+      state.closedGroups.has(id) ? state.closedGroups.delete(id) : state.closedGroups.add(id);
       renderLibrary();
       return;
     }
     if (btn.dataset.place)   { placeTopic(btn.dataset.topic, btn.dataset.place); return; }
     if (btn.dataset.move)    { placeTopic(btn.dataset.topic, btn.dataset.move); return; }
     if (btn.dataset.remove)  { unplaceTopic(btn.dataset.remove); return; }
-    if (btn.dataset.addsrc)  { state.acceptedSources.add(btn.dataset.addsrc); renderSources(); renderStrength(); return; }
-    if (btn.dataset.nosrc)   { state.dismissedSources.add(btn.dataset.nosrc); renderSources(); return; }
-    if (btn.dataset.unsrc)   { state.acceptedSources.delete(btn.dataset.unsrc); renderSources(); renderStrength(); return; }
   }
+
+  // clicking the provenance expander shouldn't toggle the pick state
+  if (e.target.closest('details.tc-eps')) return;
 
   // click a library card -> toggle lane buttons (no-drag fallback)
   const card = e.target.closest('.topic-card');
@@ -950,6 +1387,21 @@ $('#custom-form').addEventListener('submit', e => {
   e.preventDefault();
   addCustomTopic($('#custom-input').value);
   $('#custom-input').value = '';
+});
+
+$('#show-search').addEventListener('input', e => {
+  state.showQuery = e.target.value;
+  state.scanMsg = null;
+  renderShowsPanel();
+});
+$('#show-search').addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const q = state.showQuery.trim();
+  if (!q) return;
+  if (isUrl(q)) { scanUrl(q); return; }
+  const first = filteredDirectory()[0];
+  if (first) addShow(first);
 });
 
 /* ---------- drag & drop ---------- */
