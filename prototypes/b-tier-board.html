@@ -1,0 +1,1021 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Build your interest profile</title>
+<style>
+  :root {
+    --fg: #111; --muted: #666; --line: #e5e5e5; --line-strong: #ccc;
+    --bg-soft: #f7f7f7; --accent: #1a73e8; --danger: #c0392b;
+    --t1: #1a73e8; --t1-bg: #eef4fe; --t1-line: #c4daf8;
+    --t2: #b45309; --t2-bg: #fdf6ec; --t2-line: #f0ddbe;
+    --mute: #5f6672; --mute-bg: #f2f3f5; --mute-line: #d9dce1;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    max-width: 1240px; margin: 0 auto; padding: 24px 24px 64px;
+    color: var(--fg); line-height: 1.5; background: #fff;
+  }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .lede { color: var(--muted); font-size: 13px; margin: 0; max-width: 60ch; }
+  button { font-family: inherit; cursor: pointer; }
+
+  /* ---------- header ---------- */
+  .top {
+    display: flex; gap: 32px; align-items: flex-end; justify-content: space-between;
+    flex-wrap: wrap; margin-bottom: 20px;
+  }
+  .strength { min-width: 260px; flex: 0 1 300px; }
+  .strength-label {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 12px; margin-bottom: 5px;
+  }
+  #strength-name { font-weight: 600; }
+  #strength-counts { color: var(--muted); font-size: 11px; }
+  .strength-bar {
+    height: 6px; border-radius: 3px; background: var(--bg-soft);
+    border: 1px solid var(--line); overflow: hidden;
+  }
+  #strength-fill {
+    height: 100%; width: 0%; border-radius: 3px;
+    background: linear-gradient(90deg, #7fb1f5, var(--accent));
+    transition: width .45s cubic-bezier(.22,1,.36,1);
+  }
+
+  /* ---------- workspace grid ---------- */
+  .workspace { display: grid; grid-template-columns: 318px 1fr; gap: 24px; align-items: start; }
+
+  /* ---------- library ---------- */
+  .library {
+    position: sticky; top: 16px; max-height: calc(100vh - 32px);
+    display: flex; flex-direction: column;
+    border: 1px solid var(--line); border-radius: 10px; background: #fff;
+    overflow: hidden;
+  }
+  .library.drop-target { outline: 2px dashed var(--line-strong); outline-offset: -6px; }
+  .lib-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding: 14px 14px 0;
+  }
+  .lib-head h2 {
+    font-size: 12px; margin: 0; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--muted); font-weight: 700;
+  }
+  .lib-count { font-size: 11px; color: var(--muted); }
+  .lib-tools { padding: 10px 14px 12px; border-bottom: 1px solid var(--line); }
+  #lib-search {
+    width: 100%; padding: 7px 10px; font-size: 13px; font-family: inherit;
+    border: 1px solid var(--line-strong); border-radius: 6px;
+  }
+  #lib-search:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .custom-row { display: flex; gap: 6px; margin-top: 8px; }
+  .custom-row input {
+    flex: 1; min-width: 0; padding: 6px 10px; font-size: 12.5px; font-family: inherit;
+    border: 1px dashed var(--line-strong); border-radius: 6px; background: var(--bg-soft);
+  }
+  .custom-row input:focus { outline: 2px solid var(--accent); outline-offset: -1px; background:#fff; }
+  .custom-row button {
+    font-size: 12px; padding: 5px 12px; border: 1px solid var(--line-strong);
+    background: #fff; border-radius: 6px;
+  }
+  .custom-row button:hover { background: var(--bg-soft); }
+  #domains { overflow-y: auto; padding: 4px 8px 14px; flex: 1; }
+
+  .dom { margin-top: 4px; }
+  .dom-head {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    padding: 8px 6px; border: none; background: none; text-align: left;
+    border-radius: 6px; font-size: 13px; font-weight: 600; color: var(--fg);
+  }
+  .dom-head:hover { background: var(--bg-soft); }
+  .dom-head .tri {
+    width: 0; height: 0; border-left: 5px solid #999; border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent; transition: transform .15s; flex: none;
+  }
+  .dom.open .tri { transform: rotate(90deg); }
+  .dom-head .dom-n { flex: 1; min-width: 0; }
+  .dom-head .dom-meta { font-size: 10.5px; color: var(--muted); font-weight: 400; white-space: nowrap; }
+  .dom-head .dom-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none;
+    visibility: hidden;
+  }
+  .dom.has-placed .dom-dot { visibility: visible; }
+  .dom-body { display: none; padding: 2px 2px 6px; }
+  .dom.open .dom-body { display: block; }
+
+  .topic-card {
+    border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px 10px;
+    margin: 6px 2px; background: #fff; cursor: grab; position: relative;
+    transition: border-color .12s, box-shadow .12s;
+  }
+  .topic-card:hover { border-color: var(--line-strong); box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+  .topic-card:active { cursor: grabbing; }
+  .topic-card.dragging { opacity: .45; }
+  .tc-name { font-size: 13px; font-weight: 600; line-height: 1.3; }
+  .tc-blurb { font-size: 11.5px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+  .tc-ex {
+    font-size: 11px; color: #444; font-style: italic; margin-top: 6px;
+    padding: 1px 0 1px 8px; border-left: 2px solid var(--line-strong); line-height: 1.4;
+  }
+  .tc-ex::before { content: "would surface: "; font-style: normal; color: #999; font-size: 10px;
+                   text-transform: uppercase; letter-spacing: .04em; }
+  .tc-actions {
+    display: none; gap: 6px; margin-top: 9px; padding-top: 8px;
+    border-top: 1px solid var(--line);
+  }
+  .topic-card.picked { border-color: var(--accent); box-shadow: 0 1px 6px rgba(26,115,232,.18); }
+  .topic-card.picked .tc-actions { display: flex; }
+  .tc-actions button {
+    flex: 1; font-size: 11px; font-weight: 600; padding: 5px 4px; border-radius: 5px;
+    border: 1px solid; background: #fff;
+  }
+  .tc-actions .to-always  { color: var(--t1); border-color: var(--t1-line); }
+  .tc-actions .to-always:hover  { background: var(--t1-bg); }
+  .tc-actions .to-context { color: var(--t2); border-color: var(--t2-line); }
+  .tc-actions .to-context:hover { background: var(--t2-bg); }
+  .tc-actions .to-mute    { color: var(--mute); border-color: var(--mute-line); }
+  .tc-actions .to-mute:hover    { background: var(--mute-bg); }
+  .lib-empty { padding: 18px 10px; font-size: 12px; color: var(--muted); font-style: italic; text-align: center; }
+
+  /* ---------- board lanes ---------- */
+  .lanes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .lane { border-radius: 10px; border: 1px solid var(--line); overflow: hidden; background: #fff; }
+  .lane header { padding: 11px 13px 9px; border-bottom: 1px solid var(--line); }
+  .lane-title-row { display: flex; align-items: baseline; gap: 8px; }
+  .lane-title { font-size: 13px; font-weight: 700; flex: 1; display: flex; align-items: center; gap: 7px; }
+  .lane-title .swatch { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+  .lane-count {
+    font-size: 11px; font-weight: 600; color: var(--muted);
+    background: var(--bg-soft); border-radius: 9px; padding: 0 7px; min-width: 22px; text-align: center;
+  }
+  .lane-sub { font-size: 10.5px; color: var(--muted); margin-top: 2px; letter-spacing: .01em; }
+  .lane-body { padding: 9px; min-height: 150px; transition: background .12s; }
+  .lane[data-lane="always"]  .swatch { background: var(--t1); }
+  .lane[data-lane="context"] .swatch { background: var(--t2); }
+  .lane[data-lane="mute"]    .swatch { background: var(--mute); }
+  .lane.drag-over[data-lane="always"]  .lane-body { background: var(--t1-bg); }
+  .lane.drag-over[data-lane="context"] .lane-body { background: var(--t2-bg); }
+  .lane.drag-over[data-lane="mute"]    .lane-body { background: var(--mute-bg); }
+  .lane-hint {
+    border: 1.5px dashed var(--line-strong); border-radius: 8px; padding: 18px 14px;
+    font-size: 11.5px; color: #999; text-align: center; line-height: 1.5; margin: 2px;
+  }
+  .lane-hint b { color: #777; font-weight: 600; }
+
+  .lane-card {
+    display: flex; align-items: center; gap: 6px; cursor: grab;
+    border: 1px solid; border-radius: 7px; padding: 7px 9px; margin-bottom: 7px;
+    font-size: 12.5px; background: #fff; position: relative;
+  }
+  .lane-card:active { cursor: grabbing; }
+  .lane-card.dragging { opacity: .45; }
+  .lane[data-lane="always"]  .lane-card { border-color: var(--t1-line); background: var(--t1-bg); }
+  .lane[data-lane="context"] .lane-card { border-color: var(--t2-line); background: var(--t2-bg); }
+  .lane[data-lane="mute"]    .lane-card { border-color: var(--mute-line); background: var(--mute-bg); color: var(--mute); }
+  .lc-name { flex: 1; min-width: 0; font-weight: 600; line-height: 1.3; }
+  .lc-controls { display: flex; gap: 3px; opacity: 0; transition: opacity .12s; flex: none; }
+  .lane-card:hover .lc-controls, .lane-card:focus-within .lc-controls { opacity: 1; }
+  .lc-controls button {
+    font-size: 10px; line-height: 1; padding: 4px 6px; border-radius: 4px;
+    border: 1px solid rgba(0,0,0,.14); background: rgba(255,255,255,.85); color: #555;
+  }
+  .lc-controls button:hover { background: #fff; color: #111; }
+  .lc-controls .lc-x:hover { color: var(--danger); border-color: #f3c5be; }
+
+  /* ---------- lower panels ---------- */
+  .panels { display: grid; grid-template-columns: 1.25fr 1fr; gap: 14px; margin-top: 14px; }
+  .panel { border: 1px solid var(--line); border-radius: 10px; background: #fff; overflow: hidden; }
+  .panel > header {
+    padding: 11px 14px 9px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  }
+  .panel h2 {
+    font-size: 12px; margin: 0; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--muted); font-weight: 700;
+  }
+  .panel .panel-note { font-size: 10.5px; color: var(--muted); }
+  .panel-body { padding: 12px 14px 14px; }
+
+  /* brief preview */
+  .brief-item { display: flex; gap: 11px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .brief-item:last-of-type { border-bottom: none; }
+  .brief-ord {
+    flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--accent);
+    color: #fff; font-size: 11px; font-weight: 700; display: flex;
+    align-items: center; justify-content: center; margin-top: 1px;
+  }
+  .brief-item.ctx .brief-ord { background: #fff; color: var(--t2); border: 1.5px solid var(--t2-line); }
+  .brief-head { font-size: 13px; font-weight: 600; line-height: 1.35; }
+  .brief-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .brief-meta .ts { color: var(--accent); font-weight: 600; cursor: pointer; }
+  .brief-meta .ctx-badge {
+    font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--t2); background: var(--t2-bg); border: 1px solid var(--t2-line);
+    padding: 0 5px; border-radius: 3px; margin-left: 5px;
+  }
+  .brief-muted {
+    margin-top: 10px; padding: 7px 10px; border-radius: 6px; background: var(--mute-bg);
+    font-size: 11px; color: var(--mute);
+  }
+  .brief-empty { padding: 6px 0 2px; }
+  .ghost-item { display: flex; gap: 11px; padding: 9px 0; opacity: .5; }
+  .ghost-ord {
+    flex: none; width: 22px; height: 22px; border-radius: 50%;
+    border: 1.5px dashed var(--line-strong);
+  }
+  .ghost-lines { flex: 1; padding-top: 3px; }
+  .ghost-l1 { height: 9px; border-radius: 4px; background: var(--bg-soft); width: 78%; }
+  .ghost-l2 { height: 7px; border-radius: 4px; background: var(--bg-soft); width: 45%; margin-top: 6px; }
+  .brief-empty-note { font-size: 12px; color: var(--muted); font-style: italic; margin: 6px 0 0; }
+
+  /* sources */
+  .src-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .src-row:last-of-type { border-bottom: none; }
+  .src-type {
+    flex: none; font-size: 9.5px; font-weight: 700; padding: 2px 7px; border-radius: 9px;
+    text-transform: uppercase; letter-spacing: .04em;
+  }
+  .src-type.podcast { background: #f3e8ff; color: #7c3aed; }
+  .src-type.youtube { background: #fee2e2; color: #dc2626; }
+  .src-info { flex: 1; min-width: 0; }
+  .src-name { font-size: 13px; font-weight: 600; line-height: 1.3; }
+  .src-why { font-size: 10.5px; color: var(--muted); }
+  .src-btns { display: flex; gap: 5px; flex: none; }
+  .src-btns .src-add {
+    font-size: 11px; font-weight: 600; padding: 4px 11px; border-radius: 5px;
+    border: 1px solid var(--accent); color: var(--accent); background: #fff;
+  }
+  .src-btns .src-add:hover { background: var(--t1-bg); }
+  .src-btns .src-no {
+    font-size: 13px; line-height: 1; padding: 4px 7px; border-radius: 5px;
+    border: 1px solid transparent; color: #999; background: none;
+  }
+  .src-btns .src-no:hover { color: var(--danger); background: #fbe9e6; }
+  .src-empty { font-size: 12px; color: var(--muted); font-style: italic; padding: 4px 0; }
+  .my-sources { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .my-sources-h {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); margin-bottom: 4px;
+  }
+  ul.chips { list-style: none; padding: 0; margin: 0; }
+  ul.chips li {
+    display: inline-flex; align-items: center; margin: 4px 6px 0 0;
+    padding: 4px 5px 4px 11px; background: var(--bg-soft); border-radius: 14px; font-size: 12px;
+  }
+  ul.chips li .chip-type { font-size: 9px; margin-right: 5px; }
+  ul.chips li .chip-type.podcast { color: #7c3aed; }
+  ul.chips li .chip-type.youtube { color: #dc2626; }
+  ul.chips li button {
+    margin-left: 5px; padding: 0 5px; background: none; border: none;
+    color: var(--muted); font-size: 14px; line-height: 1;
+  }
+  ul.chips li button:hover { color: var(--danger); }
+
+  /* markdown */
+  details.md-details { margin-top: 14px; }
+  details.md-details summary {
+    cursor: pointer; font-size: 12px; color: var(--muted); padding: 6px 2px; user-select: none;
+  }
+  details.md-details summary:hover { color: var(--fg); }
+  .md-box { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-top: 6px; }
+  .md-tools {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 7px 12px; background: var(--bg-soft); border-bottom: 1px solid var(--line);
+  }
+  .md-tools .md-path { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 11px; color: var(--muted); }
+  .md-tools button {
+    font-size: 11px; padding: 4px 12px; border: 1px solid var(--line-strong);
+    background: #fff; border-radius: 5px;
+  }
+  .md-tools button:hover { background: #fff; border-color: var(--accent); color: var(--accent); }
+  pre#md-out {
+    margin: 0; padding: 14px 16px; max-height: 420px; overflow: auto;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 11.5px;
+    line-height: 1.55; white-space: pre-wrap; word-break: break-word; color: #333;
+  }
+
+  .footer { margin-top: 48px; color: var(--muted); font-size: 11px; text-align: center; }
+
+  /* ---------- responsive ---------- */
+  @media (max-width: 980px) {
+    .workspace { grid-template-columns: 1fr; }
+    .library { position: static; max-height: 420px; }
+    .lanes { grid-template-columns: 1fr; }
+    .lane-body { min-height: 84px; }
+    .panels { grid-template-columns: 1fr; }
+    .lc-controls { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div>
+    <h1>Build your interest profile</h1>
+    <p class="lede">
+      Pick topics from the library and sort them into lanes. The profile biases how your
+      daily brief is ranked &mdash; no markdown required.
+    </p>
+  </div>
+  <div class="strength" aria-label="Profile strength">
+    <div class="strength-label">
+      <span id="strength-name">Empty</span>
+      <span id="strength-counts"></span>
+    </div>
+    <div class="strength-bar"><div id="strength-fill"></div></div>
+  </div>
+</header>
+
+<div class="workspace">
+
+  <aside class="library" id="library">
+    <div class="lib-head">
+      <h2>Topic library</h2>
+      <span class="lib-count" id="lib-count"></span>
+    </div>
+    <div class="lib-tools">
+      <input id="lib-search" type="search" placeholder="Search topics &mdash; tokens, GLP-1, ransomware&hellip;" autocomplete="off">
+      <form class="custom-row" id="custom-form">
+        <input id="custom-input" type="text" placeholder="Add your own topic&hellip;" autocomplete="off">
+        <button type="submit">Add</button>
+      </form>
+    </div>
+    <div id="domains"></div>
+  </aside>
+
+  <main class="board">
+    <div class="lanes">
+      <section class="lane" data-lane="always">
+        <header>
+          <div class="lane-title-row">
+            <div class="lane-title"><span class="swatch"></span>Always surface</div>
+            <span class="lane-count" data-count="always">0</span>
+          </div>
+          <div class="lane-sub">Tier 1 &mdash; these lead every brief</div>
+        </header>
+        <div class="lane-body" data-drop="always"></div>
+      </section>
+      <section class="lane" data-lane="context">
+        <header>
+          <div class="lane-title-row">
+            <div class="lane-title"><span class="swatch"></span>Context</div>
+            <span class="lane-count" data-count="context">0</span>
+          </div>
+          <div class="lane-sub">Tier 2 &mdash; tracked, but never beats Tier 1</div>
+        </header>
+        <div class="lane-body" data-drop="context"></div>
+      </section>
+      <section class="lane" data-lane="mute">
+        <header>
+          <div class="lane-title-row">
+            <div class="lane-title"><span class="swatch"></span>Mute</div>
+            <span class="lane-count" data-count="mute">0</span>
+          </div>
+          <div class="lane-sub">Down-weight &mdash; noise you never want</div>
+        </header>
+        <div class="lane-body" data-drop="mute"></div>
+      </section>
+    </div>
+
+    <div class="panels">
+      <section class="panel">
+        <header>
+          <h2>Tomorrow&rsquo;s brief &mdash; preview</h2>
+          <span class="panel-note">sample items, updates live</span>
+        </header>
+        <div class="panel-body" id="preview-body"></div>
+      </section>
+      <section class="panel">
+        <header>
+          <h2>Starter sources</h2>
+          <span class="panel-note">picked from your top lane</span>
+        </header>
+        <div class="panel-body" id="sources-body"></div>
+      </section>
+    </div>
+
+    <details class="md-details">
+      <summary>Advanced: view as markdown (generated <code>profile.md</code>)</summary>
+      <div class="md-box">
+        <div class="md-tools">
+          <span class="md-path">config/profile.md &mdash; generated from the board</span>
+          <button id="copy-md" type="button">Copy</button>
+        </div>
+        <pre id="md-out"></pre>
+      </div>
+    </details>
+  </main>
+</div>
+
+<p class="footer">Prototype B &mdash; topic library + tier board &middot; all data mocked, nothing is saved</p>
+
+<script>
+'use strict';
+
+/* ============================== data ============================== */
+
+const SOURCES = {
+  bg:          { name: 'BG2 Pod',                   type: 'podcast' },
+  allin:       { name: 'All-In Podcast',            type: 'youtube' },
+  sharptech:   { name: 'Sharp Tech',                type: 'podcast' },
+  dwarkesh:    { name: 'Dwarkesh Podcast',          type: 'youtube' },
+  acq:         { name: 'Acquired',                  type: 'podcast' },
+  v20:         { name: 'The Twenty Minute VC',      type: 'podcast' },
+  asianometry: { name: 'Asianometry',               type: 'youtube' },
+  riskybiz:    { name: 'Risky Business',            type: 'podcast' },
+  darknet:     { name: 'Darknet Diaries',           type: 'podcast' },
+  secnow:      { name: 'Security Now',              type: 'podcast' },
+  odd:         { name: 'Odd Lots',                  type: 'podcast' },
+  compound:    { name: 'The Compound and Friends',  type: 'podcast' },
+  lex:         { name: 'Lex Fridman Podcast',       type: 'youtube' },
+  latent:      { name: 'Latent Space',              type: 'podcast' },
+  nopriors:    { name: 'No Priors',                 type: 'podcast' },
+  a16z:        { name: 'a16z Podcast',              type: 'podcast' },
+  equity:      { name: 'Equity',                    type: 'podcast' },
+  fintakes:    { name: 'Fintech Takes',             type: 'podcast' },
+  catalyst:    { name: 'Catalyst with Shayle Kann', type: 'podcast' },
+  volts:       { name: 'Volts',                     type: 'podcast' },
+  huberman:    { name: 'Huberman Lab',              type: 'youtube' },
+  attia:       { name: 'The Drive (Peter Attia)',   type: 'podcast' },
+  longrun:     { name: 'The Long Run',              type: 'podcast' },
+  wotr:        { name: 'War on the Rocks',          type: 'podcast' },
+  chinatalk:   { name: 'ChinaTalk',                 type: 'podcast' },
+  hardfork:    { name: 'Hard Fork',                 type: 'podcast' },
+  vergecast:   { name: 'The Vergecast',             type: 'podcast' },
+  pivot:       { name: 'Pivot',                     type: 'podcast' },
+  unchained:   { name: 'Unchained',                 type: 'podcast' },
+  bankless:    { name: 'Bankless',                  type: 'youtube' },
+  empire:      { name: 'Empire',                    type: 'podcast' },
+  meco:        { name: 'Main Engine Cut Off',       type: 'podcast' },
+};
+
+/* Each topic: id, n(ame), b(lurb), h(eadline it would surface), s(uggested source keys) */
+const DOMAINS = [
+  { id: 'ai', name: 'AI & compute economics', topics: [
+    { id: 'ai-tokens',  n: 'Token pricing & inference costs', b: 'Cost-per-token trajectories, $/Mtok tiers, batch and cache discounts.', h: 'OpenAI cuts o-series output pricing 60% as inference costs keep falling', s: ['latent','nopriors','bg'] },
+    { id: 'ai-gpu',     n: 'GPU supply & hyperscaler capex', b: 'NVIDIA allocation, lead times, capex guidance from the big clouds.', h: 'Microsoft guides to $80B AI capex; GB300 lead times stretch to 40 weeks', s: ['bg','allin','asianometry'] },
+    { id: 'ai-labs',    n: 'Foundation model labs', b: 'Lab revenue and ARR mix, training costs, talent moves, compute deals.', h: 'Anthropic enterprise ARR triples; API now half of the revenue mix', s: ['dwarkesh','nopriors','hardfork'] },
+    { id: 'ai-agents',  n: 'AI agents & dev tools', b: 'Coding agents and dev-tool adoption, seat economics, retention.', h: 'Cursor passes $500M ARR as agents write 40% of merged code', s: ['latent','lex','v20'] },
+    { id: 'ai-power',   n: 'Datacenters, power & grid', b: 'Siting, interconnect queues, nuclear PPAs, cost per megawatt.', h: 'xAI signs 1.2GW nuclear PPA to anchor its next cluster buildout', s: ['catalyst','volts','bg'] },
+    { id: 'ai-silicon', n: 'Custom silicon vs NVIDIA', b: 'TPU / Trainium / ASIC economics and what the CUDA moat costs to leave.', h: 'Google claims TPU v6 cuts training cost 2.5x versus an H100 fleet', s: ['asianometry','dwarkesh'] },
+    { id: 'ai-open',    n: 'Open vs closed model economics', b: 'Open-weight commoditization, hosting price wars, margin pressure.', h: 'Llama hosting price war squeezes inference margins to single digits', s: ['latent','a16z'] },
+    { id: 'ai-consumer',n: 'AI consumer apps & usage', b: 'Weekly actives, engagement depth, consumer subscription revenue.', h: 'ChatGPT hits 400M weekly users; consumer subs cross a $4B run-rate', s: ['hardfork','pivot'] },
+  ]},
+  { id: 'saas', name: 'Enterprise software & SaaS', topics: [
+    { id: 'sa-earn',   n: 'SaaS earnings & metrics', b: 'ARR, NRR, rule-of-40, RPO and backlog from public software cos.', h: 'Datadog NRR dips below 115% as cloud cost optimization bites', s: ['bg','equity'] },
+    { id: 'sa-disp',   n: 'AI-native displacement', b: 'AI-first products eating incumbent installed bases; named lost deals.', h: 'Glean cited in three lost-deal disclosures on enterprise search renewals', s: ['bg','v20'] },
+    { id: 'sa-seats',  n: 'Seat compression & pricing models', b: 'Per-outcome vs per-seat pricing as agents shrink seat counts.', h: 'ServiceNow pilots per-resolution pricing as AI agents cut seat counts', s: ['bg','acq'] },
+    { id: 'sa-vert',   n: 'Vertical SaaS land-grab', b: 'AI-first entrants in legal, medical, construction; ARR and customer counts.', h: 'Harvey hits $100M ARR as AmLaw 50 adoption accelerates', s: ['v20','equity'] },
+    { id: 'sa-ma',     n: 'Software M&A & take-privates', b: 'Announced and rumored deals, multiples, strategic rationale.', h: 'Thoma Bravo takes another security vendor private at 8x ARR', s: ['acq','equity'] },
+    { id: 'sa-plg',    n: 'PLG & go-to-market shifts', b: 'Self-serve revenue mix, usage-based transitions, time-to-paid.', h: 'Figma says self-serve is now 60% of new ARR post-IPO', s: ['v20','a16z'] },
+    { id: 'sa-cloud',  n: 'Cloud platform wars', b: 'AWS vs Azure vs GCP share shifts and AI revenue disclosure.', h: 'Azure AI services add 13 points to growth; AWS re-accelerates', s: ['bg','sharptech'] },
+    { id: 'sa-ipo',    n: 'Tech IPOs & late-stage privates', b: 'S-1 financials, accumulated deficits, secondaries, valuation resets.', h: 'Databricks S-1 shows 60% growth on a $6B accumulated deficit', s: ['equity','allin'] },
+  ]},
+  { id: 'sec', name: 'Cybersecurity', topics: [
+    { id: 'se-breach', n: 'Breaches & incident disclosures', b: 'Named breach costs, customer counts, dwell-time and pattern shifts.', h: 'UnitedHealth puts total breach cost at $2.9B in an updated filing', s: ['riskybiz','darknet'] },
+    { id: 'se-off',    n: 'AI on offense', b: 'Model-found vulnerabilities, autonomous pentesting, AI-scaled phishing.', h: 'Autonomous agent found 12 zero-days across an open-source stack, lab says', s: ['riskybiz','secnow'] },
+    { id: 'se-def',    n: 'AI on defense & SOC automation', b: 'Alert-triage reduction claims, MDR/XDR pricing, analyst productivity.', h: 'CrowdStrike claims a 70% alert-triage reduction from its agentic SOC', s: ['riskybiz','bg'] },
+    { id: 'se-ma',     n: 'Vendor consolidation & security M&A', b: 'Platform plays, SASE/CNAPP convergence, CIO budget consolidation.', h: 'Palo Alto platformization lands 90 eight-figure consolidation deals', s: ['bg','riskybiz'] },
+    { id: 'se-id',     n: 'Identity & zero trust', b: 'Workforce identity dynamics, bundling pressure, zero-trust adoption.', h: 'Okta workforce bookings slow as Microsoft Entra bundling bites', s: ['riskybiz','secnow'] },
+    { id: 'se-ransom', n: 'Ransomware economics', b: 'Payout trends, cyber-insurance terms, exclusions and premiums.', h: 'Average ransomware payout falls 35% as insurers harden terms', s: ['darknet','riskybiz'] },
+    { id: 'se-supply', n: 'Supply-chain & critical infrastructure', b: 'Software supply-chain compromises, OT and utility intrusions.', h: 'Water-utility OT compromise traced to unpatched VPN appliances', s: ['darknet','secnow'] },
+    { id: 'se-budget', n: 'CISO budget signals', b: 'Security spend as % of IT, line-item shifts, year-on-year growth.', h: 'Security budgets up 12% YoY; spend rotates from prevention to detection', s: ['riskybiz'] },
+  ]},
+  { id: 'fin', name: 'Fintech & payments', topics: [
+    { id: 'fi-rails',  n: 'Payment networks & interchange', b: 'Visa/Mastercard economics, routing rules, regulatory pressure.', h: 'DOJ suit targets debit routing; network take rates under scrutiny', s: ['fintakes','odd'] },
+    { id: 'fi-neo',    n: 'Neobanks & consumer fintech', b: 'Unit economics, ARPU, cross-sell, deposit growth.', h: 'Nubank crosses 100M customers with ARPU up 23% on cross-sell', s: ['fintakes','v20'] },
+    { id: 'fi-stable', n: 'Stablecoins & onchain payments', b: 'Settlement volume, issuer economics, merchant adoption.', h: 'Stablecoin settlement passes Visa quarterly volume for the first time', s: ['unchained','bankless'] },
+    { id: 'fi-credit', n: 'BNPL & consumer credit', b: 'Loss rates, funding costs, subprime mix shifts.', h: 'Affirm 30-day delinquencies tick down despite a subprime mix shift', s: ['fintakes','odd'] },
+    { id: 'fi-baas',   n: 'Banking-as-a-service & infrastructure', b: 'Sponsor-bank crackdowns, embedded finance economics.', h: 'Synapse fallout pushes BaaS deposits back to the top-20 banks', s: ['fintakes'] },
+    { id: 'fi-wealth', n: 'Wealth & trading platforms', b: 'Asset gathering, PFOF, subscription attach on brokerages.', h: 'Robinhood Gold hits 3M subscribers as asset inflows accelerate', s: ['compound','equity'] },
+    { id: 'fi-insur',  n: 'Insurtech & embedded insurance', b: 'Loss ratios, cyber premiums, parametric products.', h: 'Cyber insurance premiums fall 10% as underwriting competition returns', s: ['fintakes'] },
+  ]},
+  { id: 'mkt', name: 'Markets & macro', topics: [
+    { id: 'mk-rates',  n: 'Rates & central banks', b: 'Fed path, term premium, QT mechanics, global policy divergence.', h: 'Fed signals two cuts; the long end sells off on deficit worries', s: ['odd','compound'] },
+    { id: 'mk-earn',   n: 'Megacap tech earnings', b: 'Results, guidance, and the capex-to-revenue handoff that moves indexes.', h: 'NVIDIA guides data-center revenue above $50B for the quarter', s: ['compound','bg'] },
+    { id: 'mk-vc',     n: 'Venture & private markets', b: 'Fund returns, DPI, dry powder, mark-downs and secondaries.', h: 'VC distributions hit a decade low as the DPI gap widens', s: ['v20','allin'] },
+    { id: 'mk-comm',   n: 'Energy & commodities markets', b: 'Oil, uranium, copper supply-demand; datacenter-driven demand.', h: 'Copper squeeze: datacenter buildout adds 1Mt of annual demand', s: ['odd'] },
+    { id: 'mk-fx',     n: 'Currencies & sovereign debt', b: 'Dollar cycle, carry trades, fiscal sustainability scares.', h: 'Japan steps in as the yen breaks 165 and the carry trade unwinds', s: ['odd','compound'] },
+    { id: 'mk-re',     n: 'Housing & real assets', b: 'CRE stress, housing supply, REIT repricing.', h: 'Office CMBS delinquencies hit a post-GFC high', s: ['odd'] },
+    { id: 'mk-ipo',    n: 'Capital markets windows', b: 'IPO issuance, buybacks, convertible waves.', h: 'IPO window reopens: five tech listings price above range', s: ['equity','compound'] },
+  ]},
+  { id: 'geo', name: 'Geopolitics & policy', topics: [
+    { id: 'ge-chips',  n: 'Chip export controls', b: 'HBM and accelerator restrictions, actual vs intended impact.', h: 'New rules cap HBM sales to China; the H20 successor is blocked', s: ['chinatalk','asianometry'] },
+    { id: 'ge-uschina',n: 'US-China tech competition', b: 'Named CEO and policymaker disputes, domestic chip industry pace.', h: 'Huang warns Washington that export rules forfeit the China market', s: ['chinatalk','allin'] },
+    { id: 'ge-taiwan', n: 'Taiwan & semiconductor concentration', b: 'TSMC risk, CHIPS Act execution, fab buildouts outside Taiwan.', h: 'TSMC Arizona yields reach parity with its Taiwan fabs', s: ['asianometry','chinatalk'] },
+    { id: 'ge-aireg',  n: 'AI regulation & safety policy', b: 'EU AI Act, frontier-model bills, compute thresholds.', h: 'Revised frontier-model bill adds a training-compute threshold', s: ['hardfork','chinatalk'] },
+    { id: 'ge-sov',    n: 'Sovereign AI buildouts', b: 'UAE, Saudi, India, EU compute deals and the access regimes attached.', h: 'G42 secures 500k accelerators in a US-brokered access deal', s: ['bg','chinatalk'] },
+    { id: 'ge-def',    n: 'Defense tech & autonomy', b: 'Drones, procurement reform, new primes vs old primes.', h: 'Anduril wins a $22B program of record, beating legacy primes', s: ['wotr','allin'] },
+    { id: 'ge-trade',  n: 'Trade & industrial policy', b: 'Tariff schedules, reshoring subsidies, supply-chain rerouting.', h: 'New tariff schedule spares chips but hits server assemblies', s: ['odd','chinatalk'] },
+    { id: 'ge-energy', n: 'Energy as geopolitical leverage', b: 'Grid interconnects, petro-politics, nuclear diplomacy tied to AI.', h: 'Grid interconnect politics stall AI datacenter siting across Europe', s: ['wotr','volts'] },
+  ]},
+  { id: 'bio', name: 'Health & bio', topics: [
+    { id: 'bi-glp',    n: 'GLP-1s & metabolic health', b: 'Pricing, supply, oral formulations, expanding indications.', h: 'Lilly prices its oral GLP-1 40% below injectables at launch', s: ['attia','odd'] },
+    { id: 'bi-aidrug', n: 'AI in drug discovery', b: 'Pipeline milestones, partnership economics, first AI-designed assets.', h: 'Isomorphic signs a $3B milestone deal; first AI-designed asset hits phase 2', s: ['longrun','nopriors'] },
+    { id: 'bi-long',   n: 'Longevity & preventive medicine', b: 'Biomarkers, screening protocols, actual clinical evidence.', h: 'First rapamycin RCT in healthy adults reports biomarker shifts', s: ['attia','huberman'] },
+    { id: 'bi-fund',   n: 'Biotech funding & M&A', b: 'XBI cycles, licensing deals, pharma takeouts.', h: 'Pharma M&A reopens with three $5B-plus takeouts in a month', s: ['longrun','equity'] },
+    { id: 'bi-diag',   n: 'Diagnostics & early detection', b: 'Liquid biopsy readouts, screening economics, payer coverage.', h: 'Multi-cancer blood test readout cuts late-stage incidence 18%', s: ['attia','longrun'] },
+    { id: 'bi-payers', n: 'Healthcare systems & payers', b: 'Value-based care, PBM reform, hospital economics.', h: 'PBM reform bill caps spread pricing; pharmacy stocks rally', s: ['odd'] },
+    { id: 'bi-neuro',  n: 'Neuroscience & mental health', b: 'Psychedelics trials, neuro devices, sleep and cognition science.', h: 'FDA clears the first closed-loop neurostimulation device for depression', s: ['huberman'] },
+  ]},
+  { id: 'clim', name: 'Climate & energy', topics: [
+    { id: 'cl-nuke',   n: 'Nuclear renaissance', b: 'SMRs, plant restarts, AI-driven power purchase agreements.', h: 'Three Mile Island restart inks a 20-year deal with Microsoft', s: ['volts','catalyst'] },
+    { id: 'cl-solar',  n: 'Solar, storage & the grid', b: 'Battery cost curves, interconnection queues, grid-scale economics.', h: 'Grid-scale battery costs fall below $100/kWh installed', s: ['volts','catalyst'] },
+    { id: 'cl-geo',    n: 'Geothermal & next-gen energy', b: 'Enhanced geothermal wins, fusion milestones, levelized costs.', h: 'Fervo&rsquo;s Utah site hits its 500MW phase at $70/MWh', s: ['catalyst','volts'] },
+    { id: 'cl-ev',     n: 'EVs & batteries', b: 'Chemistry shifts, charging curves, China cost leadership.', h: 'BYD&rsquo;s 5-minute-charge platform resets the EV cost curve', s: ['catalyst','asianometry'] },
+    { id: 'cl-carbon', n: 'Carbon markets & removal', b: 'DAC cost trajectories, offtake deals, credit quality.', h: 'Frontier signs a $500M offtake; DAC costs guide below $300/t', s: ['catalyst'] },
+    { id: 'cl-risk',   n: 'Climate risk & insurance', b: 'Wildfire and flood repricing, insurer exits, parametric cover.', h: 'State Farm&rsquo;s California pullback spreads; parametric products fill the gap', s: ['odd','catalyst'] },
+    { id: 'cl-indus',  n: 'Hydrogen & industrial decarbonization', b: 'Green steel, ammonia, process-heat economics.', h: 'First commercial green-steel plant ships at a €100/t premium', s: ['catalyst','volts'] },
+  ]},
+  { id: 'media', name: 'Media & consumer', topics: [
+    { id: 'me-stream', n: 'Streaming economics', b: 'Churn, ad tiers, bundling, sports rights inflation.', h: 'Netflix ad tier hits 80M MAUs as sports-rights bids escalate', s: ['pivot','vergecast'] },
+    { id: 'me-creator',n: 'Creator economy & platforms', b: 'Monetization splits, creator payouts, studio-scale creators.', h: 'YouTube discloses $70B paid to creators over three years', s: ['pivot','hardfork'] },
+    { id: 'me-gaming', n: 'Gaming', b: 'Engagement, UGC platform payouts, console cycle economics.', h: 'Roblox DAUs hit 100M; creator payouts top $1B annually', s: ['vergecast','equity'] },
+    { id: 'me-social', n: 'Social platforms & attention', b: 'TikTok divestiture, ad-dollar rotation, engagement shifts.', h: 'TikTok divest deadline passes; ad dollars rotate to Reels and Shorts', s: ['pivot','hardfork'] },
+    { id: 'me-ip',     n: 'AI content & IP', b: 'Licensing deals, lawsuits, provenance and training-data economics.', h: 'News Corp&rsquo;s OpenAI deal reprices content licensing at $250M over 5 years', s: ['hardfork','vergecast'] },
+    { id: 'me-comm',   n: 'Commerce & retail media', b: 'Amazon ads, Shopify GMV, cross-border discounters.', h: 'Retail media crosses $60B as Amazon ads margin props up profits', s: ['pivot','equity'] },
+    { id: 'me-sports', n: 'Sports business', b: 'Franchise valuations, PE in leagues, media-rights resets.', h: 'NBA&rsquo;s $76B rights deal triples the annual take; the RSN model collapses', s: ['acq','compound'] },
+  ]},
+  { id: 'crypto', name: 'Crypto & web3', topics: [
+    { id: 'cr-btc',    n: 'Bitcoin & institutional adoption', b: 'ETF flows, corporate treasuries, sovereign positioning.', h: 'Spot ETF flows pass $60B; two S&P 500 firms add BTC to treasury', s: ['bankless','unchained'] },
+    { id: 'cr-rwa',    n: 'Tokenized assets & RWAs', b: 'Tokenized funds, T-bill yield onchain, settlement experiments.', h: 'BlackRock&rsquo;s tokenized fund crosses $2B in onchain T-bills', s: ['unchained','empire'] },
+    { id: 'cr-l2',     n: 'L1/L2 economics', b: 'Fee markets, sequencer revenue, blockspace pricing wars.', h: 'Base sequencer revenue annualizes at $200M as the L2 fee war intensifies', s: ['bankless','empire'] },
+    { id: 'cr-reg',    n: 'Crypto regulation', b: 'Market-structure bills, enforcement reversals, stablecoin law.', h: 'Market-structure bill clears the Senate; SEC drops two flagship suits', s: ['unchained','bankless'] },
+    { id: 'cr-defi',   n: 'DeFi & onchain finance', b: 'Perps volume, real yield, TVL quality.', h: 'Onchain perps volume tops $300B monthly, led by Hyperliquid', s: ['empire','bankless'] },
+    { id: 'cr-ai',     n: 'Crypto x AI', b: 'Decentralized compute markets, agent-to-agent payments.', h: 'Agent-to-agent stablecoin payments pilot clears 1M transactions', s: ['empire','latent'] },
+  ]},
+  { id: 'fron', name: 'Science, space & frontier tech', topics: [
+    { id: 'fr-space',  n: 'Launch & satellite economics', b: 'Starship cadence, constellation P&L, segment-level disclosures.', h: 'Starlink revenue passes $12B; the space division turns an operating profit', s: ['meco','allin'] },
+    { id: 'fr-robot',  n: 'Robotics & embodied AI', b: 'Humanoid pilots, BOM cost curves, factory deployments.', h: 'Figure&rsquo;s BMW pilot expands; humanoid BOM falls below $50k', s: ['lex','nopriors'] },
+    { id: 'fr-quant',  n: 'Quantum computing', b: 'Error-correction milestones, commercialization timelines.', h: 'Logical-qubit milestone: error rates cross threshold at scale', s: ['lex','asianometry'] },
+    { id: 'fr-av',     n: 'Autonomous vehicles', b: 'Robotaxi unit economics, expansion markets, per-mile costs.', h: 'Waymo hits 250k paid rides weekly; per-mile cost nears parity', s: ['sharptech','lex'] },
+    { id: 'fr-indspace',n: 'Space industrialization', b: 'In-space manufacturing, lunar economy, defense-space contracts.', h: 'Varda&rsquo;s third capsule returns with pharma crystallization contracts signed', s: ['meco'] },
+    { id: 'fr-bci',    n: 'Brain-computer interfaces', b: 'Implant trials, capability milestones, competitor progress.', h: 'Second Neuralink patient controls CAD software via implant', s: ['lex','huberman'] },
+    { id: 'fr-mat',    n: 'Materials & advanced manufacturing', b: 'Rare earths, additive manufacturing, reshoring economics.', h: 'MP Materials lands a DoD magnet deal; rare-earth pricing decouples', s: ['odd','asianometry'] },
+  ]},
+];
+
+const LANES = ['always', 'context', 'mute'];
+const LANE_LABEL = { always: 'Always surface', context: 'Context', mute: 'Mute' };
+
+/* ============================== state ============================== */
+
+const state = {
+  placements: new Map(),      // topicId -> laneId (insertion order = lane order)
+  customTopics: [],           // topic objects in the 'custom' pseudo-domain
+  openDomains: new Set(['ai', 'saas']),
+  picked: null,               // topicId with action buttons open
+  search: '',
+  acceptedSources: new Set(), // source keys
+  dismissedSources: new Set(),
+};
+
+const topicIndex = new Map();
+DOMAINS.forEach(d => d.topics.forEach(t => topicIndex.set(t.id, t)));
+
+function allDomains() {
+  if (!state.customTopics.length) return DOMAINS;
+  return [{ id: 'custom', name: 'Your topics', topics: state.customTopics }, ...DOMAINS];
+}
+function topicById(id) {
+  return topicIndex.get(id) || state.customTopics.find(t => t.id === id) || null;
+}
+function laneTopics(lane) {
+  const out = [];
+  for (const [id, l] of state.placements) if (l === lane) { const t = topicById(id); if (t) out.push(t); }
+  return out;
+}
+
+/* ============================== helpers ============================== */
+
+const $ = s => document.querySelector(s);
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+/* deterministic fake timestamp per topic id */
+function fakeTs(id) {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  const total = 300 + (h % 4200); // 5:00 .. 75:00
+  const m = Math.floor(total / 60), s = total % 60;
+  return m + ':' + String(s).padStart(2, '0');
+}
+function htmlToText(s) { const d = document.createElement('div'); d.innerHTML = s; return d.textContent; }
+
+/* ============================== actions ============================== */
+
+function placeTopic(id, lane) {
+  if (!topicById(id)) return;
+  state.placements.delete(id); // re-insert so it lands at the end of the target lane
+  state.placements.set(id, lane);
+  state.picked = null;
+  renderAll();
+}
+function unplaceTopic(id) {
+  state.placements.delete(id);
+  state.picked = null;
+  renderAll();
+}
+function addCustomTopic(name) {
+  const clean = name.trim().replace(/\s+/g, ' ');
+  if (!clean) return;
+  const slug = 'custom-' + clean.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  if (topicById(slug)) { state.picked = slug; renderAll(); return; }
+  state.customTopics.push({
+    id: slug, n: clean, custom: true,
+    b: 'Your own topic — the ranker reads it verbatim.',
+    h: 'Any concrete claim or disclosure about ' + esc(clean.toLowerCase()),
+    s: [],
+  });
+  state.openDomains.add('custom');
+  state.picked = slug; // open lane buttons so the user immediately files it
+  renderAll();
+}
+
+/* ============================== rendering ============================== */
+
+function renderAll() {
+  renderLibrary();
+  renderLanes();
+  renderPreview();
+  renderSources();
+  renderMarkdown();
+  renderStrength();
+}
+
+function topicMatches(t, q) {
+  if (!q) return true;
+  return (t.n + ' ' + t.b + ' ' + htmlToText(t.h)).toLowerCase().includes(q);
+}
+
+function renderLibrary() {
+  const q = state.search.trim().toLowerCase();
+  const root = $('#domains');
+  let total = 0, shown = 0;
+  let html = '';
+  for (const dom of allDomains()) {
+    total += dom.topics.length;
+    const visible = dom.topics.filter(t => !state.placements.has(t.id) && topicMatches(t, q));
+    const placedHere = dom.topics.filter(t => state.placements.has(t.id)).length;
+    if (q && !visible.length) continue;
+    const open = q ? true : state.openDomains.has(dom.id);
+    shown += visible.length;
+    const meta = placedHere
+      ? `${visible.length} left &middot; ${placedHere} placed`
+      : `${visible.length}`;
+    html += `<div class="dom ${open ? 'open' : ''} ${placedHere ? 'has-placed' : ''}" data-dom="${dom.id}">
+      <button type="button" class="dom-head" data-domtoggle="${dom.id}">
+        <span class="tri"></span>
+        <span class="dom-n">${esc(dom.name)}</span>
+        <span class="dom-dot" title="Some topics from this domain are on your board"></span>
+        <span class="dom-meta">${meta}</span>
+      </button>
+      <div class="dom-body">`;
+    if (!visible.length) {
+      html += `<div class="lib-empty">All placed on the board.</div>`;
+    }
+    for (const t of visible) {
+      const picked = state.picked === t.id;
+      html += `<div class="topic-card ${picked ? 'picked' : ''}" draggable="true" data-topic="${t.id}" tabindex="0">
+        <div class="tc-name">${esc(t.n)}</div>
+        <div class="tc-blurb">${esc(t.b)}</div>
+        <div class="tc-ex">&ldquo;${t.h}&rdquo;</div>
+        <div class="tc-actions">
+          <button type="button" class="to-always"  data-place="always"  data-topic="${t.id}">Always</button>
+          <button type="button" class="to-context" data-place="context" data-topic="${t.id}">Context</button>
+          <button type="button" class="to-mute"    data-place="mute"    data-topic="${t.id}">Mute</button>
+        </div>
+      </div>`;
+    }
+    html += `</div></div>`;
+  }
+  if (q && !shown) {
+    html = `<div class="lib-empty">No topics match &ldquo;${esc(state.search)}&rdquo;.<br>
+            Add it as your own topic above.</div>`;
+  }
+  root.innerHTML = html;
+  $('#lib-count').textContent = `${total} topics · ${state.placements.size} placed`;
+}
+
+const LANE_HINTS = {
+  always: '<b>Drag topics here</b> (or click a card and choose a lane).<br>These lead every brief — aim for 3–6.',
+  context: 'Worth tracking, but it never<br>displaces your top lane.',
+  mute: 'Noise you never want —<br>hype, fluff, off-topic chatter.',
+};
+
+function renderLanes() {
+  for (const lane of LANES) {
+    const body = document.querySelector(`[data-drop="${lane}"]`);
+    const topics = laneTopics(lane);
+    document.querySelector(`[data-count="${lane}"]`).textContent = topics.length;
+    if (!topics.length) {
+      body.innerHTML = `<div class="lane-hint">${LANE_HINTS[lane]}</div>`;
+      continue;
+    }
+    body.innerHTML = topics.map(t => {
+      const others = LANES.filter(l => l !== lane);
+      const moveBtns = others.map(l =>
+        `<button type="button" data-move="${l}" data-topic="${t.id}" title="Move to ${LANE_LABEL[l]}">&rarr; ${LANE_LABEL[l].split(' ')[0]}</button>`
+      ).join('');
+      return `<div class="lane-card" draggable="true" data-topic="${t.id}" title="${esc(t.b)}">
+        <span class="lc-name">${esc(t.n)}</span>
+        <div class="lc-controls">${moveBtns}
+          <button type="button" class="lc-x" data-remove="${t.id}" title="Remove from board">&times;</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
+
+function renderPreview() {
+  const body = $('#preview-body');
+  const t1 = laneTopics('always');
+  const t2 = laneTopics('context');
+  const muted = laneTopics('mute');
+
+  if (!t1.length && !t2.length) {
+    body.innerHTML = `
+      <div class="brief-empty">
+        ${[78, 62, 71].map(w => `
+          <div class="ghost-item">
+            <div class="ghost-ord"></div>
+            <div class="ghost-lines"><div class="ghost-l1" style="width:${w}%"></div><div class="ghost-l2"></div></div>
+          </div>`).join('')}
+        <p class="brief-empty-note">Your top stories appear here as you fill the board. Start with <b>Always surface</b>.</p>
+      </div>`;
+    return;
+  }
+
+  const items = [];
+  t1.slice(0, 4).forEach(t => items.push({ t, ctx: false }));
+  t2.slice(0, Math.max(0, 6 - items.length)).forEach(t => items.push({ t, ctx: true }));
+
+  let html = items.map((it, i) => {
+    const src = it.t.s && it.t.s.length ? SOURCES[it.t.s[0]].name : 'your sources';
+    return `<div class="brief-item ${it.ctx ? 'ctx' : ''}">
+      <div class="brief-ord">${i + 1}</div>
+      <div>
+        <div class="brief-head">${it.t.h}</div>
+        <div class="brief-meta">${esc(it.t.n)} &middot; ${esc(src)} &middot; <span class="ts">&#9654; ${fakeTs(it.t.id)}</span>${it.ctx ? '<span class="ctx-badge">context</span>' : ''}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  if (!t1.length && t2.length) {
+    html += `<p class="brief-empty-note">Everything here is context — add topics to <b>Always surface</b> to anchor the brief.</p>`;
+  }
+  if (muted.length) {
+    const names = muted.slice(0, 3).map(t => t.n).join(', ');
+    html += `<div class="brief-muted">&#8722; ${muted.length * 2} candidate${muted.length > 1 ? 's' : ''} suppressed by your mute list (${esc(names)}${muted.length > 3 ? ', …' : ''})</div>`;
+  }
+  body.innerHTML = html;
+}
+
+function renderSources() {
+  const body = $('#sources-body');
+  const t1 = laneTopics('always');
+
+  // accepted chips
+  const accepted = [...state.acceptedSources];
+  const chips = accepted.length ? `
+    <div class="my-sources">
+      <div class="my-sources-h">Your sources (${accepted.length})</div>
+      <ul class="chips">${accepted.map(k => `
+        <li><span class="chip-type ${SOURCES[k].type}">&#9679;</span>${esc(SOURCES[k].name)}
+            <button type="button" data-unsrc="${k}" title="Remove">&times;</button></li>`).join('')}
+      </ul>
+    </div>` : '';
+
+  if (!t1.length) {
+    body.innerHTML = `<div class="src-empty">Add topics to <b>Always surface</b> and starter podcasts &amp; channels show up here.</div>` + chips;
+    return;
+  }
+
+  // union of tier-1 topics' suggestions, keep first suggesting topic for the "why"
+  const suggestions = new Map(); // key -> topicName
+  for (const t of t1) for (const k of (t.s || [])) {
+    if (!suggestions.has(k) && !state.acceptedSources.has(k) && !state.dismissedSources.has(k)) {
+      suggestions.set(k, t.n);
+    }
+  }
+  const rows = [...suggestions].slice(0, 6).map(([k, why]) => `
+    <div class="src-row">
+      <span class="src-type ${SOURCES[k].type}">${SOURCES[k].type === 'youtube' ? 'YouTube' : 'Podcast'}</span>
+      <div class="src-info">
+        <div class="src-name">${esc(SOURCES[k].name)}</div>
+        <div class="src-why">Covers ${esc(why)}</div>
+      </div>
+      <div class="src-btns">
+        <button type="button" class="src-add" data-addsrc="${k}">Add</button>
+        <button type="button" class="src-no" data-nosrc="${k}" title="Not interested">&times;</button>
+      </div>
+    </div>`).join('');
+
+  body.innerHTML = (rows || `<div class="src-empty">No more suggestions — every match is already in your sources.</div>`) + chips;
+}
+
+/* ---------- profile.md generation (mirrors config/profile.md) ---------- */
+
+function topicLine(t) { return t.n; }
+
+function renderMarkdown() {
+  const t1 = laneTopics('always');
+  const t2 = laneTopics('context');
+  const muted = laneTopics('mute');
+
+  const L = [];
+  L.push('# Interest Profile');
+  L.push('');
+  L.push('This file is the bias function for the ranking stage. The model reads it');
+  L.push('verbatim and uses it to filter and rank extracted candidates.');
+  L.push('');
+  L.push('---');
+  L.push('');
+  L.push('## Priority hierarchy');
+  L.push('');
+  L.push('Apply this hierarchy when choosing among candidates. Items in a higher');
+  L.push('tier beat items in a lower tier.');
+  L.push('');
+  if (t1.length) {
+    L.push('**TIER 1 — always lift:**');
+    L.push(t1.map(topicLine).join('; ') + '.');
+    L.push('Credible candidates in these themes beat everything else.');
+  } else {
+    L.push('**TIER 1 — always lift:**');
+    L.push('_(empty — drag topics into "Always surface")_');
+  }
+  L.push('');
+  L.push('**TIER 2 — secondary lift:**');
+  L.push(t2.length
+    ? t2.map(topicLine).join('; ') + '. Important context but should not displace Tier 1 items.'
+    : '_(empty — drag topics into "Context")_');
+  L.push('');
+  L.push('**TIER 3 — mention only if exceptional:**');
+  L.push('Everything else. Skip unless the disclosure is genuinely first-of-its-kind.');
+  L.push('');
+  L.push('---');
+  L.push('');
+  L.push('## Themes I care about');
+  L.push('');
+  const themed = [...t1.map(t => [t, 1]), ...t2.map(t => [t, 2])];
+  if (!themed.length) L.push('_(none yet)_', '');
+  for (const [t, tier] of themed) {
+    L.push(`### ${t.n}  (Tier ${tier})`);
+    L.push(`- ${t.b}`);
+    L.push(`- e.g. "${htmlToText(t.h)}"`);
+    L.push('');
+  }
+  L.push('## Down-weight');
+  L.push('');
+  L.push('These are noise — rank lower or drop entirely:');
+  if (muted.length) for (const t of muted) L.push(`- ${t.n} — ${t.b}`);
+  else L.push('- _(nothing muted yet — drag noise into "Mute")_');
+  L.push('');
+
+  $('#md-out').textContent = L.join('\n');
+}
+
+function renderStrength() {
+  const t1 = laneTopics('always').length;
+  const t2 = laneTopics('context').length;
+  const m = laneTopics('mute').length;
+  const s = state.acceptedSources.size;
+  const pct = Math.min(100, Math.round(
+    Math.min(t1, 4) * 14 + Math.min(t2, 3) * 6 + Math.min(m, 3) * 5 + Math.min(s, 3) * 4 + (t1 > 4 ? 3 : 0)
+  ));
+  $('#strength-fill').style.width = pct + '%';
+  let name = 'Empty — pick a few topics';
+  if (pct > 0)  name = 'Just started';
+  if (pct >= 30) name = 'Taking shape';
+  if (pct >= 60) name = 'Usable profile';
+  if (pct >= 85) name = 'Sharp';
+  $('#strength-name').textContent = name;
+  $('#strength-counts').textContent = (t1 + t2 + m)
+    ? `${t1} always · ${t2} context · ${m} muted · ${s} sources`
+    : '';
+}
+
+/* ============================== events ============================== */
+
+document.addEventListener('click', e => {
+  const btn = e.target.closest('button');
+
+  if (btn) {
+    if (btn.dataset.domtoggle) {
+      const id = btn.dataset.domtoggle;
+      state.openDomains.has(id) ? state.openDomains.delete(id) : state.openDomains.add(id);
+      renderLibrary();
+      return;
+    }
+    if (btn.dataset.place)   { placeTopic(btn.dataset.topic, btn.dataset.place); return; }
+    if (btn.dataset.move)    { placeTopic(btn.dataset.topic, btn.dataset.move); return; }
+    if (btn.dataset.remove)  { unplaceTopic(btn.dataset.remove); return; }
+    if (btn.dataset.addsrc)  { state.acceptedSources.add(btn.dataset.addsrc); renderSources(); renderStrength(); return; }
+    if (btn.dataset.nosrc)   { state.dismissedSources.add(btn.dataset.nosrc); renderSources(); return; }
+    if (btn.dataset.unsrc)   { state.acceptedSources.delete(btn.dataset.unsrc); renderSources(); renderStrength(); return; }
+  }
+
+  // click a library card -> toggle lane buttons (no-drag fallback)
+  const card = e.target.closest('.topic-card');
+  if (card && !e.target.closest('.tc-actions')) {
+    state.picked = state.picked === card.dataset.topic ? null : card.dataset.topic;
+    renderLibrary();
+    return;
+  }
+  // click elsewhere -> close any open card
+  if (state.picked && !e.target.closest('.topic-card')) {
+    state.picked = null;
+    renderLibrary();
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.activeElement && document.activeElement.classList &&
+      document.activeElement.classList.contains('topic-card')) {
+    state.picked = state.picked === document.activeElement.dataset.topic
+      ? null : document.activeElement.dataset.topic;
+    const id = state.picked;
+    renderLibrary();
+    if (id) { const el = document.querySelector(`.topic-card[data-topic="${id}"]`); if (el) el.focus(); }
+  }
+  if (e.key === 'Escape' && state.picked) { state.picked = null; renderLibrary(); }
+});
+
+$('#lib-search').addEventListener('input', e => { state.search = e.target.value; renderLibrary(); });
+
+$('#custom-form').addEventListener('submit', e => {
+  e.preventDefault();
+  addCustomTopic($('#custom-input').value);
+  $('#custom-input').value = '';
+});
+
+/* ---------- drag & drop ---------- */
+
+let dragId = null;
+
+document.addEventListener('dragstart', e => {
+  const el = e.target.closest('[data-topic]');
+  if (!el) return;
+  dragId = el.dataset.topic;
+  el.classList.add('dragging');
+  e.dataTransfer.setData('text/plain', dragId);
+  e.dataTransfer.effectAllowed = 'move';
+});
+document.addEventListener('dragend', e => {
+  const el = e.target.closest('[data-topic]');
+  if (el) el.classList.remove('dragging');
+  dragId = null;
+  document.querySelectorAll('.lane.drag-over').forEach(l => l.classList.remove('drag-over'));
+  $('#library').classList.remove('drop-target');
+});
+
+for (const laneEl of document.querySelectorAll('.lane')) {
+  laneEl.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; laneEl.classList.add('drag-over'); });
+  laneEl.addEventListener('dragleave', e => { if (!laneEl.contains(e.relatedTarget)) laneEl.classList.remove('drag-over'); });
+  laneEl.addEventListener('drop', e => {
+    e.preventDefault();
+    laneEl.classList.remove('drag-over');
+    const id = e.dataTransfer.getData('text/plain') || dragId;
+    if (id) placeTopic(id, laneEl.dataset.lane);
+  });
+}
+
+// drop back onto the library to remove from the board
+const libEl = $('#library');
+libEl.addEventListener('dragover', e => {
+  if (dragId && state.placements.has(dragId)) { e.preventDefault(); libEl.classList.add('drop-target'); }
+});
+libEl.addEventListener('dragleave', e => { if (!libEl.contains(e.relatedTarget)) libEl.classList.remove('drop-target'); });
+libEl.addEventListener('drop', e => {
+  e.preventDefault();
+  libEl.classList.remove('drop-target');
+  const id = e.dataTransfer.getData('text/plain') || dragId;
+  if (id && state.placements.has(id)) unplaceTopic(id);
+});
+
+/* ---------- copy markdown ---------- */
+
+$('#copy-md').addEventListener('click', () => {
+  const text = $('#md-out').textContent;
+  const done = () => {
+    const b = $('#copy-md'); b.textContent = 'Copied';
+    setTimeout(() => { b.textContent = 'Copy'; }, 1400);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done, done);
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch (_) {}
+    document.body.removeChild(ta); done();
+  }
+});
+
+/* ============================== init ============================== */
+renderAll();
+</script>
+</body>
+</html>
