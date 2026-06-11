@@ -72,6 +72,60 @@
   }
   #intro .hint { font-size: 12px; color: var(--muted); margin-top: 10px; }
 
+  /* ---------- Show picker ---------- */
+  #pick-search {
+    width: 100%; padding: 11px 14px; font-size: 14px; border: 1px solid var(--line-strong);
+    border-radius: 8px; font-family: inherit; margin: 2px 0 6px;
+  }
+  #pick-search:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+  .scan-zone { min-height: 0; }
+  .scan-btn {
+    width: 100%; text-align: left; padding: 10px 14px; margin: 6px 0;
+    border: 1px dashed var(--accent); background: #f7faff; color: var(--accent);
+    border-radius: 8px; font-size: 13px;
+  }
+  .scan-status {
+    display: flex; align-items: center; gap: 8px; padding: 10px 14px; margin: 6px 0;
+    font-size: 12.5px; color: #1c3d6e; background: var(--accent-soft);
+    border-radius: 8px; border-left: 3px solid var(--accent);
+  }
+  .scan-status.ok { background: #eaf7e8; border-left-color: var(--good); color: #1c4d12; }
+  .spin {
+    width: 12px; height: 12px; border: 2px solid #b7cef2; border-top-color: var(--accent);
+    border-radius: 50%; animation: spin .7s linear infinite; flex: none;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .pick-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(218px, 1fr));
+    gap: 8px; margin-top: 10px;
+  }
+  .pick-card {
+    text-align: left; padding: 10px 12px; border-radius: 9px; position: relative;
+    border: 1px solid var(--line-strong); transition: border-color .12s, background .12s;
+  }
+  .pick-card .pc-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .pick-card .pc-name { font-weight: 650; font-size: 13px; }
+  .pick-card .pc-eps { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.35; }
+  .pick-card.sel { border-color: var(--accent); background: var(--accent-soft); }
+  .pick-card.sel .pc-eps { color: #3b66a8; }
+  .pick-card .pc-check {
+    position: absolute; top: -7px; right: -7px; width: 18px; height: 18px; border-radius: 50%;
+    background: var(--accent); color: #fff; font-size: 11px; display: none;
+    align-items: center; justify-content: center;
+  }
+  .pick-card.sel .pc-check { display: inline-flex; }
+  .pick-none {
+    padding: 14px; border: 1px dashed var(--line-strong); border-radius: 8px;
+    color: var(--muted); font-size: 12.5px; background: var(--bg-soft); grid-column: 1 / -1;
+  }
+  .pick-foot {
+    position: sticky; bottom: 0; margin-top: 18px; padding: 14px 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0), #fff 30%);
+    display: flex; gap: 14px; align-items: center;
+  }
+  .pick-foot .summary { font-size: 12px; color: var(--muted); }
+  .pick-foot button.primary { padding: 9px 18px; font-size: 14px; }
+
   /* ---------- Rating layout ---------- */
   .rate-grid { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 24px; align-items: start; }
   @media (max-width: 860px) {
@@ -108,6 +162,10 @@
 
   .item-src { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
   .item-src .show { font-weight: 600; color: #333; }
+  .item-src .ep {
+    color: var(--muted); max-width: 320px; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; font-style: italic;
+  }
   .item-src .ts {
     color: var(--accent); font-family: ui-monospace, "SF Mono", Consolas, monospace;
     font-size: 11.5px; text-decoration: none;
@@ -255,7 +313,7 @@
     display: inline-flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 14px;
   }
   #done h2 { font-size: 20px; margin: 0 0 6px; }
-  #done p { font-size: 13.5px; color: var(--muted); max-width: 420px; margin: 6px auto; }
+  #done p { font-size: 13.5px; color: var(--muted); max-width: 460px; margin: 6px auto; }
   #done .stats { display: flex; gap: 10px; justify-content: center; margin: 22px 0; flex-wrap: wrap; }
   #done .stat { padding: 10px 18px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
   #done .stat b { display: block; font-size: 20px; color: var(--fg); }
@@ -269,24 +327,40 @@
   <div class="hero">
     <h1>Train your brief by example</h1>
     <p>Every morning this agent reads hours of podcasts and YouTube and emails you the few claims
-       worth your time. To know what's worth <em>your</em> time, it needs taste — yours.</p>
-    <p>Instead of filling in a form, react to a sample brief. Each card is the kind of item the agent
-       finds: a claim, a quote, a source. Tell it what you'd want in your inbox.</p>
+       worth your time. To know what&rsquo;s worth <em>your</em> time, it needs taste — yours.</p>
+    <p>First you tell it which shows you actually listen to. It scans their recent episodes and builds
+       a training deck <b>from those shows&rsquo; real coverage</b> — then you react to each item and watch
+       it infer your interest profile, live.</p>
     <div class="steps">
-      <div class="step"><span class="n">1</span><b>React to sample items</b>Must&nbsp;have, fine, or don't care. Takes about two minutes.</div>
-      <div class="step"><span class="n">2</span><b>Watch it learn</b>Your interest profile builds itself live as you go — every inference explained.</div>
-      <div class="step"><span class="n">3</span><b>Review &amp; start</b>Approve the profile and a starter set of shows matched to what you loved.</div>
+      <div class="step"><span class="n">1</span><b>Pick your shows</b>Search a directory or paste any RSS/YouTube URL. It scans the recent episodes.</div>
+      <div class="step"><span class="n">2</span><b>React to items from them</b>Must&nbsp;have, fine, or don&rsquo;t care — every card comes from a show you picked.</div>
+      <div class="step"><span class="n">3</span><b>Review &amp; start</b>Approve the inferred profile, plus shows adjacent to yours worth adding.</div>
     </div>
-    <button class="primary" id="start-btn" style="padding:10px 22px;font-size:14px;">Show me the sample brief</button>
-    <div class="hint">No wrong answers — the items deliberately span very different territory.</div>
+    <button class="primary" id="start-btn" style="padding:10px 22px;font-size:14px;">Pick my shows →</button>
+    <div class="hint">No items from territory your shows never touch — the deck is seeded from what they actually cover.</div>
+  </div>
+</section>
+
+<!-- ============================ SHOW PICKER ============================ -->
+<section id="pick" class="screen">
+  <h1>Which shows should I track?</h1>
+  <p class="lede">The training deck is drawn from these shows&rsquo; recent episodes — pick the ones you really listen to.
+     Type to search the directory, or paste an RSS / YouTube URL and I&rsquo;ll scan the feed.</p>
+  <input id="pick-search" type="text" autocomplete="off" spellcheck="false"
+         placeholder="Search shows… or paste an RSS / YouTube URL">
+  <div class="scan-zone" id="scan-zone"></div>
+  <div class="pick-grid" id="pick-grid"></div>
+  <div class="pick-foot">
+    <button class="primary" id="to-rate" disabled title="Select at least one directory show first">Scan episodes &amp; start training →</button>
+    <span class="summary" id="pick-count"></span>
   </div>
 </section>
 
 <!-- ============================ RATING ============================ -->
 <section id="rate" class="screen">
-  <h1>Sample brief — react to each item</h1>
-  <p class="lede">Would you want this in tomorrow's email? <b style="color:#444">★ Must have</b> lifts a theme,
-     <b style="color:#444">Don't care</b> teaches it what to mute. Your profile builds on the right.</p>
+  <h1>Your shows&rsquo; recent coverage — react to each item</h1>
+  <p class="lede" id="rate-lede">Would you want this in tomorrow&rsquo;s email? <b style="color:#444">★ Must have</b> lifts a theme,
+     <b style="color:#444">Don&rsquo;t care</b> teaches it what to mute. Your profile builds on the right.</p>
 
   <div class="progress-row">
     <span class="label" id="progress-label">1 of ~16</span>
@@ -305,12 +379,12 @@
           <div class="react-row">
             <button class="react-btn must" data-react="must">★ Must have <small>front of my brief</small></button>
             <button class="react-btn fine" data-react="fine">Fine <small>worth a glance</small></button>
-            <button class="react-btn skip" data-react="dont">Don't care <small>mute this stuff</small></button>
+            <button class="react-btn skip" data-react="dont">Don&rsquo;t care <small>mute this stuff</small></button>
           </div>
         </div>
       </div>
       <div class="under-row">
-        <span class="keys"><span><kbd>1</kbd> must</span> <span><kbd>2</kbd> fine</span> <span><kbd>3</kbd> don't care</span></span>
+        <span class="keys"><span><kbd>1</kbd> must</span> <span><kbd>2</kbd> fine</span> <span><kbd>3</kbd> don&rsquo;t care</span></span>
         <a id="undo-link" style="visibility:hidden">↩ undo last</a>
       </div>
     </div>
@@ -318,7 +392,7 @@
     <aside id="panel">
       <div class="panel-box">
         <div class="panel-head">Profile — learning live <span class="dot" id="live-dot"></span></div>
-        <div class="infer-box empty" id="infer-box">React to your first item and I'll start inferring what you care about.</div>
+        <div class="infer-box empty" id="infer-box">React to your first item and I&rsquo;ll start inferring what you care about.</div>
         <div class="tier-block">
           <div class="tier-title t1">Tier 1 — always lift</div>
           <div class="chip-row" id="chips-t1"><span class="chip-empty">nothing yet</span></div>
@@ -343,7 +417,7 @@
 <!-- ============================ REVIEW ============================ -->
 <section id="review" class="screen">
   <h1>Your inferred profile</h1>
-  <p class="lede" id="review-lede">Built from your reactions. Adjust anything — move themes between tiers, drop what's wrong. This becomes the ranking rubric for every brief.</p>
+  <p class="lede" id="review-lede">Built from your reactions to your shows&rsquo; episodes. Adjust anything — move themes between tiers, drop what&rsquo;s wrong. This becomes the ranking rubric for every brief.</p>
 
   <h2 class="sec">Tier 1 — always lift</h2>
   <div id="rev-t1" class="review-grid"></div>
@@ -360,8 +434,8 @@
     <div class="adv-actions"><button id="copy-md">Copy markdown</button> <span id="copy-ok" style="font-size:11px;color:var(--good);visibility:hidden">copied</span></div>
   </details>
 
-  <h2 class="sec">Suggested starter sources</h2>
-  <p class="lede" style="margin-bottom:12px" id="src-lede">Shows that reliably cover your Tier 1 themes. Toggle off any you don't want — you can always add more later.</p>
+  <h2 class="sec">Shows adjacent to yours</h2>
+  <p class="lede" style="margin-bottom:12px" id="src-lede">Suggested because they cover the themes you starred — never shows you already added. Toggle off any you don&rsquo;t want.</p>
   <div id="rev-sources"></div>
 
   <div class="save-bar">
@@ -392,11 +466,11 @@ const THEMES = {
   'ai-econ': {
     label: 'AI cost economics & tokenomics',
     chip: 'AI cost economics',
-    t1line: 'AI tokenomics — cost-per-token and $/Mtok trajectories, inference margins, cache and batch pricing tiers',
+    t1line: 'AI tokenomics — cost-per-token and $/Mtok trajectories, inference margins, GPU-rental and custom-silicon economics',
     bullets: [
       'Cost-per-token / $/Mtok trajectories — input, output, cached, batch tiers; year-on-year reductions',
-      'Inference economics: tokens/sec per chip per dollar, prefill vs decode cost split, KV-cache reuse efficiency',
-      'Token-pricing-tier launches and lab pricing changes (OpenAI, Anthropic, Google, xAI)',
+      'Inference economics: tokens/sec per chip per dollar, neocloud rental margins, utilization break-evens',
+      'Custom-silicon vs NVIDIA cost comparisons; token-pricing-tier launches and lab pricing changes',
     ],
     down: 'AI pricing and inference-cost discussion',
   },
@@ -407,7 +481,7 @@ const THEMES = {
     bullets: [
       'Hyperscaler AI capex commitments, pace, and guidance changes',
       'GPU allocation, lead times, and depreciation schedule changes that move earnings',
-      'Power, datacenter siting, and grid constraints — capacity & cost framing',
+      'Capex cycle history and overshoot signals — capacity & cost framing',
     ],
     down: 'Datacenter capex and GPU supply chatter',
   },
@@ -440,7 +514,7 @@ const THEMES = {
     bullets: [
       'Stablecoin and real-time settlement volume vs card networks; take-rate compression',
       'Consumer-credit signals: BNPL delinquencies, charge-off trends, cohort data',
-      'Interchange, processing margin, and embedded-finance unit economics',
+      'Interchange, processing margin, and neobank / embedded-finance unit economics',
     ],
     down: 'Fintech and payments coverage',
   },
@@ -451,17 +525,16 @@ const THEMES = {
     bullets: [
       'AI-designed molecules hitting clinical milestones — timelines vs industry baseline',
       'Platform economics: cost-per-candidate, partnership and milestone deal structures',
-      'Manufacturing-capacity constraints as the binding market limit (e.g. GLP-1s)',
     ],
     down: 'Biotech and drug-discovery coverage',
   },
   'energy': {
     label: 'Energy, power & datacenter siting',
     chip: 'Energy & power',
-    t1line: 'energy economics where they meet compute — PPAs, $/MWh trends, nuclear deals tied to AI',
+    t1line: 'energy economics where they meet compute — PPAs, $/MWh trends, interconnection-queue and grid constraints',
     bullets: [
       'Nuclear and firmed-renewable PPAs tied to datacenters — $/MWh and term disclosures',
-      'Solar+storage and gas cost crossover points; interconnection-queue dynamics',
+      'Solar+storage, geothermal, and gas cost crossover points; interconnection-queue dynamics',
       'Grid constraints as a gating factor on AI buildout',
     ],
     down: 'Energy and climate-tech coverage',
@@ -469,24 +542,24 @@ const THEMES = {
   'macro': {
     label: 'Markets & macro',
     chip: 'Markets & macro',
-    t1line: 'market-structure and credit signals that touch tech — spreads, issuance, IPO-window dynamics',
+    t1line: 'market-structure and credit signals that touch tech — spreads, issuance, concentration, megacap earnings',
     bullets: [
       'Credit-market signals around tech capex: spreads, issuance volumes, neocloud leverage',
-      'IPO window: S-1 pipeline, filing financials, pricing vs last private rounds',
+      'Megacap earnings and concentration dynamics framed through the AI trade',
       'Rate and liquidity shifts framed through their effect on growth assets',
     ],
     down: 'General markets and macro commentary',
   },
   'consumer': {
-    label: 'Consumer, media & creator economy',
+    label: 'Consumer, media & platform strategy',
     chip: 'Consumer & media',
-    t1line: 'consumer subscription and creator-economy unit economics',
+    t1line: 'consumer platform strategy and media economics — bundling, churn, aggregation shifts',
     bullets: [
       'Streaming churn, bundling economics, CAC vs LTV disclosures',
-      'Creator monetization: RPM trends, platform take-rate changes',
+      'Platform-strategy shifts: aggregation, default-assistant battles, business-model constraints',
       'Consumer-subscription pricing power and retention data',
     ],
-    down: 'Consumer media and creator-economy coverage',
+    down: 'Consumer media and platform-strategy coverage',
   },
   'geo': {
     label: 'Semiconductors & AI geopolitics',
@@ -507,204 +580,587 @@ const THEMES = {
       'Architecture and systems internals when the speaker quantifies the cost or performance consequence',
       'Benchmark and efficiency claims with reproducible numbers',
     ],
-    down: 'Pure engineering walkthroughs ("here\'s how it works") with no cost or competitive outcome attached',
+    down: 'Pure engineering walkthroughs ("here’s how it works") with no cost or competitive outcome attached',
+  },
+  'venture': {
+    label: 'Venture & private markets',
+    chip: 'Venture & funds',
+    t1line: 'venture-market mechanics — DPI and fund returns, secondaries pricing, IPO-window dynamics',
+    bullets: [
+      'Fund returns and DPI disclosures; LP pressure, re-up rates, secondaries discounts',
+      'IPO window: S-1 pipeline, filing financials, pricing vs last private rounds',
+      'Structural shifts: evergreen vehicles, solo GPs, valuation resets',
+    ],
+    down: 'Venture-market inside baseball',
+  },
+  'frontier': {
+    label: 'Robotics, space & autonomy',
+    chip: 'Frontier tech',
+    t1line: 'frontier-tech unit economics — robotaxi cost per mile, launch costs, robot-data economics, BCI milestones',
+    bullets: [
+      'Robotaxi and AV unit economics: cost per mile, utilization, expansion pace',
+      'Launch / satellite economics and humanoid-robot data-cost curves',
+      'Capability milestones with deployment numbers attached (BCI, quantum, defense autonomy)',
+    ],
+    down: 'Robotics, space, and autonomy coverage',
+  },
+  'health': {
+    label: 'Health & longevity science',
+    chip: 'Health & longevity',
+    t1line: 'health and longevity findings with named studies and effect sizes',
+    bullets: [
+      'Protocols backed by named trials and effect sizes — not anecdote',
+      'GLP-1 metabolic findings: lean-mass data, supply economics, expanding indications',
+      'Longevity biomarkers (VO2 max, ApoB) with hazard-ratio evidence',
+    ],
+    down: 'Health, longevity, and protocol coverage',
   },
   'hype': {
-    label: 'Big-vision quotes & hype',
+    label: 'Big-vision quotes & filler',
     chip: 'Big-vision quotes',
     t1line: 'big-picture vision statements from credible operators, even when unquantified',
     bullets: [
       'Sweeping directional claims from founders/operators with real skin in the game',
     ],
-    // when negative this expands into the classic noise list:
     downList: [
       'Generic "AI will change everything" framing',
       'Vague predictions without timeframes or numbers',
-      'Hype quotes about partnership announcements without substance',
-      '"We\'re really excited about..." filler',
+      'Sponsor reads, partnership-announcement filler, and host banter segments',
+      '"We’re really excited about..." filler',
     ],
     down: 'Unquantified hype and excitement filler',
   },
 };
 
 /* ================================================================
-   SAMPLE BRIEF ITEMS — deliberately spanning very different territory
+   MOCK SHOW DIRECTORY — the seed corpus.
+   Every show carries 6-8 recent episodes, each distilled to one
+   brief-item-able claim + supporting quote + timestamp, tagged with
+   a theme. The training deck is drawn ONLY from selected shows.
    ================================================================ */
-const ITEMS = [
-  // --- AI infra economics ---
-  { id:'tok1', theme:'ai-econ', facet:'the $/Mtok item',
-    claim:'Serving GPT-4-class output now costs ~$0.40/Mtok — a 40x decline in 18 months, and the curve hasn’t flattened',
-    quote:'People haven’t internalized this. The tokens we sold for sixty dollars a million in early ’23 — we can serve a strictly better model today for under fifty cents. And there is nothing in the data that says that curve is bending.',
-    speaker:'Infra lead, frontier lab', show:'BG2 Pod', medium:'youtube', ts:'41:22' },
-  { id:'tok2', theme:'ai-econ', facet:'the cached-token margin item',
-    claim:'Cached-input pricing is the quiet margin lever: 90% discounts that still carry ~70% gross margin',
-    quote:'Everyone watches the headline price per million. The actual business is in cache hits — you re-serve the same prefix at a tenth of the price and your margin on that token goes up, not down.',
-    speaker:'AI infra investor', show:'No Priors', medium:'podcast', ts:'28:05' },
-  { id:'tok3', theme:'ai-econ', facet:'the batch-pricing item',
-    claim:'Batch-tier tokens are commoditizing first — three labs now priced within 8% of each other',
-    quote:'On the batch tier there’s effectively no differentiation left. Three labs within eight percent on price. The premium real-time tier is where the pricing power still lives.',
-    speaker:'Guest', show:'Latent Space', medium:'podcast', ts:'52:40' },
-
-  // --- Compute capex ---
-  { id:'capex1', theme:'gpu-capex', facet:'the hyperscaler-capex item',
-    claim:'Combined hyperscaler AI capex guided to $480B for 2026 — up 55% year on year',
-    quote:'Add up the four prints: four hundred and eighty billion dollars. The market’s question is no longer "can they spend it" — it’s what the depreciation schedule does to 2028 earnings.',
-    speaker:'Guest', show:'BG2 Pod', medium:'youtube', ts:'12:31' },
-  { id:'capex2', theme:'gpu-capex', facet:'the GPU-depreciation item',
-    claim:'Quietly stretching GPU depreciation from 4 to 6 years is worth ~$30B of 2026 hyperscaler earnings',
-    quote:'Two extra years of useful life across that fleet is thirty billion dollars of earnings that didn’t come from selling anything. Auditors signed off, but the second-hand H100 market will tell us if it was true.',
-    speaker:'Analyst guest', show:'Odd Lots', medium:'podcast', ts:'33:18' },
-
-  // --- SaaS ---
-  { id:'saas1', theme:'saas', facet:'the seat-compression item',
-    claim:'A Fortune-100 insurer renewed at 40% fewer support seats after deploying agents — and forced per-resolution pricing',
-    quote:'They didn’t churn, and that’s what should scare the vendor. They renewed — at forty percent fewer seats — and demanded to be billed per resolved ticket. That contract structure is the whole story of the next five years of SaaS.',
-    speaker:'Enterprise software CEO', show:'20VC', medium:'podcast', ts:'58:47' },
-  { id:'saas2', theme:'saas', facet:'the AI-displacement item',
-    claim:'Cursor displaced GitHub Copilot at three of the ten largest US banks this quarter',
-    quote:'These are not startups experimenting. Three of the ten biggest banks in the country ripped out the incumbent this quarter. Distribution was supposed to be the moat.',
-    speaker:'Guest', show:'Lenny’s Podcast', medium:'youtube', ts:'1:04:12' },
-  { id:'saas3', theme:'saas', facet:'the NRR item',
-    claim:'Public SaaS median NRR slipped to 104% — the first sub-105 print since 2017',
-    quote:'One-oh-four median net retention. That’s not a demand story, that’s a structural story — expansion revenue was the engine of every model in the sector and it is decelerating in plain sight.',
-    speaker:'Guest', show:'Acquired', medium:'podcast', ts:'1:21:30' },
-
-  // --- Security ---
-  { id:'sec1', theme:'security', facet:'the ransomware-economics item',
-    claim:'Average ransomware recovery cost hit $4.7M while actual payouts fell 35% — insurers are forcing refusal to pay',
-    quote:'Recovery cost is up, payment rate is down by a third. The insurers did what regulation couldn’t — they just stopped covering the ransom, and the attackers’ unit economics broke.',
-    speaker:'Host', show:'Risky Business', medium:'podcast', ts:'22:48' },
-  { id:'sec2', theme:'security', facet:'the AI-found-zero-days item',
-    claim:'An autonomous red-team model found 14 exploitable zero-days in shipped enterprise software in a single quarter',
-    quote:'Fourteen real, exploitable vulnerabilities in one quarter, found by a model running unattended. The asymmetry question is no longer theoretical — patching cadence was designed for human-speed discovery.',
-    speaker:'Guest, security researcher', show:'Risky Business', medium:'podcast', ts:'41:09' },
-  { id:'sec3', theme:'security', facet:'the security-consolidation item',
-    claim:'Palo Alto’s platform bundling pushed three point-solution vendors below 90% gross retention',
-    quote:'When the platform guy gives away your category as a bundle line-item, your gross retention tells the story. Three public point vendors are now under ninety. The consolidation wave is here, it’s just unevenly distributed.',
-    speaker:'Guest CISO', show:'Security Weekly', medium:'youtube', ts:'36:55' },
-
-  // --- Fintech ---
-  { id:'fin1', theme:'fintech', facet:'the stablecoin-settlement item',
-    claim:'Stablecoin settlement crossed $12T annualized — more than Visa and Mastercard combined',
-    quote:'Twelve trillion dollars of annualized settlement. Most of it is exchange flow, fine — but even the conservative cut of real commerce is growing 80% a year, and the card networks’ take rate is the bullseye.',
-    speaker:'Guest', show:'Fintech Takes', medium:'podcast', ts:'18:26' },
-  { id:'fin2', theme:'fintech', facet:'the BNPL-credit item',
-    claim:'BNPL delinquencies doubled in six months in the subprime cohort — the sector’s first real credit-cycle test',
-    quote:'These books have never seen a cycle. Subprime delinquency doubled in two quarters and the originate-to-hold players are about to learn why credit cards price the way they do.',
-    speaker:'Guest', show:'Odd Lots', medium:'podcast', ts:'45:02' },
-
-  // --- Biotech ---
-  { id:'bio1', theme:'biotech', facet:'the AI-antibody item',
-    claim:'First AI-designed antibody cleared Phase 2 — nine months from target to IND vs the industry’s 4.5-year average',
-    quote:'Nine months from target selection to IND filing. The industry average is fifty-four months. If the Phase 3 reads out, the cost structure of the entire discovery industry is wrong.',
-    speaker:'Biotech founder', show:'The Long Run', medium:'podcast', ts:'27:14' },
-  { id:'bio2', theme:'biotech', facet:'the GLP-1-capacity item',
-    claim:'GLP-1 supply, not demand, caps the market — Novo’s manufacturing capex now rivals a mid-size chip fab',
-    quote:'Demand is functionally infinite at this price point. The binding constraint is fill-finish capacity, and Novo is spending fab-scale money — eight billion a year — to build it.',
-    speaker:'Guest analyst', show:'Business Breakdowns', medium:'podcast', ts:'31:40' },
-
-  // --- Energy / climate ---
-  { id:'enr1', theme:'energy', facet:'the nuclear-PPA item',
-    claim:'Microsoft’s Three Mile Island PPA pencils to ~$110/MWh — 2.5x grid rate, signed for 20 years',
-    quote:'Run the math on the restart cost and the term: they’re paying something like a hundred and ten dollars a megawatt-hour for twenty years. That’s not an energy trade, that’s a statement that firm power is the scarce input.',
-    speaker:'Host', show:'Catalyst with Shayle Kann', medium:'podcast', ts:'14:53' },
-  { id:'enr2', theme:'energy', facet:'the solar-storage-cost item',
-    claim:'Solar-plus-storage cleared at $38/MWh in Texas — under new-build gas, without subsidies',
-    quote:'Thirty-eight dollars a megawatt-hour, firmed, in ERCOT, no ITC in that number. New gas can’t get under forty-five with current turbine lead times. The crossover already happened; the market just hasn’t repriced it.',
-    speaker:'Guest developer', show:'Volts', medium:'podcast', ts:'49:21' },
-
-  // --- Macro / markets ---
-  { id:'mac1', theme:'macro', facet:'the credit-spread item',
-    claim:'High-yield spreads at 280bps aren’t pricing an AI-capex credit cycle — neocloud debt issuance tripled this year',
-    quote:'GPU-backed lending tripled and spreads barely moved. Either the collateral is better than anyone thinks, or credit is making the same mistake it made with telecom fiber in 1999.',
-    speaker:'Guest', show:'Odd Lots', medium:'podcast', ts:'08:44' },
-  { id:'mac2', theme:'macro', facet:'the IPO-window item',
-    claim:'The IPO window is reopening: 14 enterprise software S-1s on file, median ARR $400M',
-    quote:'Fourteen S-1s in the pipeline, median four hundred million of ARR, median growth thirty-eight percent. The interesting part is the accumulated-deficit lines — some of these are records.',
-    speaker:'Guest banker', show:'20VC', medium:'podcast', ts:'24:17' },
-
-  // --- Consumer / media ---
-  { id:'con1', theme:'consumer', facet:'the streaming-churn item',
-    claim:'Streaming churn hit 5.5% monthly — bundles are back because CAC now exceeds LTV in a third of subs',
-    quote:'At five and a half percent monthly churn, a third of your subscriber adds never pay back their acquisition cost. That’s why every service is suddenly in a bundle — it’s not strategy, it’s arithmetic.',
-    speaker:'Guest', show:'The Town', medium:'podcast', ts:'19:38' },
-  { id:'con2', theme:'consumer', facet:'the creator-RPM item',
-    claim:'Median short-form creator RPM fell 22% this year as AI-generated content floods feeds',
-    quote:'Supply of watchable content just went vertical, and the ad pool didn’t. Median RPM down twenty-two percent. Mid-tier creators are the ones getting squeezed out first.',
-    speaker:'Host', show:'Colin and Samir', medium:'youtube', ts:'42:55' },
-
-  // --- Geopolitics ---
-  { id:'geo1', theme:'geo', facet:'the export-control-loophole item',
-    claim:'H20-class chips reached China at 3x reported volume via Malaysia transshipment, per customs-data analysis',
-    quote:'Match the export manifests against Malaysian import data and there’s a three-x gap. The controls aren’t failing at the policy level, they’re failing at the freight-forwarder level.',
-    speaker:'Guest researcher', show:'ChinaTalk', medium:'podcast', ts:'37:42' },
-  { id:'geo2', theme:'geo', facet:'the TSMC-Arizona item',
-    claim:'TSMC Arizona yields are now within 4 points of Hsinchu — at 30% higher cost per wafer',
-    quote:'The yield story is basically solved — four points off the mothership. The cost story is not: thirty percent more per wafer, and that delta is structural, not a learning curve.',
-    speaker:'Guest', show:'Sharp Tech', medium:'podcast', ts:'26:09' },
-  { id:'geo3', theme:'geo', facet:'the sovereign-AI item',
-    claim:'The UAE’s 5GW AI campus comes with a US-controlled access regime — compute is becoming foreign policy',
-    quote:'Read the terms: American cloud providers operate the clusters, American export rules govern who touches them. Five gigawatts of sovereignty that isn’t actually sovereign. That template is the interesting part.',
-    speaker:'Guest', show:'ChinaTalk', medium:'podcast', ts:'1:02:33' },
-
-  // --- Pure engineering ---
-  { id:'eng1', theme:'eng', facet:'the attention-internals item',
-    claim:'Deep dive: how sliding-window attention with summary tokens keeps gradient flow across an 8x-smaller KV cache',
-    quote:'You keep a rolling window per head, re-derive global context through learned summary tokens, and the elegant bit is the gradient still flows through the summaries during training. Let me walk through the masking.',
-    speaker:'Research guest', show:'Latent Space', medium:'podcast', ts:'1:11:05' },
-  { id:'eng2', theme:'eng', facet:'the Postgres-internals item',
-    claim:'Inside Postgres’ new async I/O: the io_uring rewrite that doubles sequential scan throughput',
-    quote:'The executor used to block on every read-ahead miss. With io_uring you queue the next eight extents before the scan needs them — here’s how the buffer manager changed to make that safe.',
-    speaker:'Core contributor', show:'The Changelog', medium:'podcast', ts:'54:30' },
-
-  // --- Hype / fluff ---
-  { id:'hyp1', theme:'hype', facet:'the “AI changes everything” quote',
+const DIRECTORY = [
+ { id:'allin', name:'All-In Podcast', medium:'youtube', m:['allin','all-in'],
+   why:'Roundtable on tech, markets and venture — capex, macro, and the occasional food fight.',
+   items:[
+  { theme:'gpu-capex', facet:'capex-bubble-math item', ep:'E231: NVIDIA’s blowout quarter, the capex arms race & bubble math', ts:'1:22:40',
+    claim:'Hyperscaler capex now equals 28% of combined operating cash flow — 1999 telecom peaked at 31%',
+    quote:'Run the bubble math: twenty-eight percent of operating cash flow going to capex. Telecom hit thirty-one in ’99. The difference is these guys fund it from earnings, not debt — for now.',
+    speaker:'Bestie roundtable' },
+  { theme:'macro', facet:'rate-cut item', ep:'E236: Fed signals two cuts; the long end isn’t buying it', ts:'38:12',
+    claim:'The Fed signaled two cuts but the 10-year sold off 30bps — the bond market is pricing fiscal risk, not inflation',
+    quote:'Short end rallied, long end sold off thirty basis points the same afternoon. That’s not an inflation trade, that’s term premium — the market is repricing the deficit.',
+    speaker:'Macro bestie' },
+  { theme:'venture', facet:'venture-liquidity item', ep:'E234: The IPO window reopens + venture’s DPI reckoning', ts:'52:30',
+    claim:'Median 2018-vintage fund has returned just 0.3x DPI — LPs are now selling stakes at 30% discounts',
+    quote:'Point-three DPI on an eight-year-old fund. The secondary desks are doing record volume at thirty-percent discounts. That is the quiet repricing of the entire asset class.',
+    speaker:'Guest LP' },
+  { theme:'energy', facet:'power-crunch item', ep:'E238: The datacenter power crunch: nuclear PPAs, gas turbines, grid fights', ts:'1:04:45',
+    claim:'Gas turbine lead times stretched to 5 years — datacenters are now buying behind-the-meter generation outright',
+    quote:'You cannot get a turbine before 2030. So the hyperscalers stopped asking the utility and started buying the generation themselves. That’s a structural break in how the grid gets built.',
+    speaker:'Guest, energy investor' },
+  { theme:'geo', facet:'tariff-schedule item', ep:'E232: Tariff schedule drops — chips spared, server assemblies hit', ts:'27:58',
+    claim:'New tariffs exempt GPUs but hit assembled servers at 25% — final assembly moves onshore within 18 months',
+    quote:'Read the schedule: the chip crosses free, the finished server pays twenty-five percent. Every ODM is standing up US final assembly by mid-next-year. That was the whole point.',
+    speaker:'Bestie roundtable' },
+  { theme:'frontier', facet:'robotaxi-economics item', ep:'E237: Waymo’s 250k weekly rides — robotaxi unit economics get real', ts:'44:20',
+    claim:'Waymo hit 250k paid weekly rides with per-mile costs down 40% year over year',
+    quote:'A quarter million paid rides a week and cost per mile down forty percent in a year. At this slope they undercut human rideshare in their launch markets by 2027.',
+    speaker:'Bestie roundtable' },
+  { theme:'hype', facet:'“AI is the new electricity” quote', ep:'E233: OpenAI restructures + foundation-model endgame', ts:'1:32:18',
     claim:'“AI is the new electricity — every company on earth becomes an AI company”',
     quote:'I just think we’re so early. This changes literally everything about how every business operates. The opportunity is just massive — bigger than the internet, bigger than mobile, bigger than anything we’ve seen.',
-    speaker:'Guest investor', show:'All-In Podcast', medium:'youtube', ts:'1:32:18' },
-  { id:'hyp2', theme:'hype', facet:'the partnership-hype quote',
-    claim:'A “transformative strategic alliance” announced — no terms, numbers, or timeline disclosed',
-    quote:'We’re incredibly excited about this partnership. Two amazing teams with completely aligned visions. I can’t share specifics yet, but the synergies really speak for themselves.',
-    speaker:'Guest CEO', show:'20VC', medium:'podcast', ts:'06:12' },
-  { id:'hyp3', theme:'hype', facet:'the “agents bigger than the internet” quote',
+    speaker:'Guest investor' },
+ ]},
+ { id:'bg2', name:'BG2 Pod', medium:'podcast', m:['bg2'],
+   why:'Capital-markets lens on AI infra — capex, token pricing, margins.',
+   items:[
+  { theme:'ai-econ', facet:'$/Mtok-decline item', ep:'Token economics — is inference pricing a race to zero?', ts:'41:22',
+    claim:'Serving GPT-4-class output now costs ~$0.40/Mtok — a 40x decline in 18 months, and the curve hasn’t flattened',
+    quote:'People haven’t internalized this. The tokens we sold for sixty dollars a million in early ’23 — we can serve a strictly better model today for under fifty cents. And there is nothing in the data that says that curve is bending.',
+    speaker:'Guest, frontier-lab infra lead' },
+  { theme:'gpu-capex', facet:'hyperscaler-capex item', ep:'Hyperscaler capex: $480B and the depreciation question', ts:'12:31',
+    claim:'Combined hyperscaler AI capex guided to $480B for 2026 — up 55% year on year',
+    quote:'Add up the four prints: four hundred and eighty billion dollars. The market’s question is no longer "can they spend it" — it’s what the depreciation schedule does to 2028 earnings.',
+    speaker:'Co-hosts' },
+  { theme:'saas', facet:'seat-compression-in-NRR item', ep:'Software in the agent era: seat compression is showing up in NRR', ts:'33:05',
+    claim:'Seat compression is now visible in public SaaS prints — support-heavy vendors are guiding NRR down 4-6 points',
+    quote:'It’s in the numbers now. Every vendor with a support-seat-heavy base just guided net retention down four to six points and blamed "macro". It’s not macro, it’s agents.',
+    speaker:'Co-hosts' },
+  { theme:'geo', facet:'sovereign-compute item', ep:'Sovereign AI and the Gulf compute buildout', ts:'58:14',
+    claim:'The Gulf’s 5GW AI campuses come with US-controlled access regimes — compute is becoming foreign policy',
+    quote:'Read the terms: American cloud providers operate the clusters, American export rules govern who touches them. Five gigawatts of sovereignty that isn’t actually sovereign. That template is the interesting part.',
+    speaker:'Guest' },
+  { theme:'ai-econ', facet:'custom-silicon item', ep:'The CUDA moat, priced: TPU and Trainium economics', ts:'24:40',
+    claim:'Google’s internal TPU cost per training FLOP runs ~45% below NVIDIA list — the moat is switching cost, not silicon',
+    quote:'On raw cost per FLOP the TPU is maybe half of what you pay at list. The reason everyone still buys NVIDIA is the two years of engineering it takes to leave CUDA, and that tax is shrinking.',
+    speaker:'Guest, semis analyst' },
+  { theme:'macro', facet:'megacap-concentration item', ep:'Megacap concentration and the AI trade', ts:'47:33',
+    claim:'Top-10 names are now 38% of the S&P — passive flows make the AI trade self-reinforcing in both directions',
+    quote:'Thirty-eight percent in ten names. Every 401k dollar buys the same exposure, so the trade reinforces itself — and the same machinery runs in reverse if capex disappoints.',
+    speaker:'Co-hosts' },
+ ]},
+ { id:'acquired', name:'Acquired', medium:'podcast', m:['acquired'],
+   why:'Deep business-model and competitive-dynamics breakdowns.',
+   items:[
+  { theme:'geo', facet:'TSMC-concentration item', ep:'TSMC (Remastered): the most important company in the world', ts:'2:14:30',
+    claim:'TSMC makes ~90% of leading-edge logic — and its Arizona fabs will still run one node behind Taiwan through 2030',
+    quote:'Ninety percent of the chips that matter come out of one campus complex in one country. Arizona helps, but it ships N-minus-one. The concentration risk doesn’t move until the 2030s.',
+    speaker:'Hosts' },
+  { theme:'fintech', facet:'Visa-take-rate item', ep:'Visa: the original payments network', ts:'1:48:12',
+    claim:'Visa runs an 83% operating margin on ~15 basis points of take — the best business ever built on a fraction of a percent',
+    quote:'Fifteen basis points doesn’t sound like a moat until you multiply it by fifteen trillion dollars of volume at an eighty-three percent operating margin. Nobody has ever disintermediated it.',
+    speaker:'Hosts' },
+  { theme:'saas', facet:'Copilot-economics item', ep:'Microsoft Volume III: Copilot and the AI pivot', ts:'2:40:55',
+    claim:'Copilot attach is ~10% of eligible seats — but likely carries negative gross margin at current inference prices',
+    quote:'Ten percent attach on the biggest installed base in software, and the kicker is they likely lose money on every seat at today’s inference cost. They’re buying the position, not the P&L.',
+    speaker:'Hosts' },
+  { theme:'consumer', facet:'Costco-membership item', ep:'Costco: the membership machine', ts:'1:12:08',
+    claim:'Costco’s entire operating profit is membership fees — merchandise margin rounds to zero by design',
+    quote:'The punchline of the whole model: they make roughly nothing selling you goods. The fee line is the profit line, and renewal runs north of ninety percent. Everything else is a loyalty engine.',
+    speaker:'Hosts' },
+  { theme:'fintech', facet:'Stripe-mix-shift item', ep:'Stripe: rebuilding the internet’s payment rails', ts:'1:55:40',
+    claim:'Stripe processed $1.4T last year — and its fastest-growing revenue line is now billing software, not payments',
+    quote:'One point four trillion of volume, but look at the mix shift: the software take — billing, tax, revenue recognition — is growing faster than payments itself. The rails were the wedge.',
+    speaker:'Hosts' },
+  { theme:'gpu-capex', facet:'NVIDIA-ramp item', ep:'NVIDIA Part IV: the datacenter decade', ts:'3:02:21',
+    claim:'NVIDIA’s datacenter revenue went from $3B to $100B+ in six years — the fastest hardware revenue ramp ever',
+    quote:'Three billion to a hundred billion in six years. There is no precedent — not the iPhone, not anything. The question the next part of the story answers is what the downslope of a cycle like that looks like.',
+    speaker:'Hosts' },
+  { theme:'hype', facet:'victory-lap episode', ep:'Holiday special: our favorite business model ever', ts:'04:12',
+    claim:'A two-hour victory-lap episode revisiting old takes — warm, fun, and containing nothing new',
+    quote:'No research this time, folks — just the two of us, some wine, and our favorite moments from ten years of the show. Pour one and hang out with us.',
+    speaker:'Hosts' },
+ ]},
+ { id:'dwarkesh', name:'Dwarkesh Podcast', medium:'youtube', m:['dwarkesh'],
+   why:'Long-form depth on compute scaling, AI research, and geopolitics.',
+   items:[
+  { theme:'ai-econ', facet:'cluster-economics item', ep:'Trillion-dollar clusters and the geopolitics of compute', ts:'1:18:40',
+    claim:'A 2028 frontier training run pencils to $100B+ all-in — only nation-states and the top hyperscalers can play',
+    quote:'By 2028 the all-in number for a frontier run — chips, power, land, people — crosses a hundred billion. At that point the list of entities that can do it fits on one hand, and half of them are governments.',
+    speaker:'Guest researcher' },
+  { theme:'geo', facet:'HBM-chokepoint item', ep:'A history of export controls, from COCOM to HBM', ts:'52:17',
+    claim:'HBM controls bind harder than GPU controls — China’s domestic stacks are 3+ years behind and yield-limited',
+    quote:'Everyone watches the GPU line. The memory line is the real chokepoint — domestic HBM is three years behind and the yields are brutal. That’s the control that actually bites.',
+    speaker:'Guest' },
+  { theme:'eng', facet:'post-training deep dive', ep:'John Schulman — RL, agents, and what post-training actually does', ts:'1:44:09',
+    claim:'Deep dive: why RLHF is best understood as distribution sharpening, not capability creation',
+    quote:'The base model already knows the answer; post-training changes which answer it reaches for. Let me walk through what the KL penalty is actually doing during PPO.',
+    speaker:'Research guest' },
+  { theme:'hype', facet:'superintelligence-timeline quote', ep:'Why AGI timelines moved: a debate', ts:'2:05:33',
+    claim:'“We’ll have superintelligence by the end of the decade and nothing will be the same” — undated mechanism, no numbers',
+    quote:'I just don’t see what stops it. End of the decade we have systems smarter than any human at everything, and every institution we have gets rebuilt. People are not ready for how fast this goes.',
+    speaker:'Guest' },
+  { theme:'frontier', facet:'robot-data-cost item', ep:'Robotics scaling laws: why manipulation is still hard', ts:'58:26',
+    claim:'Robot manipulation data costs ~$5 per episode vs effectively free text — the data wall is the entire robotics problem',
+    quote:'Text was lying around for free. Every manipulation episode costs you about five dollars of teleop time. Until that’s down two orders of magnitude, there is no GPT moment for robots.',
+    speaker:'Guest, robotics-lab founder' },
+  { theme:'geo', facet:'China-open-weights item', ep:'Inside China’s open-weight surge', ts:'36:50',
+    claim:'Chinese labs hold 6 of the top 10 open-weight slots — now 9 months behind closed frontier, down from 18',
+    quote:'Count the leaderboard: six of the top ten open models are Chinese. The gap to the closed frontier halved in a year. The export controls changed the strategy, not the trajectory.',
+    speaker:'Guest analyst' },
+ ]},
+ { id:'nopriors', name:'No Priors', medium:'podcast', m:['nopriors','no-priors'],
+   why:'Operator-grade interviews on AI economics and AI-native software.',
+   items:[
+  { theme:'ai-econ', facet:'cached-token-margin item', ep:'The real cost of inference — with a GPU-cloud CEO', ts:'28:05',
+    claim:'Cached-input pricing is the quiet margin lever: 90% discounts that still carry ~70% gross margin',
+    quote:'Everyone watches the headline price per million. The actual business is in cache hits — you re-serve the same prefix at a tenth of the price and your margin on that token goes up, not down.',
+    speaker:'Guest, GPU-cloud CEO' },
+  { theme:'saas', facet:'AI-displacement item', ep:'Coding agents at scale: what 40% of merged code means', ts:'1:04:12',
+    claim:'Cursor displaced GitHub Copilot at three of the ten largest US banks this quarter',
+    quote:'These are not startups experimenting. Three of the ten biggest banks in the country ripped out the incumbent this quarter. Distribution was supposed to be the moat.',
+    speaker:'Guest' },
+  { theme:'biotech', facet:'AI-antibody item', ep:'AI drug discovery’s first real readouts', ts:'27:14',
+    claim:'First AI-designed antibody cleared Phase 2 — nine months from target to IND vs the industry’s 4.5-year average',
+    quote:'Nine months from target selection to IND filing. The industry average is fifty-four months. If the Phase 3 reads out, the cost structure of the entire discovery industry is wrong.',
+    speaker:'Guest, techbio founder' },
+  { theme:'frontier', facet:'robot-data-bottleneck item', ep:'Robot foundation models and the data bottleneck', ts:'39:48',
+    claim:'Teleop data runs $3-5 per episode — robot data cost, not architecture, is the binding constraint',
+    quote:'We can scale the model fine. What we can’t scale is paying humans three to five dollars an episode to teleoperate. Whoever cracks self-supervised robot data wins the decade.',
+    speaker:'Guest founder' },
+  { theme:'saas', facet:'enterprise-agent-reality item', ep:'What’s actually deployed: an enterprise AI adoption check', ts:'18:33',
+    claim:'Only 11% of enterprise agent pilots reached production — but the ones that did cut process cost 60%+',
+    quote:'Eleven percent make it out of pilot. That sounds damning until you look at the winners: the ones in production are taking sixty, seventy percent out of the process cost. The dispersion is the story.',
+    speaker:'Guest, enterprise CIO' },
+  { theme:'hype', facet:'“agents bigger than the internet” quote', ep:'Frontier lab roadmaps, decoded', ts:'47:50',
     claim:'“Agents will be bigger than the internet” — undated, unquantified',
     quote:'Mark my words, agents are going to be bigger than the internet itself. Every workflow, every job function. I don’t want to put a date on it, but it’s coming faster than anyone thinks.',
-    speaker:'Guest founder', show:'All-In Podcast', medium:'youtube', ts:'47:50' },
+    speaker:'Guest founder' },
+ ]},
+ { id:'lex', name:'Lex Fridman Podcast', medium:'youtube', m:['lexfridman','lex-fridman','lexfridmanpodcast'],
+   why:'Long-form interviews across AI, frontier tech, and science.',
+   items:[
+  { theme:'frontier', facet:'Neuralink item', ep:'Neuralink update: second patient, CAD by thought', ts:'1:51:22',
+    claim:'Neuralink’s second patient hit 9 bits-per-second cursor control — 2x the first implant, using half the electrodes',
+    quote:'Nine bits per second with half the channels active. The decode is improving faster than the hardware — which tells you the constraint was always software.',
+    speaker:'Guest engineer' },
+  { theme:'health', facet:'psilocybin-trial item', ep:'Neuroscientist on consciousness, psychedelics, and depression trials', ts:'2:18:40',
+    claim:'Psilocybin Phase 3 showed 8-week remission in 37% of treatment-resistant patients vs 18% placebo',
+    quote:'Thirty-seven percent remission against eighteen for placebo, in people who failed two or more prior treatments. If the six-month durability holds, this is the first new mechanism in psychiatry in thirty years.',
+    speaker:'Guest neuroscientist' },
+  { theme:'eng', facet:'AGI-first-principles deep dive', ep:'John Carmack — AGI from first principles', ts:'3:12:08',
+    claim:'Deep dive: Carmack’s case that AGI’s core fits in 10k lines — and why he bets on online learning over scale',
+    quote:'I think the core of it fits in ten thousand lines. The thing everyone’s missing isn’t scale, it’s continuous online learning — let me walk through the architecture I’d try.',
+    speaker:'John Carmack' },
+  { theme:'frontier', facet:'Starship-reuse item', ep:'SpaceX propulsion engineer: Starship’s path to orbit-class reuse', ts:'1:27:55',
+    claim:'Starship’s $10M marginal-launch target would cut $/kg to LEO by 50x — propellant is just $1M of it',
+    quote:'The propellant bill is about a million dollars. If the vehicle truly flies again in days, the ten-million-dollar marginal launch is real — and that’s a fifty-x change in what a kilogram to orbit costs.',
+    speaker:'Guest engineer' },
+  { theme:'geo', facet:'embargo-history item', ep:'Historian on US-China and the Thucydides trap', ts:'2:44:17',
+    claim:'A historian’s case that chip controls map to 1930s oil embargoes — effective, and historically escalatory',
+    quote:'We’ve run this experiment before. Resource denial works — that’s exactly why it escalates. The oil embargo did precisely what it was designed to do, and look where it led.',
+    speaker:'Guest historian' },
+  { theme:'hype', facet:'Mars-timeline quote', ep:'Elon Musk — Mars timelines, Optimus, and xAI', ts:'41:30',
+    claim:'“A million people on Mars in 20 years” — no costing, no architecture, pure vision',
+    quote:'I think we get a million people to Mars within twenty years. Maybe sooner. Once the ships are flying, it’s really just a question of will. Humanity becomes multiplanetary — that’s the whole point of everything.',
+    speaker:'Elon Musk' },
+ ]},
+ { id:'a16z', name:'a16z Podcast', medium:'podcast', m:['a16z'],
+   why:'Firm-side views on agents, bio x AI, fintech rails, and American Dynamism.',
+   items:[
+  { theme:'fintech', facet:'stablecoin-settlement item', ep:'Stablecoins go mainstream: payments’ new rail', ts:'18:26',
+    claim:'Stablecoin settlement crossed $12T annualized — more than Visa and Mastercard combined',
+    quote:'Twelve trillion dollars of annualized settlement. Most of it is exchange flow, fine — but even the conservative cut of real commerce is growing 80% a year, and the card networks’ take rate is the bullseye.',
+    speaker:'Guest, payments lead' },
+  { theme:'venture', facet:'services-TAM item', ep:'Big Ideas: AI agents eat services revenue', ts:'24:50',
+    claim:'The agent opportunity is services revenue, not software — a $4.6T labor pool vs SaaS’s $300B',
+    quote:'Software TAM is three hundred billion. The services and labor pool agents address is four point six trillion. Every fund’s model breaks if you price the opportunity off the old denominator.',
+    speaker:'GP roundtable' },
+  { theme:'biotech', facet:'bio-x-AI-deals item', ep:'Bio x AI: where models meet molecules', ts:'33:15',
+    claim:'AI-first biotechs are signing $50M+ upfront pharma partnerships pre-clinical — structures unheard of five years ago',
+    quote:'Fifty million upfront for a molecule that hasn’t seen a mouse. Pharma is effectively outsourcing discovery risk to the model companies, and the milestone ladders are getting steeper every quarter.',
+    speaker:'Guest, bio-fund GP' },
+  { theme:'frontier', facet:'defense-procurement item', ep:'American Dynamism: rebuilding the arsenal', ts:'41:02',
+    claim:'A drone program went concept-to-fielded in 18 months under new procurement authorities — legacy primes average 11 years',
+    quote:'Eighteen months from whiteboard to a fielded system. The incumbent timeline for the same category is eleven years. The procurement reform is the product.',
+    speaker:'Guest founder' },
+  { theme:'consumer', facet:'consumer-AI-runrate item', ep:'Who wins consumer AI?', ts:'29:37',
+    claim:'ChatGPT’s consumer subscription run-rate passed $4B — 3x bigger than Netflix at the same age',
+    quote:'Four billion of consumer subscription run-rate in under three years. Netflix took nine to get there. The interesting question is whether the default-assistant slot is winner-take-most.',
+    speaker:'Guest partner' },
+  { theme:'hype', facet:'partnership-hype quote', ep:'Founder lessons: scaling past $100M ARR', ts:'06:12',
+    claim:'A “transformative strategic alliance” announced — no terms, numbers, or timeline disclosed',
+    quote:'We’re incredibly excited about this partnership. Two amazing teams with completely aligned visions. I can’t share specifics yet, but the synergies really speak for themselves.',
+    speaker:'Guest CEO' },
+ ]},
+ { id:'sharptech', name:'Sharp Tech with Ben Thompson', medium:'podcast', m:['sharptech','sharp-tech'],
+   why:'Strategy-first tech analysis (Stratechery adjacent).',
+   items:[
+  { theme:'geo', facet:'TSMC-Arizona item', ep:'Chips check-in: TSMC Arizona yields and the inference market', ts:'26:09',
+    claim:'TSMC Arizona yields are now within 4 points of Hsinchu — at 30% higher cost per wafer',
+    quote:'The yield story is basically solved — four points off the mothership. The cost story is not: thirty percent more per wafer, and that delta is structural, not a learning curve.',
+    speaker:'Hosts' },
+  { theme:'consumer', facet:'Apple-AI item', ep:'Apple’s AI problem isn’t the model, it’s the business model', ts:'31:44',
+    claim:'Apple monetizes hardware margin, not engagement — paying for frontier inference breaks its model, so it won’t',
+    quote:'Every query costs money and Apple sells margin on devices, not attention. Until the business model changes, "behind on AI" is a choice, not a failure.',
+    speaker:'Ben Thompson' },
+  { theme:'saas', facet:'Microsoft-OpenAI-deal item', ep:'Microsoft and OpenAI: the most expensive divorce in tech?', ts:'12:20',
+    claim:'The renegotiated Microsoft-OpenAI deal trades exclusivity for a 20% revenue share — both sides now build against each other',
+    quote:'Microsoft gave up exclusivity and kept the rev share. Which means both companies are now explicitly funding their hedge against the other. Watch where the capex goes, not the press release.',
+    speaker:'Ben Thompson' },
+  { theme:'consumer', facet:'streaming-bundle item', ep:'Streaming bundles, sports rights, and the cable-ization of everything', ts:'48:31',
+    claim:'The new streaming bundles recreate cable at 85% of the old price — churn drops 60% inside a bundle',
+    quote:'We spent fifteen years unbundling cable to rebuild it at a fifteen percent discount. But the churn data explains everything: inside a bundle, cancellation drops by more than half.',
+    speaker:'Hosts' },
+  { theme:'frontier', facet:'robotaxi-cost-curve item', ep:'Waymo expands; Tesla responds — the robotaxi race', ts:'22:15',
+    claim:'Waymo’s per-vehicle sensor cost fell under $40k while Tesla bets camera-only — it’s now a cost-curve bet, not a capability bet',
+    quote:'Forty thousand dollars of sensors and falling, against cameras that cost basically nothing but haven’t shipped a driverless mile. Pick your cost curve; that’s the whole debate now.',
+    speaker:'Hosts' },
+  { theme:'hype', facet:'mailbag-banter segment', ep:'Mailbag: smart glasses, Vision Pro, and the wearables race', ts:'03:40',
+    claim:'Fifteen minutes of mailbag banter about keyboard preferences before the wearables discussion starts',
+    quote:'Okay, one more email about mechanical keyboards because I can’t help myself — and then I promise we’ll actually talk about the glasses. This is why the show runs long, folks.',
+    speaker:'Hosts' },
+ ]},
+ { id:'stratechery', name:'Stratechery', medium:'podcast', m:['stratechery'],
+   why:'Aggregation theory and platform strategy, applied weekly.',
+   items:[
+  { theme:'saas', facet:'end-of-seats item', ep:'The end of per-seat software', ts:'14:02',
+    claim:'Per-seat pricing breaks when agents do the work — Salesforce’s consumption pivot is the tell for the whole industry',
+    quote:'The seat was always a proxy for work done. Agents sever that link. When the biggest seat-seller in the world pivots to consumption pricing, the era is officially over.',
+    speaker:'Ben Thompson' },
+  { theme:'consumer', facet:'aggregation-agents item', ep:'Aggregation theory in the AI era', ts:'09:48',
+    claim:'If agents do the browsing, aggregators lose the demand chokepoint — the first structural threat to Google’s model in 20 years',
+    quote:'Aggregation theory rests on owning demand. An agent that books the flight without showing you ten blue links dissolves that ownership. This is the first time the theory itself is under threat.',
+    speaker:'Ben Thompson' },
+  { theme:'gpu-capex', facet:'ecosystem-moat item', ep:'NVIDIA’s real moat is the ecosystem', ts:'21:36',
+    claim:'NVIDIA’s moat is $2B/year of developer-ecosystem spend — the silicon lead is 18 months but the software lead is 10 years',
+    quote:'Anyone can tape out a chip eighteen months behind. Nobody can replicate two billion dollars a year of ecosystem investment compounding for a decade. That’s the actual product.',
+    speaker:'Ben Thompson' },
+  { theme:'geo', facet:'silicon-shield item', ep:'TSMC, Taiwan, and the geopolitics of the leading edge', ts:'17:25',
+    claim:'Every credible Taiwan deterrence scenario now includes fab destruction — the “silicon shield” has inverted into a liability',
+    quote:'The shield argument assumed the fabs protect Taiwan. Walk through the war games: every scenario now treats the fabs as the first thing that gets destroyed, by either side. The logic flipped.',
+    speaker:'Ben Thompson' },
+  { theme:'consumer', facet:'YouTube-economics item', ep:'YouTube: the quiet giant of streaming', ts:'11:53',
+    claim:'YouTube is now #1 in US living-room watch time with ~$50B revenue — and pays no content costs upfront',
+    quote:'Number one on the television, fifty billion in revenue, and the content acquisition cost is a rev share. Netflix’s margin structure simply cannot compete with that.',
+    speaker:'Ben Thompson' },
+  { theme:'macro', facet:'Meta-capex-earnings item', ep:'Meta earnings and the open-source bet', ts:'19:10',
+    claim:'Meta’s AI capex hit $65B with zero direct revenue attribution — the market gave it a pass because ad-targeting gains covered it',
+    quote:'Sixty-five billion of capex justified by better ad load and ranking. The open-source release is a write-off they’ve decided pays for itself in ecosystem leverage. The street bought it — this quarter.',
+    speaker:'Ben Thompson' },
+ ]},
+ { id:'oddlots', name:'Odd Lots', medium:'podcast', m:['oddlots','odd-lots'],
+   why:'Markets and plumbing — credit, commodities, energy, market structure.',
+   items:[
+  { theme:'gpu-capex', facet:'GPU-depreciation item', ep:'The depreciation question behind the AI buildout', ts:'33:18',
+    claim:'Quietly stretching GPU depreciation from 4 to 6 years is worth ~$30B of 2026 hyperscaler earnings',
+    quote:'Two extra years of useful life across that fleet is thirty billion dollars of earnings that didn’t come from selling anything. Auditors signed off, but the second-hand H100 market will tell us if it was true.',
+    speaker:'Analyst guest' },
+  { theme:'macro', facet:'credit-spread item', ep:'Is credit mispricing the AI capex cycle?', ts:'08:44',
+    claim:'High-yield spreads at 280bps aren’t pricing an AI-capex credit cycle — neocloud debt issuance tripled this year',
+    quote:'GPU-backed lending tripled and spreads barely moved. Either the collateral is better than anyone thinks, or credit is making the same mistake it made with telecom fiber in 1999.',
+    speaker:'Guest' },
+  { theme:'fintech', facet:'BNPL-credit item', ep:'BNPL’s first real credit test', ts:'45:02',
+    claim:'BNPL delinquencies doubled in six months in the subprime cohort — the sector’s first real credit-cycle test',
+    quote:'These books have never seen a cycle. Subprime delinquency doubled in two quarters and the originate-to-hold players are about to learn why credit cards price the way they do.',
+    speaker:'Guest' },
+  { theme:'energy', facet:'interconnection-queue item', ep:'The interconnection queue, explained', ts:'26:31',
+    claim:'There’s 2.6TW sitting in US interconnection queues — double the entire installed grid',
+    quote:'Two point six terawatts waiting in line. The entire existing grid is about one point three. The bottleneck isn’t generation or capital — it’s the queue itself.',
+    speaker:'Guest, grid analyst' },
+  { theme:'health', facet:'GLP-1-economics item', ep:'The economics of GLP-1s — with a pharma analyst', ts:'31:40',
+    claim:'GLP-1 supply, not demand, caps the market — Novo’s manufacturing capex now rivals a mid-size chip fab',
+    quote:'Demand is functionally infinite at this price point. The binding constraint is fill-finish capacity, and Novo is spending fab-scale money — eight billion a year — to build it.',
+    speaker:'Guest analyst' },
+  { theme:'macro', facet:'carry-trade item', ep:'Japan, the yen, and the great carry-trade unwind', ts:'52:48',
+    claim:'An estimated $1.2T of yen carry positioning remains — every BOJ hike threatens a repeat of the August unwind',
+    quote:'The August episode liquidated maybe a quarter of it. There’s still over a trillion dollars of borrowed-yen positioning out there, and it all watches the same central bank.',
+    speaker:'Guest strategist' },
+  { theme:'fintech', facet:'stablecoin-plumbing item', ep:'How stablecoins became systemically important', ts:'14:55',
+    claim:'Stablecoin issuers now hold more T-bills than most G20 countries — crypto plumbing is a money-market player',
+    quote:'Add up the issuer balance sheets: more bills than Germany holds. Whatever you think of crypto, the plumbing is now big enough that a depeg is a money-market event.',
+    speaker:'Guest' },
+ ]},
+ { id:'iltb', name:'Invest Like the Best', medium:'podcast', m:['investlikethebest','invest-like','colossus','iltb'],
+   why:'Investor interviews with real numbers — capex cycles, multiples, private markets.',
+   items:[
+  { theme:'gpu-capex', facet:'capex-cycle item', ep:'Gavin Baker on AI capex cycles and the semis trade', ts:'42:11',
+    claim:'Every prior compute capex cycle overshot demand by 18-24 months — this one has no inventory signal to watch',
+    quote:'In every previous cycle you could watch inventories build. GPUs don’t sit in a channel — they’re racked the week they ship. The overshoot will be invisible until it’s in the earnings.',
+    speaker:'Gavin Baker' },
+  { theme:'venture', facet:'permanent-capital item', ep:'Permanent capital and the future of private markets', ts:'36:28',
+    claim:'Evergreen vehicles now raise more than traditional VC funds — the 10-year fund structure is quietly dying',
+    quote:'The crossover happened this year: more dollars into evergreen and permanent structures than into ten-year funds. The entire industry was built on a wrapper that’s going away.',
+    speaker:'Guest allocator' },
+  { theme:'fintech', facet:'Ramp-velocity item', ep:'Ramp’s founder on velocity as strategy', ts:'51:33',
+    claim:'Ramp ships 200+ product releases per quarter and credits velocity for winning 70% of head-to-head deals',
+    quote:'Two hundred releases a quarter isn’t a vanity stat — when we’re in a bake-off, the buyer sees the product improve during the eval. We win seven of ten on that alone.',
+    speaker:'Founder guest' },
+  { theme:'energy', facet:'battery-returns item', ep:'Energy-transition investing — with a power trader', ts:'47:19',
+    claim:'Texas power volatility made batteries the best risk-adjusted asset in energy — top projects cleared 35% unlevered returns',
+    quote:'The arbitrage spread in ERCOT paid the best battery projects thirty-five percent unlevered last year. That return is the market screaming for more storage, and the queue can’t deliver it.',
+    speaker:'Guest trader' },
+  { theme:'saas', facet:'software-multiples item', ep:'Software multiples in the agent era', ts:'29:50',
+    claim:'Median software multiple compressed to 6x revenue while the top decile re-rated to 18x — the market is pricing agent winners and losers',
+    quote:'Six times for the median name, eighteen for the decile the market thinks survives agents. That dispersion is the widest since 2009. The index hides the verdict.',
+    speaker:'Guest PM' },
+  { theme:'consumer', facet:'sports-rights item', ep:'The business of sports: rights, franchises, and scarcity', ts:'58:02',
+    claim:'Sports rights inflation runs 8%/yr against flat pay-TV revenue — the gap is funded by tech balance sheets',
+    quote:'Rights grow eight percent a year and the distribution revenue that used to fund them is flat to down. The bridge is Amazon, Apple, and Netflix treating sports as customer acquisition.',
+    speaker:'Guest' },
+ ]},
+ { id:'20vc', name:'20VC with Harry Stebbings', medium:'youtube', m:['20vc','twentyminutevc'],
+   why:'Founders and VCs disclosing real numbers — ARR, DPI, IPO mechanics.',
+   items:[
+  { theme:'saas', facet:'seat-compression item', ep:'Why enterprise renewals are getting ugly — with a software CEO', ts:'58:47',
+    claim:'A Fortune-100 insurer renewed at 40% fewer support seats after deploying agents — and forced per-resolution pricing',
+    quote:'They didn’t churn, and that’s what should scare the vendor. They renewed — at forty percent fewer seats — and demanded to be billed per resolved ticket. That contract structure is the whole story of the next five years of SaaS.',
+    speaker:'Enterprise software CEO' },
+  { theme:'venture', facet:'IPO-window item', ep:'From S-1 to pop: an IPO postmortem with the CFO', ts:'24:17',
+    claim:'The IPO window is reopening: 14 enterprise software S-1s on file, median ARR $400M',
+    quote:'Fourteen S-1s in the pipeline, median four hundred million of ARR, median growth thirty-eight percent. The interesting part is the accumulated-deficit lines — some of these are records.',
+    speaker:'Guest banker' },
+  { theme:'venture', facet:'LP-re-up item', ep:'The DPI crisis: LPs are done waiting', ts:'31:26',
+    claim:'LPs pulled re-up commitments from 40% of managers raising this year — the first fund-count contraction since 2009',
+    quote:'Four in ten funds in market right now will not get their anchor re-up. People call it a pause; the data says it’s the first real contraction in manager count in fifteen years.',
+    speaker:'Guest LP' },
+  { theme:'fintech', facet:'neobank-margin item', ep:'Revolut, Monzo, and the neobank end state', ts:'44:09',
+    claim:'Revolut hit $10B revenue at 25% net margin — neobanks finally crossed into bank-grade profitability',
+    quote:'Ten billion of revenue, a quarter of it dropping to the bottom line. The "neobanks never make money" line is now five years stale, and the incumbents’ cost-income ratios look terminal next to it.',
+    speaker:'Guest' },
+  { theme:'hype', facet:'“greatest wealth creation” quote', ep:'Roundtable: are AI app-layer companies real businesses?', ts:'06:12',
+    claim:'“The single greatest wealth-creation opportunity in human history” — no numbers attached',
+    quote:'I genuinely believe this is the greatest wealth creation event in the history of capitalism. Every single industry gets rebuilt. If you’re not deploying right now you’ll regret it for the rest of your career.',
+    speaker:'Guest VC' },
+  { theme:'saas', facet:'vertical-AI-ARR item', ep:'Harvey’s CEO on passing $100M ARR in legal AI', ts:'17:42',
+    claim:'Harvey passed $100M ARR in 3 years — fastest in legal software history, 70% of it from the top 50 law firms',
+    quote:'A hundred million of ARR in thirty-six months, and the concentration is the point: seventy percent comes from the AmLaw 50. The buyers everyone said would move slowest moved first.',
+    speaker:'Founder guest' },
+ ]},
+ { id:'riskyb', name:'Risky Business', medium:'podcast', m:['risky'],
+   why:'The sharpest weekly read on security-industry economics.',
+   items:[
+  { theme:'security', facet:'ransomware-economics item', ep:'Cyber insurance hardens: payouts down 35%', ts:'22:48',
+    claim:'Average ransomware recovery cost hit $4.7M while actual payouts fell 35% — insurers are forcing refusal to pay',
+    quote:'Recovery cost is up, payment rate is down by a third. The insurers did what regulation couldn’t — they just stopped covering the ransom, and the attackers’ unit economics broke.',
+    speaker:'Hosts' },
+  { theme:'security', facet:'AI-found-zero-days item', ep:'Model-found zero-days land in the wild', ts:'41:09',
+    claim:'An autonomous red-team model found 14 exploitable zero-days in shipped enterprise software in a single quarter',
+    quote:'Fourteen real, exploitable vulnerabilities in one quarter, found by a model running unattended. The asymmetry question is no longer theoretical — patching cadence was designed for human-speed discovery.',
+    speaker:'Guest, security researcher' },
+  { theme:'security', facet:'platform-consolidation item', ep:'Identity is the new perimeter — platform bundling bites', ts:'36:55',
+    claim:'Palo Alto’s platform bundling pushed three point-solution vendors below 90% gross retention',
+    quote:'When the platform guy gives away your category as a bundle line-item, your gross retention tells the story. Three public point vendors are now under ninety. The consolidation wave is here, it’s just unevenly distributed.',
+    speaker:'Guest CISO' },
+  { theme:'security', facet:'telco-persistence item', ep:'Salt Typhoon fallout: telcos are still finding implants', ts:'11:32',
+    claim:'A year after disclosure, carriers are still finding Salt Typhoon implants — average dwell time now estimated at 3+ years',
+    quote:'They keep finding boxes. The working assumption is now three-plus years of dwell across every major carrier, and nobody will certify the networks clean. That’s the quiet part out loud.',
+    speaker:'Hosts' },
+  { theme:'security', facet:'MSP-blast-radius item', ep:'Another MSP ransomware spree hits managed healthcare', ts:'08:15',
+    claim:'One MSP compromise cascaded into 340 downstream healthcare orgs — supply-chain blast radius keeps widening',
+    quote:'Three hundred and forty clinics from one management console. The MSP model concentrates risk exactly where the security budget is thinnest — we keep relearning this one.',
+    speaker:'Hosts' },
+  { theme:'hype', facet:'sponsor-pitch segment', ep:'Sponsor interview: cloud detection at scale', ts:'49:30',
+    claim:'A sponsored vendor interview: “revolutionary AI-powered detection” with no benchmarks or customer numbers',
+    quote:'Our agentless AI-native platform delivers unprecedented visibility across the entire attack surface. We’re really excited about what we’re seeing with early customers — it’s a complete game-changer for the SOC.',
+    speaker:'Sponsor guest' },
+ ]},
+ { id:'darknet', name:'Darknet Diaries', medium:'podcast', m:['darknet'],
+   why:'Narrative security storytelling with breach-economics detail.',
+   items:[
+  { theme:'security', facet:'MGM-hack item', ep:'The MGM hack, from the inside', ts:'38:14',
+    claim:'The MGM breach started with a 10-minute vishing call — and ended with a $100M quarter-loss and 36TB exfiltrated',
+    quote:'Ten minutes on the phone with the help desk. That’s it. A hundred million dollars of impact, every slot machine dark, and it started with someone being nice to a caller.',
+    speaker:'Host narration' },
+  { theme:'security', facet:'NK-IT-worker item', ep:'The North Korean IT-worker scheme', ts:'29:50',
+    claim:'North Korean IT workers infiltrated 300+ US companies, routing ~$1B/year in salaries to the weapons program',
+    quote:'These are real employees with real performance reviews, some holding multiple jobs at once. The FBI estimate is a billion dollars a year flowing straight to the regime. Your remote hire might be one.',
+    speaker:'Guest investigator' },
+  { theme:'security', facet:'bug-bounty-economics item', ep:'A bug-bounty hunter’s million-dollar year', ts:'44:33',
+    claim:'A solo researcher cleared $1.2M in bounties — platforms now route 60% of payouts to the top 1% of hunters',
+    quote:'One point two million, one person, one year. But the distribution is the real story — the platforms admit the top one percent of hunters take more than half the pool. It’s a power-law profession now.',
+    speaker:'Guest researcher' },
+  { theme:'security', facet:'SIM-swap item', ep:'Inside a SIM-swap crew', ts:'33:27',
+    claim:'A teenage SIM-swap crew moved $24M in crypto before anyone treated phone numbers as the root of account security',
+    quote:'Twenty-four million dollars, and the whole attack was convincing a carrier employee to move a number. Your entire financial life hung off SMS, and these kids understood that before the banks did.',
+    speaker:'Host narration' },
+  { theme:'security', facet:'ransom-negotiation item', ep:'Confessions of a ransomware negotiator', ts:'51:08',
+    claim:'The negotiator playbook: opening demands settle at ~25% — and attackers honor decryption 96% of the time',
+    quote:'It’s a market with norms. You’ll settle around a quarter of the opening ask, and the crews almost always deliver the decryptor — ninety-six percent in our cases. Bad reviews are bad for business, even there.',
+    speaker:'Guest negotiator' },
+  { theme:'hype', facet:'pure-narrative episode', ep:'Stuxnet: the first cyberweapon, fifteen years on', ts:'12:40',
+    claim:'A gripping retelling of Stuxnet — beautifully produced, no new information or disclosures',
+    quote:'You’ve heard this story before, but settle in, because it’s the best story in all of security. Picture Natanz in 2009. The centrifuges are spinning…',
+    speaker:'Host narration' },
+ ]},
+ { id:'latent', name:'Latent Space', medium:'podcast', m:['latent'],
+   why:'AI engineering internals, inference math, and agent infrastructure.',
+   items:[
+  { theme:'ai-econ', facet:'batch-pricing item', ep:'Inference math: tokens-per-dollar across the providers', ts:'52:40',
+    claim:'Batch-tier tokens are commoditizing first — three labs now priced within 8% of each other',
+    quote:'On the batch tier there’s effectively no differentiation left. Three labs within eight percent on price. The premium real-time tier is where the pricing power still lives.',
+    speaker:'Guest' },
+  { theme:'eng', facet:'attention-internals deep dive', ep:'Inference optimization, from speculative decoding to paged attention', ts:'1:11:05',
+    claim:'Deep dive: how sliding-window attention with summary tokens keeps gradient flow across an 8x-smaller KV cache',
+    quote:'You keep a rolling window per head, re-derive global context through learned summary tokens, and the elegant bit is the gradient still flows through the summaries during training. Let me walk through the masking.',
+    speaker:'Research guest' },
+  { theme:'ai-econ', facet:'neocloud-margin item', ep:'Neoclouds and the GPU rental market', ts:'38:22',
+    claim:'GPU rental prices fell 70% in a year — neocloud margins need 65% utilization, and the spot market clears at 50%',
+    quote:'H100 hours went from eight dollars to under two fifty. Run the lease math: below sixty-five percent utilization these clouds lose money on every hour, and the spot market says utilization is fifty.',
+    speaker:'Guest, neocloud founder' },
+  { theme:'eng', facet:'agent-memory deep dive', ep:'Agent memory: the unsolved problem', ts:'44:18',
+    claim:'Deep dive: why agent memory is retrieval with a write policy, not context — embedding-vs-graph in production',
+    quote:'Everyone keeps stuffing the context window and calling it memory. Real memory is a write policy. Let me walk through the three architectures we see in production and where each one breaks.',
+    speaker:'Guests' },
+  { theme:'saas', facet:'coding-agent-shakeout item', ep:'The coding-agent shakeout: who survives the platform shift', ts:'27:36',
+    claim:'Coding-agent startups face 9x price compression as model vendors bundle agents into base subscriptions',
+    quote:'The labs are giving away yesterday’s product with the model subscription. If your margin was the wrapper, the platform just ate it. The survivors own the workflow, not the prompt.',
+    speaker:'Hosts' },
+  { theme:'hype', facet:'“every developer 10x” quote', ep:'The rise of the AI engineer, year three', ts:'05:48',
+    claim:'“Every developer becomes 10x and software demand becomes infinite” — the year-three keynote take, no data',
+    quote:'I’ll say it again like I do every year: every developer is about to be ten-x, the demand for software is effectively infinite, and the AI engineer is the most important job of the decade. We’re just so early.',
+    speaker:'Conference keynote clip' },
+ ]},
+ { id:'huberman', name:'Huberman Lab', medium:'youtube', m:['huberman'],
+   why:'Health protocols and mechanisms — sleep, dopamine, GLP-1s.',
+   items:[
+  { theme:'health', facet:'deep-sleep-protocol item', ep:'Sleep toolkit: light, temperature, and timing', ts:'54:30',
+    claim:'Dropping core temperature 1°C is the strongest non-pharma deep-sleep lever — a warm bath 90 min before bed adds ~15% slow-wave sleep',
+    quote:'The counterintuitive part: you warm the body to cool it. The vasodilation dumps heat, core temperature drops a degree, and the polysomnography shows about fifteen percent more slow-wave sleep.',
+    speaker:'Andrew Huberman' },
+  { theme:'health', facet:'GLP-1-muscle item', ep:'GLP-1s: mechanisms, myths, and muscle loss', ts:'1:08:15',
+    claim:'Up to 40% of GLP-1 weight loss is lean mass without resistance training — protein plus lifting cuts that to ~15%',
+    quote:'The trials are consistent: as much as forty percent of what you lose is muscle if you do nothing. Add resistance training and adequate protein and that number drops to fifteen. That’s the protocol gap nobody prescribes.',
+    speaker:'Guest physiologist' },
+  { theme:'health', facet:'dopamine-protocol item', ep:'Dopamine and motivation: a protocol review', ts:'47:22',
+    claim:'Intermittent reward withholding sustains baseline dopamine better than stacking rewards — the trial data behind doing it right',
+    quote:'If you spike dopamine with every win, baseline drops. Randomize the reward — celebrate some wins, deliberately skip others — and the studies show baseline motivation holds. It’s schedule, not abstinence.',
+    speaker:'Andrew Huberman' },
+  { theme:'health', facet:'VO2max-mortality item', ep:'Exercise for longevity: zone 2, VO2 max, and strength', ts:'1:21:40',
+    claim:'Bottom-to-top VO2 max quartile is associated with a 5x difference in all-cause mortality — bigger than smoking cessation',
+    quote:'No drug comes close. Bottom quartile to top quartile of cardiorespiratory fitness is about a five-fold difference in all-cause mortality. Smoking is roughly two-and-a-half-fold. And it’s trainable at any age.',
+    speaker:'Guest physiologist' },
+  { theme:'hype', facet:'supplement-plug segment', ep:'Supplements: separating evidence from marketing', ts:'02:30',
+    claim:'An eight-minute sponsor read on electrolytes and a greens powder before the evidence discussion begins',
+    quote:'Today’s episode is brought to you by my favorite electrolyte drink — I drink it every single morning. And by the greens powder I genuinely take daily. Use the code in the show notes…',
+    speaker:'Sponsor read' },
+  { theme:'health', facet:'circadian-light item', ep:'Circadian biology: morning light and shift work', ts:'36:05',
+    claim:'10 minutes of morning sunlight advances melatonin onset ~45 min — the cheapest measurable circadian intervention on record',
+    quote:'Ten minutes of outdoor light within an hour of waking shifts melatonin onset by about forty-five minutes that evening. It’s free, it’s dose-dependent, and it’s measured, not vibes.',
+    speaker:'Andrew Huberman' },
+ ]},
+ { id:'volts', name:'Volts', medium:'podcast', m:['volts'],
+   why:'Grid, storage, and power-market detail with numbers.',
+   items:[
+  { theme:'energy', facet:'solar-storage-cost item', ep:'Grid-scale batteries: the cost curve nobody saw coming', ts:'49:21',
+    claim:'Solar-plus-storage cleared at $38/MWh in Texas — under new-build gas, without subsidies',
+    quote:'Thirty-eight dollars a megawatt-hour, firmed, in ERCOT, no ITC in that number. New gas can’t get under forty-five with current turbine lead times. The crossover already happened; the market just hasn’t repriced it.',
+    speaker:'Guest developer' },
+  { theme:'energy', facet:'nuclear-PPA item', ep:'Nuclear restarts and the AI power deals', ts:'14:53',
+    claim:'Microsoft’s Three Mile Island PPA pencils to ~$110/MWh — 2.5x grid rate, signed for 20 years',
+    quote:'Run the math on the restart cost and the term: they’re paying something like a hundred and ten dollars a megawatt-hour for twenty years. That’s not an energy trade, that’s a statement that firm power is the scarce input.',
+    speaker:'Guest analyst' },
+  { theme:'energy', facet:'queue-cost item', ep:'The interconnection queue is the climate bottleneck', ts:'23:48',
+    claim:'Median interconnection wait hit 5 years — developers pay $10M+ in network-upgrade costs just to hold queue position',
+    quote:'Five years median, and the upgrade-cost assignments are lottery tickets — ten, twenty million dollars dropped on a project mid-queue. Half the dropout rate is the process, not the economics.',
+    speaker:'Guest developer' },
+  { theme:'energy', facet:'geothermal-cost item', ep:'Geothermal’s moment: enhanced systems hit $70/MWh', ts:'41:36',
+    claim:'Enhanced geothermal hit $70/MWh on its latest wells — fracking tech cut drilling costs 60% in three years',
+    quote:'Seventy dollars firm, around the clock, and the curve is still falling — the drilling learnings came straight off the shale patch. Three years ago this number was one-eighty.',
+    speaker:'Guest founder' },
+  { theme:'energy', facet:'phantom-load item', ep:'Datacenter load growth meets a creaking grid', ts:'31:12',
+    claim:'Utilities logged 130GW of datacenter interconnection requests — roughly half are speculative duplicates, and nobody knows which half',
+    quote:'A hundred and thirty gigawatts of requests against maybe sixty of real projects. Developers shop the same datacenter to five utilities, every utility plans for all of it, and the ratepayer underwrites the phantom.',
+    speaker:'Guest, utility commissioner' },
+  { theme:'hype', facet:'electrify-everything sermon', ep:'Heat pumps and the electrify-everything agenda', ts:'07:20',
+    claim:'“Electrification is inevitable and resistance is just noise” — the stump speech, numbers-free',
+    quote:'The transition is coming whether anyone likes it or not. Electrify everything — it’s cleaner, it’s cheaper, it’s better, full stop. The holdouts will look like the people who defended landlines.',
+    speaker:'Host monologue' },
+ ]},
+ { id:'attia', name:'The Drive (Peter Attia)', medium:'podcast', m:['attia','peterattia','thedrive'],
+   why:'Longevity medicine with hazard ratios — lipids, VO2 max, sleep.',
+   items:[
+  { theme:'health', facet:'rapamycin-RCT item', ep:'Rapamycin in healthy adults: the first RCT readout', ts:'52:18',
+    claim:'The first healthy-adult rapamycin RCT showed immune-aging markers improved with no serious adverse events over 48 weeks',
+    quote:'This is the readout the field has waited a decade for: forty-eight weeks, healthy adults, immune markers moved in the right direction and the safety table is clean. It justifies the bigger trial — not the protocol, yet.',
+    speaker:'Peter Attia' },
+  { theme:'health', facet:'ApoB item', ep:'ApoB, Lp(a), and cardiovascular risk done right', ts:'38:44',
+    claim:'ApoB beats LDL-C in every discordance analysis — yet a $6 test still isn’t on standard panels',
+    quote:'When ApoB and LDL disagree, risk follows ApoB. Every time, every cohort. The fact that a six-dollar test isn’t standard of care tells you how slowly lipidology moves.',
+    speaker:'Peter Attia' },
+  { theme:'health', facet:'GLP-1-lean-mass item', ep:'GLP-1s and muscle: protecting lean mass on the way down', ts:'44:30',
+    claim:'DEXA data: 1g/kg protein + 3x/week resistance training preserved 90% of lean mass on GLP-1s vs 60% in controls',
+    quote:'The DEXA scans settle it: with the protein target and three lifting sessions a week, patients kept ninety percent of their lean mass. Without it, sixty. The drug isn’t the problem — the missing prescription around it is.',
+    speaker:'Guest, obesity researcher' },
+  { theme:'health', facet:'sleep-apnea item', ep:'Sleep apnea: the most underdiagnosed risk factor', ts:'29:55',
+    claim:'An estimated 80% of moderate-to-severe sleep apnea is undiagnosed — treatment lowers cardiovascular event risk ~30%',
+    quote:'Eight in ten cases are walking around undiagnosed, and the treated cohort shows about a thirty percent reduction in cardiovascular events. No other modifiable risk factor gets ignored at that scale.',
+    speaker:'Guest pulmonologist' },
+  { theme:'health', facet:'VO2max-dose-response item', ep:'VO2 max, training zones, and all-cause mortality', ts:'1:02:11',
+    claim:'Low to above-average VO2 max cuts all-cause mortality roughly in half — and the dose-response never plateaus',
+    quote:'Low to above-average fitness is about a fifty percent mortality risk reduction, and here’s the part people miss: the curve keeps bending all the way up. There is no observed ceiling on the benefit.',
+    speaker:'Peter Attia' },
+  { theme:'hype', facet:'n-of-one anecdote hour', ep:'A listener Q&A on routines, supplements, and everything', ts:'18:33',
+    claim:'Forty minutes of personal-routine anecdotes — which sauna, which supplement stack — with no citations',
+    quote:'People always ask what I personally do, so here goes: my sauna protocol, my exact supplement stack, the watch I wear to track it all. None of this is a recommendation, it’s just my n-of-one…',
+    speaker:'Peter Attia' },
+ ]},
 ];
+for (const s of DIRECTORY) s.slug = s.name.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-/* Serving order: maximize territory contrast early on. */
-const DIVERSITY_ORDER = [
-  'tok1','saas1','hyp1','sec1','enr1','eng1','fin1','geo1','con1','mac1','bio1',
-  'capex1','hyp2','eng2','tok2','saas3','sec3','fin2','geo3','con2','mac2','bio2',
-  'enr2','capex2','tok3','saas2','sec2','geo2','hyp3',
-];
 const MAX_ROUNDS = 16;
 const MIN_TO_FINISH = 8;
-
-/* ================================================================
-   STARTER SOURCES — suggested from what the user loved
-   ================================================================ */
-const SOURCES = [
-  { name:'BG2 Pod',                medium:'youtube', themes:['ai-econ','gpu-capex','macro'], why:'Capital-markets lens on AI infra — capex, token pricing, margins.' },
-  { name:'No Priors',              medium:'podcast', themes:['ai-econ','saas'],              why:'Operator-grade interviews on AI economics and AI-native software.' },
-  { name:'Dwarkesh Podcast',       medium:'youtube', themes:['ai-econ','geo'],               why:'Long-form depth on compute scaling and AI strategy.' },
-  { name:'20VC',                   medium:'podcast', themes:['saas','macro'],                why:'SaaS founders and investors disclosing real numbers.' },
-  { name:'Acquired',               medium:'podcast', themes:['saas','consumer'],             why:'Deep business-model and competitive-dynamics breakdowns.' },
-  { name:'Lenny’s Podcast',   medium:'youtube', themes:['saas'],                        why:'Product and growth detail from operators inside the companies.' },
-  { name:'Risky Business',         medium:'podcast', themes:['security'],                    why:'The sharpest weekly read on security-industry economics.' },
-  { name:'Security Weekly',        medium:'youtube', themes:['security'],                    why:'Vendor-landscape and CISO-budget coverage.' },
-  { name:'Fintech Takes',          medium:'podcast', themes:['fintech'],                     why:'Payments and credit unit economics, weekly.' },
-  { name:'Odd Lots',               medium:'podcast', themes:['macro','fintech','energy'],    why:'Markets and plumbing — credit, commodities, market structure.' },
-  { name:'The Long Run',           medium:'podcast', themes:['biotech'],                     why:'Biotech founders on platform economics and clinical milestones.' },
-  { name:'Catalyst with Shayle Kann', medium:'podcast', themes:['energy'],                   why:'Energy economics where they meet compute and climate.' },
-  { name:'Volts',                  medium:'podcast', themes:['energy'],                      why:'Grid, storage, and power-market detail with numbers.' },
-  { name:'ChinaTalk',              medium:'podcast', themes:['geo'],                         why:'Export controls and US-China chip policy, primary-source driven.' },
-  { name:'Sharp Tech',             medium:'podcast', themes:['geo','consumer'],              why:'Strategy-first tech analysis (Stratechery adjacent).' },
-  { name:'The Town',               medium:'podcast', themes:['consumer'],                    why:'Streaming and media economics from the inside.' },
-  { name:'Colin and Samir',        medium:'youtube', themes:['consumer'],                    why:'Creator-economy data and platform monetization shifts.' },
-  { name:'Latent Space',           medium:'podcast', themes:['eng','ai-econ'],               why:'AI engineering internals, benchmark and efficiency claims.' },
-  { name:'The Changelog',          medium:'podcast', themes:['eng'],                         why:'Software internals and infrastructure deep dives.' },
-];
+const URL_RE = /(https?:\/\/|www\.|\.xml$|\/feed)/i;
 
 /* ================================================================
    STATE
@@ -712,10 +1168,14 @@ const SOURCES = [
 let state;
 function freshState() {
   return {
+    sel: new Set(),        // selected directory show ids
+    custom: [],            // pasted feeds we couldn't match ({name, medium})
+    pool: [],              // brief items from selected shows (the deck)
+    order: [],             // serving order over pool ids
     served: [],            // item ids shown (incl. current)
     history: [],           // [{id, reaction}]
     counts: {},            // theme -> {must,fine,dont}
-    evidence: {},          // theme -> [{facet, reaction}]
+    evidence: {},          // theme -> [{facet, show, ep, reaction}]
     confirmQueue: [],      // item ids to serve next (adaptive)
     currentId: null,
     feed: [],              // inference strings (newest first)
@@ -725,7 +1185,7 @@ function freshState() {
 }
 
 const $ = id => document.getElementById(id);
-const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
 function show(screenId) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -734,18 +1194,157 @@ function show(screenId) {
 }
 
 /* ================================================================
+   SHOW PICKER
+   ================================================================ */
+function selectedShows() { return DIRECTORY.filter(s => state.sel.has(s.id)); }
+function showThemes(s) { return [...new Set(s.items.map(i => i.theme))].filter(t => t !== 'hype'); }
+
+function renderPickGrid(q) {
+  const query = (q || '').trim().toLowerCase();
+  const norm = query.replace(/[^a-z0-9]/g, '');
+  const list = DIRECTORY.filter(s =>
+    !query || s.name.toLowerCase().includes(query) || (norm && s.slug.includes(norm)));
+  const grid = $('pick-grid');
+  if (!list.length) {
+    grid.innerHTML = '<div class="pick-none">No directory match for “' + esc(q) +
+      '” — paste its RSS or YouTube URL and I’ll scan the feed.</div>';
+  } else {
+    grid.innerHTML = list.map(s => {
+      const on = state.sel.has(s.id);
+      return '<button class="pick-card' + (on ? ' sel' : '') + '" data-id="' + s.id + '">' +
+        '<span class="pc-check">✓</span>' +
+        '<span class="pc-row"><span class="pc-name">' + esc(s.name) + '</span>' +
+        '<span class="medium-badge ' + s.medium + '">' + (s.medium === 'youtube' ? 'YT' : 'Pod') + '</span></span>' +
+        '<span class="pc-eps">' + s.items.length + ' recent episodes · ' + esc(s.why) + '</span>' +
+      '</button>';
+    }).join('');
+  }
+}
+
+function renderPickFoot() {
+  const shows = selectedShows();
+  const eps = shows.reduce((a, s) => a + s.items.length, 0) + state.custom.length * 8;
+  const n = shows.length + state.custom.length;
+  $('pick-count').textContent = n
+    ? n + ' show' + (n === 1 ? '' : 's') + ' selected · ' + eps + ' recent episodes scanned'
+    : 'Nothing selected yet';
+  const btn = $('to-rate');
+  btn.disabled = shows.length === 0;
+  btn.title = shows.length ? 'Build the training deck from these shows'
+    : 'Select at least one directory show first';
+}
+
+let scanning = false;
+function showScanButton(url) {
+  $('scan-zone').innerHTML = '';
+  const b = document.createElement('button');
+  b.className = 'scan-btn';
+  b.textContent = '⌁ Scan feed: ' + url;
+  b.onclick = () => scanUrl(url);
+  $('scan-zone').appendChild(b);
+}
+
+function scanUrl(url) {
+  if (scanning) return;
+  scanning = true;
+  $('scan-zone').innerHTML = '<div class="scan-status"><span class="spin"></span>Scanning feed… fetching recent episodes</div>';
+  setTimeout(() => {
+    const norm = url.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const match = DIRECTORY.find(s => norm.includes(s.slug) || norm.includes(s.id) ||
+      (s.m || []).some(frag => norm.includes(frag.replace(/[^a-z0-9]/g, ''))));
+    if (match) {
+      state.sel.add(match.id);
+      $('scan-zone').innerHTML = '<div class="scan-status ok">✓ That’s <b>&nbsp;' + esc(match.name) +
+        '&nbsp;</b> — found ' + match.items.length + ' recent episodes. Added to your shows.</div>';
+    } else {
+      let host = url.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split(/[/?#]/)[0];
+      let name = (host.split('.')[0] || 'Custom feed').replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      const medium = /youtube|youtu\.be/i.test(url) ? 'youtube' : 'podcast';
+      state.custom.push({ name, medium });
+      $('scan-zone').innerHTML = '<div class="scan-status ok">✓ Found 8 recent episodes at <b>&nbsp;' + esc(name) +
+        '&nbsp;</b>. Added — I’ll learn its topics after the first real poll, so today’s training cards come from your directory shows.</div>';
+    }
+    scanning = false;
+    $('pick-search').value = '';
+    renderPickGrid('');
+    renderPickFoot();
+    setTimeout(() => { $('scan-zone').innerHTML = ''; }, 4500);
+  }, 1200);
+}
+
+/* ================================================================
+   DECK BUILDING — pool comes ONLY from the selected shows
+   ================================================================ */
+function buildPool() {
+  const pool = [];
+  for (const s of selectedShows()) {
+    s.items.forEach((it, i) => pool.push({ ...it, id: s.id + '-' + i, show: s.name, showId: s.id, medium: s.medium }));
+  }
+  return pool;
+}
+
+/* Greedy interleave: new themes first (hype delayed a little), spread shows. */
+function buildServeOrder(items) {
+  const order = [];
+  const remaining = [...items];
+  const themeUse = {}, showUse = {};
+  let lastTheme = null, lastShow = null;
+  while (remaining.length) {
+    let best = null, bestScore = -Infinity;
+    for (const it of remaining) {
+      let sc = 0;
+      if (!themeUse[it.theme]) sc += (it.theme === 'hype' ? 30 : 100);
+      if (!showUse[it.show]) sc += 40;
+      sc -= (themeUse[it.theme] || 0) * 10;
+      sc -= (showUse[it.show] || 0) * 3;
+      if (it.theme === lastTheme) sc -= 50;
+      if (it.show === lastShow) sc -= 15;
+      if (sc > bestScore) { bestScore = sc; best = it; }
+    }
+    order.push(best.id);
+    themeUse[best.theme] = (themeUse[best.theme] || 0) + 1;
+    showUse[best.show] = (showUse[best.show] || 0) + 1;
+    lastTheme = best.theme; lastShow = best.show;
+    remaining.splice(remaining.indexOf(best), 1);
+  }
+  return order;
+}
+
+function startTraining() {
+  const sel = state.sel, custom = state.custom;
+  state = freshState();
+  state.sel = sel; state.custom = custom;
+  state.pool = buildPool();
+  state.order = buildServeOrder(state.pool);
+  const shows = selectedShows();
+  $('rate-lede').innerHTML = 'Each card is a real item from ' +
+    shows.slice(0, 3).map(s => '<b style="color:#444">' + esc(s.name) + '</b>').join(', ') +
+    (shows.length > 3 ? ' and ' + (shows.length - 3) + ' more' : '') +
+    '. <b style="color:#444">★ Must have</b> lifts a theme, <b style="color:#444">Don’t care</b> teaches it what to mute.';
+  const first = nextItem();
+  state.served.push(first.id);
+  renderItem(first);
+  renderProgress();
+  renderPanel(null);
+  show('rate');
+}
+
+/* ================================================================
    ADAPTIVE SERVING
    ================================================================ */
-function unservedOfTheme(theme) {
-  return ITEMS.filter(i => i.theme === theme && !state.served.includes(i.id));
+function itemById(id) { return state.pool.find(i => i.id === id); }
+function unservedOfTheme(theme, excludeShow) {
+  const all = state.pool.filter(i => i.theme === theme && !state.served.includes(i.id));
+  // prefer confirming from a DIFFERENT show — cross-show signal is stronger
+  return all.sort((a, b) => (a.show === excludeShow ? 1 : 0) - (b.show === excludeShow ? 1 : 0));
 }
 function nextItem() {
   while (state.confirmQueue.length) {
     const id = state.confirmQueue.shift();
-    if (!state.served.includes(id)) return ITEMS.find(i => i.id === id);
+    if (!state.served.includes(id)) return itemById(id);
   }
-  for (const id of DIVERSITY_ORDER) {
-    if (!state.served.includes(id)) return ITEMS.find(i => i.id === id);
+  for (const id of state.order) {
+    if (!state.served.includes(id)) return itemById(id);
   }
   return null;
 }
@@ -776,35 +1375,35 @@ function themeStatus(theme) {
 function inferenceText(item, reaction) {
   const t = THEMES[item.theme];
   const c = countsFor(item.theme);
-  const more = unservedOfTheme(item.theme).length > 0;
+  const more = unservedOfTheme(item.theme, item.show).length > 0;
 
   if (item.theme === 'hype') {
     if (reaction === 'dont') {
-      if (c.dont === 1) return { main:`You passed on ${item.facet} → filtering <b>unquantified hype</b> into Down-weight.`,
-        sub: more ? 'Serving one more hype-style quote to confirm.' : null, confirm: more };
-      return { main:`Second pass on a hype quote — <b>vague, numberless claims</b> locked into Down-weight.` };
+      if (c.dont === 1) return { main:'You passed on the ' + esc(item.show) + ' ' + item.facet + ' → filtering <b>unquantified hype &amp; filler</b> into Down-weight.',
+        sub: more ? 'Serving one more hype-style moment from your shows to confirm.' : null, confirm: more };
+      return { main:'Second hype pass (this one from ' + esc(item.show) + ') — <b>vague, numberless filler</b> locked into Down-weight.' };
     }
-    if (reaction === 'must') return { main:`Interesting — you starred a big-vision quote. Keeping <b>${t.chip}</b> as a Tier 2 theme instead of muting it.` };
-    return { main:`Noted ${item.facet} as fine — no strong signal either way.` };
+    if (reaction === 'must') return { main:'Interesting — you starred the ' + esc(item.show) + ' big-vision quote. Keeping <b>' + t.chip + '</b> as a Tier 2 theme instead of muting it.' };
+    return { main:'Noted the ' + esc(item.show) + ' ' + item.facet + ' as fine — no strong signal either way.' };
   }
 
   if (reaction === 'must') {
     if (c.must === 1 && c.dont === 0)
-      return { main:`Because you starred ${item.facet} → <b>${t.label}</b> → Tier 1 <i>(tentative)</i>.`,
-        sub: more ? `Queuing a second ${t.chip.toLowerCase()} item to confirm.` : null, confirm: more };
+      return { main:'Because you starred the ' + esc(item.show) + ' ' + item.facet + ' → <b>' + t.label + '</b> → Tier 1 <i>(tentative)</i>.',
+        sub: more ? 'Queuing another ' + t.chip.toLowerCase() + ' item from your shows to confirm.' : null, confirm: more };
     if (c.must >= 2)
-      return { main:`Second ★ on ${t.chip.toLowerCase()} — <b>${t.label}</b> locked into Tier 1.` };
-    return { main:`★ on ${item.facet} despite an earlier pass → settling <b>${t.chip}</b> at Tier 2 (mixed signal).` };
+      return { main:'Second ★ on ' + t.chip.toLowerCase() + ' (this one from ' + esc(item.show) + ') — <b>' + t.label + '</b> locked into Tier 1.' };
+    return { main:'★ on the ' + esc(item.show) + ' ' + item.facet + ' despite an earlier pass → settling <b>' + t.chip + '</b> at Tier 2 (mixed signal).' };
   }
   if (reaction === 'fine') {
-    if (c.dont > 0) return { main:`Mixed signal on <b>${t.chip}</b> — leaving it out of the profile for now.` };
-    if (c.must > 0) return { main:`Another mild positive on <b>${t.chip}</b> — staying Tier 1.` };
-    return { main:`${item.facet[0].toUpperCase() + item.facet.slice(1)} is fine-but-not-essential → <b>${t.chip}</b> → Tier 2.` };
+    if (c.dont > 0) return { main:'Mixed signal on <b>' + t.chip + '</b> — leaving it out of the profile for now.' };
+    if (c.must > 0) return { main:'Another mild positive on <b>' + t.chip + '</b> — staying Tier 1.' };
+    return { main:'The ' + esc(item.show) + ' ' + item.facet + ' is fine-but-not-essential → <b>' + t.chip + '</b> → Tier 2.' };
   }
   // dont
-  if (c.must > 0) return { main:`You passed on ${item.facet}, but starred this area earlier → demoting <b>${t.chip}</b> to Tier 2.` };
-  if (c.fine > 0) return { main:`Conflicting reads on <b>${t.chip}</b> — dropping it from the profile.` };
-  return { main:`You passed on ${item.facet} → down-weighting <b>${t.chip}</b>.` };
+  if (c.must > 0) return { main:'You passed on the ' + esc(item.show) + ' ' + item.facet + ', but starred this area earlier → demoting <b>' + t.chip + '</b> to Tier 2.' };
+  if (c.fine > 0) return { main:'Conflicting reads on <b>' + t.chip + '</b> — dropping it from the profile.' };
+  return { main:'You passed on the ' + esc(item.show) + ' ' + item.facet + ' → down-weighting <b>' + t.chip + '</b>.' };
 }
 
 /* ================================================================
@@ -813,11 +1412,12 @@ function inferenceText(item, reaction) {
 function renderItem(item) {
   state.currentId = item.id;
   $('item-src').innerHTML =
-    `<span class="medium-badge ${item.medium}">${item.medium}</span>` +
-    `<span class="show">${esc(item.show)}</span><span>·</span>` +
-    `<a class="ts" href="javascript:void(0)" title="In the real brief this deep-links to the moment">▶ ${item.ts}</a>`;
+    '<span class="medium-badge ' + item.medium + '">' + item.medium + '</span>' +
+    '<span class="show">' + esc(item.show) + '</span><span>·</span>' +
+    '<span class="ep" title="' + esc(item.ep) + '">' + esc(item.ep) + '</span><span>·</span>' +
+    '<a class="ts" href="javascript:void(0)" title="In the real brief this deep-links to the moment">▶ ' + item.ts + '</a>';
   $('item-claim').textContent = item.claim;
-  $('item-quote').innerHTML = `“${esc(item.quote)}”<span class="speaker">— ${esc(item.speaker)}</span>`;
+  $('item-quote').innerHTML = '“' + esc(item.quote) + '”<span class="speaker">— ' + esc(item.speaker) + '</span>';
   const card = $('item-card');
   card.classList.remove('leaving-up','leaving-down','leaving-flat');
   card.classList.add('entering');
@@ -827,8 +1427,8 @@ function renderItem(item) {
 function renderProgress() {
   const n = state.history.length;
   const total = Math.min(MAX_ROUNDS, n + remainingPossible());
-  $('progress-label').textContent = `${Math.min(n + 1, total)} of ~${total}`;
-  $('progress-fill').style.width = `${Math.min(100, (n / MAX_ROUNDS) * 100)}%`;
+  $('progress-label').textContent = Math.min(n + 1, total) + ' of ~' + total;
+  $('progress-fill').style.width = Math.min(100, (n / MAX_ROUNDS) * 100) + '%';
   const fin = $('finish-btn');
   if (n >= MIN_TO_FINISH) {
     fin.disabled = false;
@@ -836,21 +1436,20 @@ function renderProgress() {
     fin.classList.add('primary');
   } else {
     fin.disabled = true;
-    fin.title = `Rate at least ${MIN_TO_FINISH} items first (${MIN_TO_FINISH - n} to go)`;
+    fin.title = 'Rate at least ' + MIN_TO_FINISH + ' items first (' + (MIN_TO_FINISH - n) + ' to go)';
     fin.classList.remove('primary');
   }
   $('undo-link').style.visibility = n > 0 ? 'visible' : 'hidden';
 }
 function remainingPossible() {
-  // current (unrated) card + everything not yet served
-  return 1 + ITEMS.filter(i => !state.served.includes(i.id)).length;
+  return 1 + state.pool.filter(i => !state.served.includes(i.id)).length;
 }
 
 function renderPanel(latest) {
   const box = $('infer-box');
   if (latest) {
     box.classList.remove('empty');
-    box.innerHTML = latest.main + (latest.sub ? `<span class="sub">↳ ${latest.sub}</span>` : '');
+    box.innerHTML = latest.main + (latest.sub ? '<span class="sub">↳ ' + latest.sub + '</span>' : '');
     box.classList.remove('flash'); void box.offsetWidth; box.classList.add('flash');
     $('live-dot').classList.add('live');
   }
@@ -864,11 +1463,10 @@ function renderPanel(latest) {
   fillChips('chips-t2', groups['2'], 't2');
   fillChips('chips-dw', groups['down'], 'dw');
 
-  if (state.feed.length) {
+  if (state.feed.length > 1) {
     $('feed').hidden = false;
     $('feed-items').innerHTML = state.feed.slice(1, 8).map(f =>
-      `<div class="feed-item"><span class="fi-ico">${f.icon}</span>${f.plain}</div>`).join('');
-    if (state.feed.length <= 1) $('feed').hidden = true;
+      '<div class="feed-item"><span class="fi-ico">' + f.icon + '</span>' + esc(f.plain) + '</div>').join('');
   } else {
     $('feed').hidden = true;
   }
@@ -879,7 +1477,8 @@ function fillChips(elId, list, cls) {
   el.innerHTML = list.map(({ key, st }) => {
     const t = THEMES[key];
     const tent = (st.tier === '1' && !st.sure) || (st.tier === 'down' && key === 'hype' && !st.sure);
-    return `<span class="chip ${cls}${tent ? ' tentative' : ''}">${esc(t.chip)}${tent ? '<span class="conf">?</span>' : ''}</span>`;
+    return '<span class="chip ' + cls + (tent ? ' tentative' : '') + '">' + esc(t.chip) +
+      (tent ? '<span class="conf">?</span>' : '') + '</span>';
   }).join('');
 }
 
@@ -889,7 +1488,7 @@ function fillChips(elId, list, cls) {
 let reactLock = false;
 function react(reaction) {
   if (reactLock) return;
-  const item = ITEMS.find(i => i.id === state.currentId);
+  const item = itemById(state.currentId);
   if (!item) return;
   reactLock = true;
 
@@ -897,17 +1496,16 @@ function react(reaction) {
   state.counts[item.theme] = state.counts[item.theme] || { must:0, fine:0, dont:0 };
   state.counts[item.theme][reaction] += 1;
   state.evidence[item.theme] = state.evidence[item.theme] || [];
-  state.evidence[item.theme].push({ facet: item.facet, reaction });
+  state.evidence[item.theme].push({ facet: item.facet, show: item.show, ep: item.ep, reaction });
 
   const inf = inferenceText(item, reaction);
   if (inf.confirm) {
-    const candidates = unservedOfTheme(item.theme);
+    const candidates = unservedOfTheme(item.theme, item.show);
     if (candidates.length) state.confirmQueue.unshift(candidates[0].id);
   }
   const icon = reaction === 'must' ? '★' : reaction === 'fine' ? '·' : '✕';
   state.feed.unshift({ icon, plain: inf.main.replace(/<[^>]+>/g, ''), main: inf.main });
 
-  // animate card out, then advance
   const card = $('item-card');
   card.classList.add(reaction === 'must' ? 'leaving-up' : reaction === 'dont' ? 'leaving-down' : 'leaving-flat');
   renderPanel(inf);
@@ -928,11 +1526,10 @@ function undo() {
   if (reactLock) return;
   const last = state.history.pop();
   if (!last) return;
-  const item = ITEMS.find(i => i.id === last.id);
+  const item = itemById(last.id);
   state.counts[item.theme][last.reaction] -= 1;
   state.evidence[item.theme].pop();
   state.feed.shift();
-  // remove current (unrated) item from served so it can reappear later
   if (state.currentId && state.currentId !== last.id) {
     state.served = state.served.filter(id => id !== state.currentId);
     state.confirmQueue.unshift(state.currentId);
@@ -962,15 +1559,15 @@ function evidenceLine(theme) {
   const stars = ev.filter(e => e.reaction === 'must');
   const fines = ev.filter(e => e.reaction === 'fine');
   const passes = ev.filter(e => e.reaction === 'dont');
+  const name = e => 'the <b>' + esc(e.show) + '</b> ' + e.facet;
   const bits = [];
-  if (stars.length) bits.push(`${stars.length} ★ — <b>${stars.map(e => e.facet).join('</b>, <b>')}</b>`);
-  if (fines.length) bits.push(`${fines.length} fine`);
-  if (passes.length) bits.push(`${passes.length} pass`);
+  if (stars.length) bits.push(stars.length + ' ★ — ' + stars.map(name).join(', '));
+  if (fines.length) bits.push(fines.length + ' fine' + (stars.length ? '' : ' — ' + fines.map(name).join(', ')));
+  if (passes.length) bits.push(passes.length + ' pass');
   return 'From your reactions: ' + bits.join(' · ');
 }
 
 function buildReview() {
-  // theme cards
   const t1 = [], t2 = [];
   for (const key of Object.keys(THEMES)) {
     const tier = effectiveTier(key);
@@ -982,22 +1579,23 @@ function buildReview() {
   $('rev-t2').innerHTML = t2.length ? t2.map(k => themeCardHtml(k, '2')).join('')
     : '<div class="empty-note">Nothing at Tier 2.</div>';
 
-  // down-weight list
   const dwRows = [];
   for (const key of Object.keys(THEMES)) {
     if (effectiveTier(key) !== 'down') continue;
     const t = THEMES[key];
+    const passes = (state.evidence[key] || []).filter(e => e.reaction === 'dont');
     if (key === 'hype') {
-      for (const b of t.downList) dwRows.push({ text: b, src: 'from your hype-quote passes' });
+      const shows = [...new Set(passes.map(e => e.show))];
+      for (const b of t.downList) dwRows.push({ text: b, src: 'from your passes on ' + (shows.join(', ') || 'hype quotes') });
     } else {
-      dwRows.push({ text: t.down, src: `you passed on ${(state.evidence[key] || []).filter(e => e.reaction === 'dont').map(e => e.facet)[0] || 'it'}` });
+      const p = passes[0];
+      dwRows.push({ text: t.down, src: p ? 'you passed on the ' + p.show + ' ' + p.facet : 'from your reactions' });
     }
   }
   $('rev-dw').innerHTML = dwRows.length
-    ? dwRows.map(r => `<li><span>${esc(r.text)}</span><span class="src-note">${esc(r.src)}</span></li>`).join('')
+    ? dwRows.map(r => '<li><span>' + esc(r.text) + '</span><span class="src-note">' + esc(r.src) + '</span></li>').join('')
     : '<li style="background:#fff;border-style:dashed"><span style="color:#bbb;font-style:italic">Nothing muted — pass on items you don’t care about to build this list.</span></li>';
 
-  // markdown + sources + summary
   $('md-pre').textContent = generateMarkdown();
   buildSources();
   updateSaveSummary();
@@ -1007,15 +1605,13 @@ function themeCardHtml(key, tier) {
   const t = THEMES[key];
   const ov = effectiveTier(key);
   const seg = (val, cls, label) =>
-    `<button class="${ov === val ? 'on ' + cls : ''}" data-theme="${key}" data-tier="${val}" title="${label}">${label}</button>`;
-  return `<div class="theme-card">
-    <div class="t-name">${esc(t.label)}</div>
-    <div class="seg">
-      ${seg('1','s1','Tier 1')}${seg('2','s2','Tier 2')}${seg('down','sd','Mute')}${seg('off','sx','✕')}
-    </div>
-    <div class="t-evidence">${evidenceLine(key)}</div>
-    <ul class="t-bullets">${t.bullets.slice(0,2).map(b => `<li>${esc(b)}</li>`).join('')}</ul>
-  </div>`;
+    '<button class="' + (ov === val ? 'on ' + cls : '') + '" data-theme="' + key + '" data-tier="' + val + '" title="' + label + '">' + label + '</button>';
+  return '<div class="theme-card">' +
+    '<div class="t-name">' + esc(t.label) + '</div>' +
+    '<div class="seg">' + seg('1','s1','Tier 1') + seg('2','s2','Tier 2') + seg('down','sd','Mute') + seg('off','sx','✕') + '</div>' +
+    '<div class="t-evidence">' + evidenceLine(key) + '</div>' +
+    '<ul class="t-bullets">' + t.bullets.slice(0,2).map(b => '<li>' + esc(b) + '</li>').join('') + '</ul>' +
+  '</div>';
 }
 
 /* ================================================================
@@ -1029,12 +1625,14 @@ function generateMarkdown() {
     else if (tier === '2') t2.push(key);
     else if (tier === 'down') dw.push(key);
   }
+  const trackedNames = selectedShows().map(s => s.name).concat(state.custom.map(c => c.name));
   const L = [];
   L.push('# Interest Profile');
   L.push('');
   L.push('This file is the bias function for the ranking stage. The model reads it');
   L.push('verbatim and uses it to filter and rank extracted candidates.');
-  L.push('Generated from onboarding reactions on ' + new Date().toISOString().slice(0,10) + ' — edit freely.');
+  L.push('Generated on ' + new Date().toISOString().slice(0,10) + ' from onboarding reactions to recent');
+  L.push('episodes of: ' + trackedNames.join(', ') + '. Edit freely.');
   L.push('');
   L.push('---');
   L.push('');
@@ -1067,7 +1665,7 @@ function generateMarkdown() {
     L.push('### ' + t.label + '  (Tier ' + (t1.includes(k) ? '1' : '2') + ')');
     for (const b of t.bullets) L.push('- ' + b);
     const stars = (state.evidence[k] || []).filter(e => e.reaction === 'must');
-    if (stars.length) L.push('- Seeded by onboarding reactions to: ' + stars.map(e => e.facet).join('; '));
+    if (stars.length) L.push('- Seeded by onboarding reactions to: ' + stars.map(e => 'the ' + e.show + ' ' + e.facet).join('; '));
     L.push('');
   }
   L.push('## Down-weight');
@@ -1086,38 +1684,44 @@ function generateMarkdown() {
 }
 
 /* ================================================================
-   SOURCES
+   SOURCES — shows adjacent to yours; never shows already added
    ================================================================ */
 function suggestedSources() {
   const weight = k => ({ '1': 2, '2': 1 }[effectiveTier(k)] || 0);
-  return SOURCES
+  return DIRECTORY
+    .filter(s => !state.sel.has(s.id))
     .map(s => {
-      const score = s.themes.reduce((a, t) => a + weight(t), 0);
-      const top = s.themes.filter(t => weight(t) > 0).sort((a, b) => weight(b) - weight(a))[0];
-      return { ...s, score, top };
+      const th = showThemes(s);
+      const score = th.reduce((a, t) => a + weight(t), 0);
+      const top = th.filter(t => weight(t) > 0).sort((a, b) => weight(b) - weight(a))[0];
+      const kin = selectedShows().find(x => top && showThemes(x).includes(top));
+      return { ...s, score, top, kin };
     })
     .filter(s => s.score > 0)
     .sort((a, b) => b.score - a.score)
-    .slice(0, 7);
+    .slice(0, 6);
 }
 
 function buildSources() {
   const list = suggestedSources();
   if (!list.length) {
-    $('rev-sources').innerHTML = '<div class="empty-note">No suggestions yet — promote at least one theme to Tier 1 or 2.</div>';
-    $('src-lede').textContent = 'Shows are suggested from your Tier 1 and Tier 2 themes.';
+    $('rev-sources').innerHTML = '<div class="empty-note">No suggestions yet — promote at least one theme to Tier 1 or 2 and they’ll appear here.</div>';
     return;
   }
-  for (const s of list) if (!(s.name in state.srcSelected)) state.srcSelected[s.name] = s.score >= 2;
+  for (const s of list) if (!(s.name in state.srcSelected)) state.srcSelected[s.name] = s.score >= 3;
   $('rev-sources').innerHTML = list.map(s => {
     const on = !!state.srcSelected[s.name];
-    return `<div class="src-card ${on ? 'on' : ''}">
-      <div class="s-main">
-        <div class="s-name">${esc(s.name)} <span class="medium-badge ${s.medium}">${s.medium}</span></div>
-        <div class="s-why">${esc(s.why)} <b>Matches: ${esc(THEMES[s.top].chip)}.</b></div>
-      </div>
-      <button class="add-toggle ${on ? 'added' : ''}" data-src="${esc(s.name)}">${on ? '✓ Adding' : 'Add'}</button>
-    </div>`;
+    const because = s.top
+      ? 'Covers <b>' + esc(THEMES[s.top].chip.toLowerCase()) + '</b> — a theme you starred' +
+        (s.kin ? ', like ' + esc(s.kin.name) : '') + '.'
+      : '';
+    return '<div class="src-card ' + (on ? 'on' : '') + '">' +
+      '<div class="s-main">' +
+        '<div class="s-name">' + esc(s.name) + ' <span class="medium-badge ' + s.medium + '">' + s.medium + '</span></div>' +
+        '<div class="s-why">' + esc(s.why) + ' ' + because + '</div>' +
+      '</div>' +
+      '<button class="add-toggle ' + (on ? 'added' : '') + '" data-src="' + esc(s.name) + '">' + (on ? '✓ Adding' : 'Add') + '</button>' +
+    '</div>';
   }).join('');
 }
 
@@ -1126,9 +1730,12 @@ function updateSaveSummary() {
   const t2 = Object.keys(THEMES).filter(k => effectiveTier(k) === '2').length;
   const dw = Object.keys(THEMES).filter(k => effectiveTier(k) === 'down').length;
   const srcs = Object.entries(state.srcSelected).filter(([n, v]) => v && suggestedSources().some(s => s.name === n)).length;
+  const tracked = state.sel.size + state.custom.length;
   $('save-summary').textContent =
-    `${t1} Tier-1 theme${t1 === 1 ? '' : 's'} · ${t2} Tier-2 · ${dw} muted · ${srcs} source${srcs === 1 ? '' : 's'} to add`;
-  $('save-btn').textContent = srcs ? `Save profile & add ${srcs} source${srcs === 1 ? '' : 's'}` : 'Save profile';
+    tracked + ' show' + (tracked === 1 ? '' : 's') + ' tracked · ' +
+    t1 + ' Tier-1 theme' + (t1 === 1 ? '' : 's') + ' · ' + t2 + ' Tier-2 · ' + dw + ' muted · ' +
+    srcs + ' adjacent show' + (srcs === 1 ? '' : 's') + ' to add';
+  $('save-btn').textContent = srcs ? 'Save profile & add ' + srcs + ' show' + (srcs === 1 ? '' : 's') : 'Save profile';
 }
 
 /* ================================================================
@@ -1139,14 +1746,16 @@ function finishSave() {
   const t2 = Object.keys(THEMES).filter(k => effectiveTier(k) === '2');
   const dwN = Object.keys(THEMES).filter(k => effectiveTier(k) === 'down').length;
   const srcs = Object.entries(state.srcSelected).filter(([n, v]) => v && suggestedSources().some(s => s.name === n));
+  const tracked = state.sel.size + state.custom.length + srcs.length;
   $('done-line').textContent = t1.length
-    ? `Your brief will lead with ${t1.map(k => THEMES[k].chip.toLowerCase()).slice(0,3).join(', ')}${t1.length > 3 ? ' and more' : ''}.`
+    ? 'Tracking ' + tracked + ' shows. Your brief will lead with ' +
+      t1.map(k => THEMES[k].chip.toLowerCase()).slice(0,3).join(', ') + (t1.length > 3 ? ' and more' : '') + '.'
     : 'Profile saved — it will sharpen as you react to real briefs.';
   $('done-stats').innerHTML =
-    `<div class="stat"><b>${t1.length}</b><span>Tier 1 themes</span></div>` +
-    `<div class="stat"><b>${t2.length}</b><span>Tier 2 themes</span></div>` +
-    `<div class="stat"><b>${dwN}</b><span>muted</span></div>` +
-    `<div class="stat"><b>${srcs.length}</b><span>sources added</span></div>`;
+    '<div class="stat"><b>' + tracked + '</b><span>shows tracked</span></div>' +
+    '<div class="stat"><b>' + t1.length + '</b><span>Tier 1 themes</span></div>' +
+    '<div class="stat"><b>' + t2.length + '</b><span>Tier 2 themes</span></div>' +
+    '<div class="stat"><b>' + dwN + '</b><span>muted</span></div>';
   show('done');
 }
 
@@ -1154,14 +1763,33 @@ function finishSave() {
    WIRING
    ================================================================ */
 $('start-btn').addEventListener('click', () => {
-  state = freshState();
-  const first = nextItem();
-  state.served.push(first.id);
-  renderItem(first);
-  renderProgress();
-  renderPanel(null);
-  show('rate');
+  $('pick-search').value = '';
+  $('scan-zone').innerHTML = '';
+  renderPickGrid('');
+  renderPickFoot();
+  show('pick');
+  $('pick-search').focus();
 });
+
+$('pick-grid').addEventListener('click', e => {
+  const card = e.target.closest('.pick-card');
+  if (!card) return;
+  const id = card.dataset.id;
+  if (state.sel.has(id)) state.sel.delete(id); else state.sel.add(id);
+  renderPickGrid($('pick-search').value);
+  renderPickFoot();
+});
+
+$('pick-search').addEventListener('input', () => {
+  const v = $('pick-search').value.trim();
+  if (URL_RE.test(v)) { $('pick-grid').innerHTML = ''; showScanButton(v); }
+  else { $('scan-zone').innerHTML = ''; renderPickGrid(v); }
+});
+$('pick-search').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && URL_RE.test($('pick-search').value.trim())) scanUrl($('pick-search').value.trim());
+});
+
+$('to-rate').addEventListener('click', startTraining);
 
 document.querySelectorAll('.react-btn').forEach(b =>
   b.addEventListener('click', () => react(b.dataset.react)));
