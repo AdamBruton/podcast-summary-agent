@@ -749,12 +749,22 @@ document.addEventListener('click', async (ev) => {
     const name = document.getElementById(`${cat}-name`).value.trim();
     const handle = document.getElementById(`${cat}-handle`).value.trim();
     setErr(`${cat}-err`, '');
+    // The add now auto-resolves the handle server-side (yt-dlp, a few
+    // seconds) — show progress so the wait doesn't read as a hang.
+    t.disabled = true;
+    const origLabel = t.textContent;
+    t.textContent = 'Adding & resolving…';
     try {
-      await api('POST', `/api/sources/${cat}`, { name, handle });
+      const r = await api('POST', `/api/sources/${cat}`, { name, handle });
       document.getElementById(`${cat}-name`).value = '';
       document.getElementById(`${cat}-handle`).value = '';
       await load();
+      if (r.resolve_error) {
+        setErr(`${cat}-err`,
+          `Added ${handle}, but auto-resolve failed: ${r.resolve_error} — use its resolve button to retry.`);
+      }
     } catch (e) { setErr(`${cat}-err`, e.message); }
+    finally { t.disabled = false; t.textContent = origLabel; }
     return;
   }
 

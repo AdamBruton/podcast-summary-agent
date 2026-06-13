@@ -79,7 +79,24 @@ function decodeParam(s) {
 
 app.get('/api/sources', wrap(() => listAll()));
 
-app.post('/api/sources/channels', wrap(req => addChannel(req.body)));
+// Adding a channel auto-resolves the @handle to its UC… channel_id inline
+// (a few seconds of yt-dlp). Best-effort: a failed resolution must not undo
+// the add — the row is kept unresolved and the response carries
+// `resolve_error` so the UI can say so. Fallbacks remain: the manual resolve
+// button, `npm run resolve-channels`, and ingest-time resolution.
+app.post('/api/sources/channels', wrap(async req => {
+  const added = addChannel(req.body);
+  if (added.channel_id) return added;
+  try {
+    const channel_id = await resolveHandle(added.handle);
+    if (!channel_id?.startsWith('UC')) {
+      throw new Error(`resolution returned unexpected value: ${channel_id || '(empty)'}`);
+    }
+    return patchChannel(added.handle, { channel_id });
+  } catch (err) {
+    return { ...added, resolve_error: err.message };
+  }
+}));
 
 app.delete('/api/sources/channels/:handle', wrap(req => ({
   removed: removeChannel(decodeParam(req.params.handle)),

@@ -362,6 +362,11 @@ reintroduce Whisper for YouTube** — different decision for a different medium.
 - **Profile + sources edits** round-trip via the yaml Document API
   (`sources-store.js`/`profile-store.js`) — preserves comments + key order.
   Never `YAML.parse() → YAML.stringify()`.
+- **Adding a channel auto-resolves the @handle** server-side in
+  `POST /api/sources/channels` (inline `resolveHandle`, a few seconds).
+  Best-effort: failure keeps the row unresolved and returns `resolve_error`;
+  the manual resolve button, `npm run resolve-channels`, and ingest-time
+  resolution remain as fallbacks.
 - **Podcasts** (`sources-store.js`): `addPodcast`/`removePodcast`/`patchPodcast`
   keyed by feed **url** (names collide with channels); mutation routes carry the
   url in the request **body** (encoded slashes break path params behind proxies).
