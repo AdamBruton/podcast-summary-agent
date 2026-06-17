@@ -233,7 +233,7 @@
   .ti-src { font-size: 10.5px; color: var(--muted); display: flex; gap: 5px; flex-wrap: wrap; align-items: baseline; }
   .ti-src .ti-show { font-weight: 700; color: #444; }
   .ti-src .ti-ep { font-style: italic; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .ti-src .ti-ts { color: var(--accent); font-weight: 600; font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 10px; }
+  .ti-src .ti-ts { color: var(--accent); font-weight: 600; font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 10px; text-decoration: none; }
   .ti-claim { font-size: 12.5px; font-weight: 600; line-height: 1.4; margin-top: 4px; }
   .ti-quote { font-size: 11px; color: #555; font-style: italic; border-left: 2px solid var(--line-strong); padding: 1px 0 1px 8px; margin: 5px 0 0; line-height: 1.45; }
   .ti-quote .ti-spk { font-style: normal; color: #6b6b6b; font-size: 10px; }
@@ -271,7 +271,11 @@
   .brief-head { font-size: 13px; font-weight: 600; line-height: 1.35; }
   .brief-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
   .brief-meta .b-show { color: #444; font-weight: 600; }
-  .brief-meta .ts { color: var(--accent); font-weight: 600; cursor: pointer; }
+  .brief-meta .ts { color: var(--accent); font-weight: 600; cursor: pointer; text-decoration: none; }
+  a.brief-head { color: var(--fg); text-decoration: none; }
+  a.brief-head:hover { text-decoration: underline; }
+  a.ti-ep { color: inherit; text-decoration: none; }
+  .brief-meta .ts:hover, .ti-src .ti-ts:hover, a.ti-ep:hover { text-decoration: underline; }
   .brief-meta .ctx-badge { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--t2); background: var(--t2-bg); border: 1px solid var(--t2-line); padding: 0 5px; border-radius: 3px; margin-left: 5px; }
   .brief-muted { margin-top: 10px; padding: 7px 10px; border-radius: 6px; background: var(--mute-bg); font-size: 11px; color: var(--mute); }
   .brief-empty { padding: 6px 0 2px; }
@@ -1062,6 +1066,16 @@ function fakeTs(id) {
   const m = Math.floor(total / 60), s = total % 60;
   return m + ':' + String(s).padStart(2, '0');
 }
+// Mock deep-link target. Real briefs link to the exact source timestamp; with
+// no real video ids here, open a search for the show + episode so the link
+// still goes somewhere sensible (YouTube for video shows, web search otherwise).
+function sourceSearchUrl(showKey, text) {
+  const s = SHOWS[showKey];
+  const q = encodeURIComponent(((s && s.name) ? s.name + ' ' : '') + (text || ''));
+  return (s && s.type === 'youtube')
+    ? 'https://www.youtube.com/results?search_query=' + q
+    : 'https://www.google.com/search?q=' + q;
+}
 function isUrl(q) {
   return /^https?:\/\//i.test(q) || /^www\./i.test(q) ||
          /\.(com|fm|io|wtf|biz|space|net|org|tv|co|xml)(\/|$)/i.test(q);
@@ -1714,10 +1728,11 @@ function renderFeed() {
         <button type="button" data-ract="down" data-item="${it.id}" title="Less of this — down-rank or mute '${esc(tname)}'">&#128078; less</button>
       </div>`;
     }
+    const srcUrl = sourceSearchUrl(it.show, it.ep);
     return `<div class="ti ${r && r.kind === 'down' ? 'reacted-down' : ''}" data-item="${it.id}">
       <div class="ti-src"><span class="ti-show">${esc(SHOWS[it.show].name)}</span> &middot;
-        <span class="ti-ep" title="${esc(it.ep)}">${esc(it.ep)}</span> &middot;
-        <span class="ti-ts">&#9654; ${it.ts}</span></div>
+        <a class="ti-ep" href="${srcUrl}" target="_blank" rel="noopener" title="Open ${esc(it.ep)} (mock — real briefs deep-link to the source)">${esc(it.ep)}</a> &middot;
+        <a class="ti-ts" href="${srcUrl}" target="_blank" rel="noopener" title="Open this episode — mock prototype (real briefs deep-link to ${esc(it.ts)})">&#9654; ${it.ts}</a></div>
       <div class="ti-claim">${esc(it.claim)}</div>
       <blockquote class="ti-quote">&ldquo;${esc(it.quote)}&rdquo; <span class="ti-spk">&mdash; ${esc(it.spk)}</span></blockquote>
       ${tail}
@@ -1767,11 +1782,13 @@ function renderPreview() {
     const head = ep ? esc(ep.title)
       : `Any concrete claim or disclosure about ${esc(it.t.n.toLowerCase())}`;
     const showName = ep ? SHOWS[ep.key].name : 'no current coverage in your shows';
+    const url = ep ? sourceSearchUrl(ep.key, ep.title) : sourceSearchUrl(null, it.t.n);
+    const ts = fakeTs(it.t.id);
     return `<div class="brief-item ${it.ctx ? 'ctx' : ''}" data-ptopic="${it.t.id}">
       <div class="brief-ord">${i + 1}</div>
       <div>
-        <div class="brief-head">${head}</div>
-        <div class="brief-meta">${esc(it.t.n)} &middot; <span class="b-show">${esc(showName)}</span> &middot; <span class="ts">&#9654; ${fakeTs(it.t.id)}</span>${it.ctx ? '<span class="ctx-badge">context</span>' : ''}</div>
+        <a class="brief-head" href="${url}" target="_blank" rel="noopener">${head}</a>
+        <div class="brief-meta">${esc(it.t.n)} &middot; <span class="b-show">${esc(showName)}</span> &middot; <a class="ts" href="${url}" target="_blank" rel="noopener" title="Open this episode — mock prototype (real briefs deep-link to ${ts})">&#9654; ${ts}</a>${it.ctx ? '<span class="ctx-badge">context</span>' : ''}</div>
       </div>
     </div>`;
   }).join('');
