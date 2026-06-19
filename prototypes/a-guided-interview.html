@@ -1,0 +1,1742 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set up your brief — guided interview</title>
+<style>
+  :root {
+    --fg: #111; --muted: #666; --faint: #999;
+    --line: #e5e5e5; --line-strong: #ccc;
+    --bg-soft: #f7f7f7; --bg-page: #fbfbfa;
+    --accent: #1a73e8; --accent-soft: #e8f0fe; --accent-dark: #1761c4;
+    --danger: #c0392b; --danger-soft: #fdeeec;
+    --ok: #1a8800; --ok-soft: #e9f7e6;
+    --t2: #7c5cd6;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    margin: 0; color: var(--fg); background: var(--bg-page);
+    line-height: 1.5; font-size: 14px;
+  }
+
+  /* ---------- layout ---------- */
+  header.app {
+    height: 52px; display: flex; align-items: center; gap: 10px;
+    padding: 0 20px; background: #fff; border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; z-index: 30;
+  }
+  .logo-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); flex: none; }
+  header.app h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  header.app .sub { color: var(--muted); font-size: 12px; margin-left: 2px; }
+  header.app .spacer { flex: 1; }
+  .hdr-link {
+    background: none; border: none; color: var(--muted); font-size: 12px;
+    cursor: pointer; padding: 6px 8px; border-radius: 4px;
+  }
+  .hdr-link:hover { color: var(--fg); background: var(--bg-soft); }
+  #panel-toggle {
+    display: none; font-size: 12px; border: 1px solid var(--line-strong);
+    background: #fff; border-radius: 14px; padding: 4px 12px; cursor: pointer;
+  }
+  #panel-toggle .cnt {
+    background: var(--accent); color: #fff; border-radius: 9px;
+    font-size: 10px; font-weight: 700; padding: 1px 6px; margin-left: 4px;
+  }
+
+  .wrap {
+    max-width: 1080px; margin: 0 auto;
+    display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 24px;
+    padding: 0 20px; height: calc(100vh - 52px);
+  }
+
+  /* ---------- chat column ---------- */
+  .chat-col { display: flex; flex-direction: column; min-width: 0; height: 100%; }
+  .progress {
+    display: flex; align-items: center; gap: 6px; padding: 14px 4px 8px;
+    font-size: 11px; color: var(--faint); flex: none;
+  }
+  .progress .dot {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--line-strong);
+    transition: background .3s, transform .3s;
+  }
+  .progress .dot.on { background: var(--accent); }
+  .progress .dot.cur { transform: scale(1.35); }
+  .progress .plabel { margin-left: 6px; }
+
+  #chat {
+    flex: 1; overflow-y: auto; padding: 8px 4px 16px;
+    scroll-behavior: smooth;
+  }
+  .msg { display: flex; margin: 14px 0; gap: 10px; max-width: 92%;
+         animation: rise .28s ease both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .msg.user { margin-left: auto; flex-direction: row-reverse; max-width: 78%; }
+  .avatar {
+    flex: none; width: 28px; height: 28px; border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; margin-top: 2px;
+    letter-spacing: -0.02em;
+  }
+  .bubble {
+    padding: 10px 14px; border-radius: 14px; min-width: 0;
+  }
+  .msg.bot .bubble { background: #fff; border: 1px solid var(--line); border-top-left-radius: 4px; }
+  .msg.user .bubble { background: var(--accent); color: #fff; border-top-right-radius: 4px; }
+  .bubble p { margin: 0 0 8px; }
+  .bubble p:last-child { margin-bottom: 0; }
+  .bubble .hint { color: var(--muted); font-size: 12px; }
+
+  /* typing indicator */
+  .typing .bubble { display: inline-flex; gap: 4px; align-items: center; padding: 14px 16px; }
+  .typing .d { width: 6px; height: 6px; border-radius: 50%; background: var(--line-strong);
+               animation: blink 1.1s infinite both; }
+  .typing .d:nth-child(2) { animation-delay: .18s; }
+  .typing .d:nth-child(3) { animation-delay: .36s; }
+  @keyframes blink { 0%, 70%, 100% { opacity: .3; transform: translateY(0); }
+                     35% { opacity: 1; transform: translateY(-2px); } }
+
+  /* chips inside chat */
+  .chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .chip {
+    border: 1px solid var(--line-strong); background: #fff; border-radius: 16px;
+    padding: 6px 14px; font-size: 13px; cursor: pointer; color: var(--fg);
+    transition: border-color .15s, background .15s, transform .1s;
+    font-family: inherit; display: inline-flex; align-items: center;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+  .chip:active { transform: scale(.97); }
+  .chip.sel { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-dark); font-weight: 600; }
+  .chip.go { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .chip.go:hover { background: var(--accent-dark); color: #fff; }
+  .chip.ghost { border-style: dashed; color: var(--muted); }
+  .chip-row.done .chip { pointer-events: none; opacity: .45; }
+  .chip-row.done .chip.sel { opacity: .8; }
+  .chip-row.done .chip.go { display: none; }
+  .chip .w {
+    background: rgba(0,0,0,.07); border-radius: 9px; font-size: 10px; font-weight: 700;
+    padding: 1px 6px; margin-left: 7px; color: var(--muted); white-space: nowrap;
+  }
+  .chip.sel .w { background: #fff; color: var(--accent-dark); }
+  .chip:hover .w { color: inherit; }
+
+  /* show picker (first question) */
+  .picker { margin-top: 10px; min-width: min(560px, 100%); }
+  .pick-search {
+    width: 100%; border: 1px solid var(--line-strong); border-radius: 8px;
+    padding: 8px 12px; font-family: inherit; font-size: 13px; outline: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .pick-search:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .pick-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; max-height: 230px; overflow: auto; }
+  .pick-chip {
+    border: 1px solid var(--line-strong); background: #fff; border-radius: 16px;
+    padding: 5px 12px; font-size: 12.5px; cursor: pointer; color: var(--fg);
+    font-family: inherit; display: inline-flex; align-items: center; gap: 7px;
+    transition: border-color .15s, background .15s;
+  }
+  .pick-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .pick-chip.sel { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-dark); font-weight: 600; }
+  .pick-chip .mb {
+    font-size: 8.5px; font-weight: 700; padding: 1px 5px; border-radius: 8px;
+    text-transform: uppercase; letter-spacing: .04em;
+  }
+  .pick-none { font-size: 12.5px; color: var(--faint); padding: 6px 2px; }
+  .scan-zone { margin-top: 10px; }
+  .scan-btn {
+    border: 1px dashed var(--accent); background: var(--accent-soft); color: var(--accent-dark);
+    border-radius: 8px; padding: 7px 14px; font-size: 12.5px; cursor: pointer; font-family: inherit;
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .scan-btn:hover { background: #dbe8fd; }
+  .scan-status { font-size: 12.5px; color: var(--muted); padding: 7px 2px; display: flex; align-items: center; gap: 8px; }
+  .scan-status .spin {
+    width: 12px; height: 12px; border: 2px solid var(--line-strong); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin .8s linear infinite; flex: none;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .scan-status.ok { color: var(--ok); }
+  .pick-foot { display: flex; align-items: center; gap: 10px; margin-top: 10px; min-height: 32px; flex-wrap: wrap; }
+  .pick-count { font-size: 12px; color: var(--muted); }
+  .picker.done { pointer-events: none; opacity: .55; }
+
+  /* review card in chat */
+  .card {
+    margin-top: 10px; border: 1px solid var(--line); border-radius: 8px;
+    background: #fff; overflow: hidden;
+  }
+  .card .card-head {
+    padding: 10px 14px; border-bottom: 1px solid var(--line);
+    font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); font-weight: 600; display: flex; align-items: center;
+  }
+  .card .card-body { padding: 12px 14px; }
+  .tier-block { margin-bottom: 12px; }
+  .tier-block:last-child { margin-bottom: 0; }
+  .tier-label { font-size: 10px; font-weight: 700; letter-spacing: .07em;
+                text-transform: uppercase; margin-bottom: 6px; display: flex; gap: 6px; align-items: baseline;}
+  .tier-label .t-desc { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--faint); }
+  .tier-label.t1 { color: var(--accent-dark); }
+  .tier-label.t2 { color: var(--t2); }
+  .tier-label.dw { color: var(--danger); }
+  .pillset { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pill {
+    font-size: 12px; padding: 4px 10px; border-radius: 12px; background: var(--bg-soft);
+    border: 1px solid var(--line);
+  }
+  .pill.t1 { background: var(--accent-soft); border-color: #cfe0fb; color: #174ea6; }
+  .pill.t2 { background: #f3efff; border-color: #e2d9f8; color: #5b3fb8; }
+  .pill.dw { background: var(--danger-soft); border-color: #f3cdc6; color: #93281b; }
+  .pill .pv { font-size: 10px; opacity: .65; margin-left: 4px; }
+  .lens-line { font-size: 12px; color: var(--muted); font-style: italic; margin-bottom: 12px;
+               padding: 8px 10px; background: var(--bg-soft); border-radius: 6px; }
+
+  details.md-view { border-top: 1px solid var(--line); }
+  details.md-view summary {
+    cursor: pointer; padding: 9px 14px; font-size: 12px; color: var(--muted);
+    user-select: none; list-style: none; display: flex; align-items: center; gap: 6px;
+  }
+  details.md-view summary::-webkit-details-marker { display: none; }
+  details.md-view summary::before { content: "▸"; font-size: 10px; transition: transform .15s; }
+  details.md-view[open] summary::before { transform: rotate(90deg); }
+  details.md-view summary:hover { color: var(--fg); background: var(--bg-soft); }
+  details.md-view pre {
+    margin: 0; padding: 12px 14px; background: #fafafa; border-top: 1px solid var(--line);
+    font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 11.5px;
+    line-height: 1.55; max-height: 300px; overflow: auto; white-space: pre-wrap;
+  }
+  .md-actions { padding: 8px 14px; border-top: 1px solid var(--line); background: #fafafa; }
+
+  .card-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  button.btn {
+    font-size: 13px; padding: 7px 16px; border: 1px solid var(--line-strong);
+    background: #fff; border-radius: 6px; cursor: pointer; color: var(--fg); font-family: inherit;
+  }
+  button.btn:hover { background: var(--bg-soft); }
+  button.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+  button.btn.primary:hover { background: var(--accent-dark); }
+  button.btn.small { font-size: 12px; padding: 4px 10px; }
+  button.btn:disabled { opacity: .5; cursor: default; }
+
+  /* source suggestion cards */
+  .src-card {
+    display: flex; align-items: center; gap: 12px; margin-top: 8px;
+    border: 1px solid var(--line); border-radius: 8px; background: #fff;
+    padding: 10px 12px; transition: opacity .25s, border-color .2s, background .2s;
+  }
+  .src-card .src-info { flex: 1; min-width: 0; }
+  .src-card .src-name { font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .src-card .src-why { color: var(--muted); font-size: 12px; margin-top: 1px; }
+  .src-card .src-btns { display: flex; gap: 6px; flex: none; }
+  .src-btn {
+    width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line-strong);
+    background: #fff; cursor: pointer; font-size: 14px; line-height: 1;
+    display: flex; align-items: center; justify-content: center; color: var(--muted);
+    transition: all .15s; font-family: inherit;
+  }
+  .src-btn.add:hover { border-color: var(--ok); color: var(--ok); background: var(--ok-soft); }
+  .src-btn.skip:hover { border-color: var(--danger); color: var(--danger); background: var(--danger-soft); }
+  .src-card.accepted { border-color: #bfe3b4; background: #f6fcf4; }
+  .src-card.declined { opacity: .45; }
+  .src-card.decided .src-btns { display: none; }
+  .src-state { font-size: 11px; font-weight: 600; flex: none; }
+  .src-state.yes { color: var(--ok); }
+  .src-state.no { color: var(--faint); }
+  .medium-badge {
+    font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 10px;
+    text-transform: uppercase; letter-spacing: .04em;
+  }
+  .medium-badge.podcast { background: #f3e8ff; color: #7c3aed; }
+  .medium-badge.youtube { background: #fee2e2; color: #dc2626; }
+
+  /* composer */
+  .composer-zone { flex: none; padding: 8px 4px 10px; background: var(--bg-page); }
+  .composer {
+    display: flex; gap: 8px; background: #fff; border: 1px solid var(--line-strong);
+    border-radius: 24px; padding: 6px 6px 6px 18px; align-items: center;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .composer:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .composer input {
+    flex: 1; border: none; outline: none; font-size: 14px; font-family: inherit;
+    background: transparent; min-width: 0;
+  }
+  .composer input::placeholder { color: var(--faint); }
+  .composer button.send {
+    flex: none; width: 34px; height: 34px; border-radius: 50%; border: none;
+    background: var(--accent); color: #fff; cursor: pointer; font-size: 15px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s, opacity .15s;
+  }
+  .composer button.send:hover { background: var(--accent-dark); }
+  .composer.disabled { opacity: .55; pointer-events: none; }
+  .skip-row {
+    display: flex; gap: 16px; justify-content: center; margin-top: 7px;
+    font-size: 11.5px; min-height: 17px;
+  }
+  .skip-row a { color: var(--faint); text-decoration: none; cursor: pointer; }
+  .skip-row a:hover { color: var(--muted); text-decoration: underline; }
+
+  /* ---------- profile panel ---------- */
+  aside.panel {
+    border-left: 1px solid var(--line); padding: 18px 0 18px 24px;
+    overflow-y: auto; background: var(--bg-page);
+  }
+  .panel-head {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--muted); font-weight: 600; margin-bottom: 4px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .panel-head .live {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--ok);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+  .panel-sub { font-size: 11.5px; color: var(--faint); margin-bottom: 16px; }
+
+  .panel-empty {
+    border: 1.5px dashed var(--line-strong); border-radius: 8px;
+    padding: 22px 16px; text-align: center; color: var(--faint); font-size: 12.5px;
+  }
+  .panel-empty .ghost-row { display: flex; gap: 6px; justify-content: center; margin-top: 12px; }
+  .panel-empty .ghost {
+    height: 20px; border-radius: 10px; background: var(--bg-soft);
+    border: 1px solid var(--line);
+  }
+  .panel-empty .ghost.w1 { width: 64px; } .panel-empty .ghost.w2 { width: 88px; } .panel-empty .ghost.w3 { width: 48px; }
+
+  .psec { margin-bottom: 18px; }
+  .psec-title { font-size: 10px; font-weight: 700; text-transform: uppercase;
+                letter-spacing: .07em; margin-bottom: 7px; display: flex; align-items: baseline; gap: 6px; }
+  .psec-title .t-desc { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--faint); font-size: 10.5px; }
+  .psec-title.t1 { color: var(--accent-dark); }
+  .psec-title.t2 { color: var(--t2); }
+  .psec-title.dw { color: var(--danger); }
+  .psec-title.src { color: #555; }
+  .psec-title.lens { color: #555; }
+  .p-lens { font-size: 12px; color: var(--muted); font-style: italic;
+            background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+  .ptags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ptag {
+    display: inline-flex; align-items: center; gap: 2px;
+    font-size: 12px; padding: 4px 6px 4px 10px; border-radius: 12px;
+    background: var(--bg-soft); border: 1px solid var(--line); max-width: 100%;
+  }
+  .ptag.t1 { background: var(--accent-soft); border-color: #cfe0fb; color: #174ea6; }
+  .ptag.t2 { background: #f3efff; border-color: #e2d9f8; color: #5b3fb8; }
+  .ptag.dw { background: var(--danger-soft); border-color: #f3cdc6; color: #93281b; }
+  .ptag.new { animation: pop .35s ease both; }
+  @keyframes pop { 0% { opacity: 0; transform: scale(.8); } 70% { transform: scale(1.04); } 100% { opacity: 1; transform: scale(1); } }
+  .ptag .x {
+    border: none; background: none; cursor: pointer; color: inherit; opacity: .4;
+    font-size: 13px; line-height: 1; padding: 0 4px; border-radius: 50%; font-family: inherit;
+  }
+  .ptag .x:hover { opacity: 1; }
+  .ptag .pn {
+    font-size: 9.5px; font-weight: 700; opacity: .6; margin-left: 4px;
+    border: none; background: rgba(0,0,0,.05); border-radius: 8px; padding: 1px 5px;
+    cursor: pointer; color: inherit; font-family: inherit;
+  }
+  .ptag .pn:hover { opacity: 1; }
+  .prov-pop {
+    width: 100%; font-size: 11.5px; color: var(--muted); background: #fff;
+    border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin-top: 2px;
+    animation: rise .2s ease both;
+  }
+  .prov-pop .pp-head { color: var(--fg); font-weight: 600; margin-bottom: 3px; }
+  .prov-pop ul { margin: 4px 0 0; padding-left: 16px; }
+  .prov-pop li { margin: 2px 0; }
+  .prov-pop li .pp-show { color: var(--faint); }
+
+  .p-show-row, .p-src-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px;
+               padding: 5px 0; border-bottom: 1px solid var(--line); }
+  .p-show-row:last-child, .p-src-row:last-child { border-bottom: none; }
+  .p-show-row.new, .p-src-row.new { animation: pop .35s ease both; }
+  .p-show-row .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .p-show-row .ep { font-size: 10.5px; color: var(--faint); flex: none; }
+  .p-show-row .x {
+    border: none; background: none; cursor: pointer; color: var(--faint);
+    font-size: 14px; line-height: 1; padding: 0 4px; border-radius: 50%; font-family: inherit; flex: none;
+  }
+  .p-show-row .x:hover { color: var(--danger); }
+  .p-seed-note { font-size: 10.5px; color: var(--faint); margin-top: 6px; }
+  .p-tier3-note { font-size: 11px; color: var(--faint); border-top: 1px solid var(--line);
+                  padding-top: 10px; margin-top: 4px; }
+  .panel-backdrop { display: none; }
+
+  /* toast */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: #222; color: #fff; padding: 10px 18px; border-radius: 8px;
+    font-size: 13px; opacity: 0; pointer-events: none; transition: all .3s; z-index: 60;
+    max-width: 90vw;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ---------- narrow ---------- */
+  @media (max-width: 880px) {
+    .wrap { grid-template-columns: 1fr; }
+    #panel-toggle { display: inline-flex; align-items: center; }
+    aside.panel {
+      position: fixed; top: 52px; right: 0; bottom: 0; width: min(330px, 88vw);
+      background: #fff; border-left: 1px solid var(--line); z-index: 50;
+      padding: 18px 18px; transform: translateX(105%); transition: transform .25s ease;
+      box-shadow: -8px 0 24px rgba(0,0,0,.06);
+    }
+    aside.panel.open { transform: none; }
+    .panel-backdrop {
+      display: block; position: fixed; inset: 52px 0 0 0; background: rgba(0,0,0,.18);
+      opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 40;
+    }
+    .panel-backdrop.show { opacity: 1; pointer-events: auto; }
+    .msg { max-width: 100%; }
+    .picker { min-width: 0; }
+  }
+</style>
+</head>
+<body>
+
+<header class="app">
+  <div class="logo-dot"></div>
+  <h1>Daily Brief</h1>
+  <span class="sub">· setup</span>
+  <div class="spacer"></div>
+  <button id="panel-toggle">Profile <span class="cnt" id="panel-count">0</span></button>
+  <button class="hdr-link" id="restart">Start over</button>
+</header>
+
+<div class="wrap">
+  <div class="chat-col">
+    <div class="progress" id="progress"></div>
+    <div id="chat"></div>
+    <div class="composer-zone">
+      <div class="composer" id="composer">
+        <input id="input" type="text" placeholder="Type an answer…" autocomplete="off">
+        <button class="send" id="send" title="Send">↑</button>
+      </div>
+      <div class="skip-row" id="skip-row"></div>
+    </div>
+  </div>
+
+  <aside class="panel" id="panel">
+    <div class="panel-head"><span class="live"></span> Your interest profile</div>
+    <div class="panel-sub">Builds live as you answer — seeded from your shows. Remove anything with ×.</div>
+    <div id="panel-body"></div>
+  </aside>
+</div>
+<div class="panel-backdrop" id="panel-backdrop"></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+/* =========================================================
+   TOPIC TAXONOMY — every episode tag maps to one of these.
+   `label` = suggestion-chip text, `theme` = Tier-1 profile line.
+   ========================================================= */
+
+const TOPICS = {
+  ai:       { label:'Frontier AI & labs',          theme:'Frontier AI labs & model economics',            t2:'Model architecture & training detail (cost-tied)',
+              kw:['ai','llm','model','openai','anthropic','frontier','agi','deepmind'] },
+  aiinfra:  { label:'AI infra & compute economics', theme:'AI infrastructure economics — GPUs, datacenters, power', t2:'Chip & datacenter supply-chain detail (cost-tied)',
+              kw:['infra','gpu','compute','datacenter','data center','capex','inference','token econ','nvidia'] },
+  agents:   { label:'AI agents & applied AI',       theme:'AI agents & applied-AI adoption',
+              kw:['agent','copilot','automation','applied ai'] },
+  semis:    { label:'Semiconductors',               theme:'Semiconductor strategy & supply chain',
+              kw:['semiconductor','chip','tsmc','fab','asml','amd'] },
+  markets:  { label:'Markets & macro',              theme:'Markets, macro & capital flows',
+              kw:['market','macro','fed','rates','stocks','bonds','treasury','inflation'] },
+  venture:  { label:'Venture & startup funding',    theme:'Venture funding & startup formation',
+              kw:['venture','vc','seed','fundraise','startup','fund'] },
+  saas:     { label:'Enterprise software & SaaS',   theme:'Enterprise software & SaaS dynamics',
+              kw:['saas','enterprise','arr','b2b','software'] },
+  consumer: { label:'Consumer platforms & devices', theme:'Consumer platforms & device strategy',
+              kw:['consumer','apple','iphone','device','app','social','platform','meta','google'] },
+  security: { label:'Cybersecurity',                theme:'Cybersecurity industry & threat landscape',     t2:'Exploit-level technical detail (impact-tied)',
+              kw:['security','cyber','breach','ransomware','hack','infosec','zero-day'] },
+  crypto:   { label:'Crypto & stablecoins',         theme:'Crypto & stablecoin economics',
+              kw:['crypto','bitcoin','stablecoin','ethereum','onchain','web3'] },
+  energy:   { label:'Energy & the grid',            theme:'Energy markets & grid buildout',                t2:'Grid engineering detail (deployment-tied)',
+              kw:['energy','grid','power','nuclear','utility','electricity','geothermal'] },
+  climate:  { label:'Climate tech',                 theme:'Climate tech deployment & cost curves',
+              kw:['climate','solar','battery','batteries','decarbon','ev','heat pump'] },
+  health:   { label:'Health & longevity',           theme:'Health, longevity & clinical evidence',         t2:'Mechanism deep-dives (evidence-tied)',
+              kw:['health','longevity','sleep','glp-1','glp1','fitness','nutrition','medical'] },
+  neuro:    { label:'Neuroscience & performance',   theme:'Neuroscience & human performance',
+              kw:['neuro','brain','dopamine','cognition','focus'] },
+  bio:      { label:'Biotech & drug development',   theme:'Biotech pipelines & drug development',
+              kw:['biotech','pharma','drug','clinical','molecule','bio '] },
+  media:    { label:'Media & creator economy',      theme:'Media, streaming & creator economy',
+              kw:['media','streaming','creator','hollywood','netflix','entertainment'] },
+  policy:   { label:'Tech policy & regulation',     theme:'Tech policy, antitrust & regulation',
+              kw:['policy','regulation','antitrust','tariff','export control','geopolit','election'] },
+  robotics: { label:'Robotics & autonomy',          theme:'Robotics & autonomy',
+              kw:['robot','autonomy','robotaxi','humanoid','waymo','drone','defense tech'] },
+  space:    { label:'Space economy',                theme:'Space economy',
+              kw:['space','rocket','orbit','mars','satellite','spacex'] },
+  fintech:  { label:'Fintech & payments',           theme:'Fintech & payments economics',
+              kw:['fintech','payments','bank','lending','interchange','neobank'] },
+  gaming:   { label:'Gaming',                       theme:'Gaming business models',
+              kw:['gaming','game','nintendo','roblox','console'] }
+};
+
+/* =========================================================
+   MOCK SHOW DIRECTORY — the seed corpus.
+   Each show: 6-8 believable recent episode titles, each tagged
+   with topics. `sig` = which signal-types the show's format
+   exemplifies, `noise` = filler patterns typical of the show.
+   ========================================================= */
+
+const SHOWS = [
+ ['allin','All-In Podcast','youtube',['numbers','ma','contrarian'],['politics','hype','banter'],[
+   ['OpenAI’s $200B compute commitment, rate cuts & the AI capex supercycle',['ai','aiinfra','markets']],
+   ['Emergency pod: Nvidia earnings blow past $60B — is this 1999?',['aiinfra','semis','markets']],
+   ['Tariffs, TikTok’s endgame, and the new chip export rules',['policy','semis','consumer']],
+   ['Besties on the agent economy: who captures the value?',['agents','ai','venture']],
+   ['Datacenter power crunch: nat gas, nukes, and the grid bottleneck',['energy','aiinfra']],
+   ['Antitrust season: Google’s remedies and the app-store endgame',['policy','consumer']],
+   ['Is venture broken? Fund returns, secondaries, and the liquidity drought',['venture','markets']],
+   ['Bitcoin at $150K, the stablecoin bill, and sovereign buyers',['crypto','markets','policy']]]],
+ ['bg2','BG2 Pod','podcast',['numbers','contrarian'],['recycled'],[
+   ['Open vs closed redux: token economics after the price wars',['ai','aiinfra']],
+   ['Capex, depreciation & the trillion-dollar AI buildout — with Michael Dell',['aiinfra','markets']],
+   ['Hyperscaler earnings deep dive: who’s actually monetizing AI?',['aiinfra','saas','markets']],
+   ['The GPU shortage is over. Now what?',['aiinfra','semis']],
+   ['Sovereign AI: nation-state compute and the new arms race',['aiinfra','policy']],
+   ['Q&A: AI agents, SaaS multiples, and the death of the seat',['agents','saas','markets']]]],
+ ['acquired','Acquired','podcast',['numbers','ma','stories'],[],[
+   ['TSMC (Part II): the most important company in the world',['semis','aiinfra']],
+   ['Costco: the membership machine',['consumer','markets']],
+   ['Visa: the original network effect',['fintech','consumer']],
+   ['Nintendo: 134 years of reinvention',['gaming','consumer']],
+   ['Anthropic: the $300B research lab',['ai','venture']],
+   ['Microsoft Volume III: Satya’s second act',['saas','ai']],
+   ['Holiday special: the best business model we’ve ever covered',['markets','consumer']]]],
+ ['dwarkesh','Dwarkesh Podcast','youtube',['technical','contrarian'],[],[
+   ['Ilya Sutskever — superintelligence timelines and what scaling missed',['ai']],
+   ['Leopold Aschenbrenner — trillion-dollar clusters and the geopolitics of compute',['aiinfra','policy']],
+   ['Tyler Cowen — AI, growth economics, and the great stagnation',['ai','markets']],
+   ['Sarah Paine — grand strategy lessons from the Pacific war',['policy']],
+   ['Demis Hassabis — AlphaFold’s successor and the science layer',['ai','bio']],
+   ['John Schulman — RL, agents, and what post-training actually does',['ai','agents']]]],
+ ['nopriors','No Priors','podcast',['stories','technical'],['hype'],[
+   ['Cursor’s run to $500M ARR — with the Anysphere founders',['agents','saas','ai','venture']],
+   ['State of foundation models — with a frontier-lab insider',['ai']],
+   ['Vertical AI agents: legal, healthcare, and the services takeover',['agents','saas']],
+   ['The inference cost curve — with Together AI’s CEO',['aiinfra','ai']],
+   ['Robot foundation models — with Physical Intelligence',['robotics','ai']],
+   ['Why enterprises still can’t ship agents',['agents','saas']]]],
+ ['lex','Lex Fridman Podcast','youtube',['technical','stories'],['recycled','selfhelp'],[
+   ['Elon Musk — Mars timelines, Optimus, and xAI',['space','robotics','ai']],
+   ['Dario Amodei — scaling, safety, and the next five years',['ai']],
+   ['Andrew Huberman — focus, dopamine, and daily protocols',['neuro','health']],
+   ['Historian deep dive: the fall of Rome (4 hours)',[]],
+   ['Boston Dynamics CTO — humanoids and the robotics stack',['robotics']],
+   ['John Carmack — AGI from first principles',['ai','gaming']]]],
+ ['a16z','a16z Podcast','podcast',['stories'],['hype','filler'],[
+   ['Big Ideas 2026: AI agents eat services revenue',['agents','venture']],
+   ['American Dynamism: defense, space, and reindustrialization',['space','robotics']],
+   ['Stablecoins as payment rails — with Stripe’s crypto team',['crypto','fintech']],
+   ['Bio x AI: when models design the molecule',['bio','ai']],
+   ['Why we’re still bullish on consumer social',['consumer','venture']],
+   ['Founder lessons: scaling past $100M ARR',['saas','venture']]]],
+ ['sharptech','Sharp Tech with Ben Thompson','podcast',['contrarian','regulation'],['banter'],[
+   ['Apple’s AI reboot and the Siri rebuild',['consumer','ai']],
+   ['Meta’s open-weights gambit and the ad-model moat',['ai','consumer','media']],
+   ['Google’s antitrust remedies: what actually changes',['policy','consumer']],
+   ['Nvidia, AMD, and the inference market-share fight',['semis','aiinfra']],
+   ['The TikTok divestiture, six months in',['consumer','policy','media']],
+   ['Mailbag: smart glasses, Vision Pro, and the wearables race',['consumer']]]],
+ ['stratechery','Stratechery','podcast',['contrarian','numbers','ma'],[],[
+   ['Aggregation theory in the agent era',['agents','consumer','ai']],
+   ['An interview with Satya Nadella on Copilot economics',['saas','ai']],
+   ['The streaming endgame: Netflix wins — who’s second?',['media','consumer']],
+   ['OpenAI’s consumer ambitions and the device question',['ai','consumer']],
+   ['Chips and the China question',['semis','policy']],
+   ['Why enterprise software isn’t dead yet',['saas','agents']]]],
+ ['oddlots','Odd Lots','podcast',['numbers','contrarian'],[],[
+   ['Why the grid can’t keep up with AI datacenters',['energy','aiinfra']],
+   ['The uranium bull market, explained',['energy','markets']],
+   ['Inside the Treasury basis trade',['markets']],
+   ['How copper became the new oil',['markets','energy','climate']],
+   ['The economics of GLP-1s — with a pharma analyst',['health','bio','markets']],
+   ['Container shipping chaos and the new trade routes',['markets','policy']],
+   ['Stablecoins and the dollar system',['crypto','fintech','markets']]]],
+ ['iltb','Invest Like the Best','podcast',['stories','numbers'],['recycled'],[
+   ['Gavin Baker — AI capex cycles and the semis trade',['aiinfra','semis','markets']],
+   ['The business of sports ownership',['media','markets']],
+   ['Ramp’s founder on velocity as strategy',['fintech','saas','venture']],
+   ['Energy-transition investing — with a power trader',['energy','markets','climate']],
+   ['Software multiples in the agent era',['saas','markets','agents']],
+   ['A stealth defense-tech founder on the new primes',['robotics','venture']]]],
+ ['20vc','20VC with Harry Stebbings','youtube',['stories','ma'],['hype','recycled','filler'],[
+   ['Why seed is broken — with three fund managers',['venture']],
+   ['Klarna’s CEO on replacing SaaS with AI agents',['agents','saas','fintech']],
+   ['The $10B solo GP — venture’s power-law endgame',['venture','markets']],
+   ['Anthropic’s CPO on enterprise AI adoption',['ai','saas']],
+   ['Roundtable: are AI app-layer companies real businesses?',['ai','venture','saas']],
+   ['Revolut, Monzo, and the neobank end state',['fintech','venture']]]],
+ ['riskyb','Risky Business','podcast',['technical','regulation'],['banter'],[
+   ['Salt Typhoon’s telco persistence, one year on',['security','policy']],
+   ['Mass exploitation hits file-transfer appliances. Again.',['security']],
+   ['Ransomware cartel consolidation and the payment-ban debate',['security','policy']],
+   ['AI-found zero-days: the SAST endgame',['security','ai']],
+   ['Okta, identity sprawl, and the death of the password',['security','saas']],
+   ['Sponsor interview: cloud detection at scale',['security']]]],
+ ['darknet','Darknet Diaries','podcast',['stories'],[],[
+   ['The MGM hack, from the inside',['security']],
+   ['A bug-bounty hunter’s million-dollar year',['security']],
+   ['The North Korean IT-worker scheme',['security','policy']],
+   ['SIM swappers and the crypto heists',['security','crypto']],
+   ['Stuxnet, revisited',['security']],
+   ['The teenage extortion crews of the Com',['security']]]],
+ ['latent','Latent Space','podcast',['technical'],['features'],[
+   ['The rise of the AI engineer, year three',['agents','ai']],
+   ['Inference math: tokens-per-dollar across the API providers',['aiinfra','ai']],
+   ['Building agents that actually ship — with Devin’s team',['agents']],
+   ['Open-weights roundup: Qwen, Llama, DeepSeek',['ai']],
+   ['Evals are all you need',['ai','agents']],
+   ['The GPU-poor stack: serving on consumer hardware',['aiinfra']]]],
+ ['huberman','Huberman Lab','podcast',['protocols'],['supplements','selfhelp'],[
+   ['Sleep architecture: the new science of deep sleep',['health','neuro']],
+   ['GLP-1s, metabolism, and appetite circuits',['health','bio']],
+   ['Dopamine and motivation: protocols that work',['neuro','health']],
+   ['Strength training for longevity — with a guest physiologist',['health']],
+   ['The gut-brain axis: what the evidence actually says',['health','neuro','bio']],
+   ['Morning light, cortisol, and circadian anchoring',['health','neuro']]]],
+ ['volts','Volts','podcast',['technical','regulation'],[],[
+   ['The interconnection queue is the whole ballgame',['energy','climate','policy']],
+   ['Geothermal’s moment: enhanced systems go commercial',['energy','climate']],
+   ['What AI datacenters mean for utilities',['energy','aiinfra']],
+   ['Heat pumps and the electrification of everything',['climate','energy']],
+   ['Transmission permitting reform, explained',['energy','policy']],
+   ['Grid-scale batteries: the cost curve nobody saw coming',['energy','climate']]]],
+ ['hardfork','Hard Fork','podcast',['regulation'],['banter','features'],[
+   ['OpenAI’s device, Apple’s response, and gadget week',['consumer','ai']],
+   ['The AI-companion boom and its discontents',['consumer','ai','media']],
+   ['Waymo expands, Tesla demurs: robotaxi reality check',['robotics','consumer']],
+   ['Inside the deepfake-election cleanup',['policy','media','ai']],
+   ['Roblox, kids, and the new platform liability',['gaming','policy','consumer']],
+   ['Our listeners’ weirdest chatbot stories',['consumer','ai']]]]
+].map(([id,name,medium,sig,noise,eps]) =>
+  ({ id, name, medium, sig, noise, eps: eps.map(([t,k]) => ({t, k})),
+     slug: name.toLowerCase().replace(/[^a-z0-9]/g,'') }));
+
+/* =========================================================
+   ROLES, SIGNAL TYPES, NOISE TYPES
+   ========================================================= */
+
+const ROLES = [
+  { id:'investor', label:'Investor / VC',
+    lens: 'what would move a thesis on a company, a sector, or a competitive dynamic',
+    kw:['invest','vc','venture','fund','analyst','capital','portfolio','lp','hedge'],
+    t1:['Specific quantitative disclosures (revenue, margin, capex, customers)','M&A — announced & rumored deals, valuations']},
+  { id:'founder', label:'Founder / operator',
+    lens: 'competitive moves, playbooks, and market structure I can act on this quarter',
+    kw:['founder','ceo','operator','startup','my company','run a','building a','cofounder'],
+    t1:['Competitive positioning & market-structure shifts','Go-to-market & pricing playbooks with results']},
+  { id:'engineer', label:'Engineer / researcher',
+    lens: 'technical shifts that change what is possible — with the business context attached',
+    kw:['engineer','developer','research','scientist','technical','swe','phd','ml engineer'],
+    t1:['Capability claims with quantified benchmarks'], promoteTechnical:true },
+  { id:'secleader', label:'Security leader',
+    lens: 'threat and vendor-landscape changes that should shape my security program and budget',
+    kw:['ciso','security lead','security engineer','soc ','appsec','security team'],
+    t1:['Threat-landscape shifts with quantified impact'], autoTheme:'Cybersecurity & threat landscape' },
+  { id:'pm', label:'Product / GTM',
+    lens: 'adoption signals, pricing moves, and product-strategy shifts worth copying or countering',
+    kw:['product manager','pm ','gtm','marketing','growth','sales','revops'],
+    t1:['Product strategy & adoption signals (with numbers)']},
+  { id:'curious', label:'Just curious',
+    lens: 'the highest-signal business and strategy developments, explained plainly',
+    kw:['curious','fun','personal','hobby','learn'], t1:[] }
+];
+
+const DETAILS = [
+  { id:'numbers', label:'Hard numbers (ARR, margins, capex)', tier:1,
+    text:'Specific numbers: revenue, growth, margin, customer counts, capex — anything not previously disclosed' },
+  { id:'ma', label:'M&A & deals', tier:1,
+    text:'M&A — announced and rumored deals, valuations, strategic rationale' },
+  { id:'contrarian', label:'Contrarian takes', tier:1,
+    text:'Contrarian takes — claims that contradict consensus; dated predictions with skin in the game' },
+  { id:'regulation', label:'Regulation & policy analysis', tier:2,
+    text:'Regulatory and geopolitical developments; named CEO/policymaker disputes' },
+  { id:'technical', label:'Technical deep dives', tier:2,
+    text:'Technical deep dives — when tied to a cost or competitive outcome' },
+  { id:'stories', label:'Founder & operator stories', tier:2,
+    text:'Founder and operator stories with specific, transferable lessons' },
+  { id:'protocols', label:'Protocols & mechanisms with citations', tier:2,
+    text:'Health/performance protocols backed by named studies and effect sizes' }
+];
+
+const NOISE = [
+  { id:'politics',    label:'Political tangents',                 text:'Political commentary unrelated to tech or regulation' },
+  { id:'hype',        label:'Hype without numbers',               text:'Generic "X will change everything" framing; hype quotes without substance' },
+  { id:'recycled',    label:'Recycled talking points',            text:'Recycled talking points the guest has said in 5+ other interviews' },
+  { id:'banter',      label:'Intro banter & inside jokes',        text:'Host banter, inside jokes, and housekeeping before the substance starts' },
+  { id:'features',    label:'Product feature tours',              text:'Product feature walkthroughs and demo tours' },
+  { id:'selfhelp',    label:'Personal-development tangents',      text:'Personal-development and productivity-routine tangents' },
+  { id:'filler',      label:'"We\'re really excited…" filler',    text:'"We\'re really excited about…" partnership-announcement filler' },
+  { id:'supplements', label:'Supplement & sponsor segments',      text:'Supplement plugs and extended sponsor segments' }
+];
+
+/* =========================================================
+   STATE
+   ========================================================= */
+
+const STEPS = ['shows','role','areas','details','noise','review','sources','done'];
+const Q_STEPS = ['shows','role','areas','details','noise'];
+const state = {
+  step: 'shows',
+  shows: [],            // selected show objects (directory refs + custom feeds)
+  role: null,
+  topics: [],           // picked topic ids (derived from shows)
+  userTopics: new Set(),// topic ids added via free text (exempt from support pruning)
+  customThemes: [],     // free-text themes (tier 1)
+  details: [],          // detail ids
+  noise: [],            // noise ids
+  customNoise: [],
+  removed: new Set(),   // removed profile-item ids
+  srcDecisions: {},     // name -> 'yes' | 'no'
+  suggestions: [],
+  saved: false
+};
+window.__state = state; // prototype: handy for testing
+
+/* =========================================================
+   DERIVATION — everything downstream is seeded from the
+   selected shows' recent-episode corpus.
+   ========================================================= */
+
+function topicStats() {
+  // topicId -> { count, shows:[names], examples:[{t, show}] }
+  const stats = {};
+  state.shows.forEach(show => {
+    show.eps.forEach(ep => (ep.k || []).forEach(tid => {
+      if (!TOPICS[tid]) return;
+      const s = stats[tid] || (stats[tid] = { count: 0, shows: [], examples: [] });
+      s.count++;
+      if (!s.shows.includes(show.name)) s.shows.push(show.name);
+      if (s.examples.length < 4) s.examples.push({ t: ep.t, show: show.name });
+    }));
+  });
+  return stats;
+}
+
+function provText(st) {
+  return 'in ' + st.count + ' recent episode' + (st.count === 1 ? '' : 's') + ' — ' + st.shows.join(', ');
+}
+function provTitle(st) {
+  return 'In ' + st.count + ' recent episode' + (st.count === 1 ? '' : 's') + ' — ' + st.shows.join(', ') +
+         '. e.g. ' + st.examples.slice(0, 2).map(e => '“' + e.t + '”').join(' · ');
+}
+
+function derivedTopicItems() {
+  const stats = topicStats();
+  return Object.keys(stats)
+    .sort((a, b) => stats[b].count - stats[a].count || stats[b].shows.length - stats[a].shows.length)
+    .slice(0, 12)
+    .map(id => ({ id, label: TOPICS[id].label, w: stats[id].count + ' ep' + (stats[id].count === 1 ? '' : 's'),
+                  title: provTitle(stats[id]) }));
+}
+
+function derivedDetailItems() {
+  const carriers = {}; // detailId -> [show names]
+  state.shows.forEach(s => (s.sig || []).forEach(d => (carriers[d] = carriers[d] || []).push(s.name)));
+  return DETAILS.filter(d => carriers[d.id]).map(d => ({
+    id: d.id, label: d.label, w: carriers[d.id].length + (carriers[d.id].length === 1 ? ' show' : ' shows'),
+    title: 'The format of ' + carriers[d.id].join(', ') + ' leans on this'
+  }));
+}
+
+function derivedNoiseItems() {
+  const carriers = {};
+  state.shows.forEach(s => (s.noise || []).forEach(n => (carriers[n] = carriers[n] || []).push(s.name)));
+  const items = NOISE.filter(n => carriers[n.id]).map(n => ({
+    id: n.id, label: n.label, w: carriers[n.id].length + (carriers[n.id].length === 1 ? ' show' : ' shows'),
+    title: 'Shows up in ' + carriers[n.id].join(', ')
+  }));
+  if (!items.length) return [
+    { id:'hype', label: NOISE.find(n=>n.id==='hype').label },
+    { id:'recycled', label: NOISE.find(n=>n.id==='recycled').label }
+  ];
+  return items;
+}
+
+/* prune picked topics that lost all support when a show is removed
+   (free-text-added topics are exempt — they can be anything) */
+function pruneUnsupportedTopics() {
+  const stats = topicStats();
+  state.topics = state.topics.filter(tid => state.userTopics.has(tid) || stats[tid]);
+}
+
+/* =========================================================
+   PROFILE MODEL
+   ========================================================= */
+
+function buildProfile() {
+  const stats = topicStats();
+  const t1 = [], t2 = [], dw = [];
+  const push = (arr, id, label, prov) => { if (!state.removed.has(id)) arr.push({ id, label, prov }); };
+
+  push(t1, 'base', 'Business strategy & capital allocation');
+
+  if (state.role) state.role.t1.forEach((t,i) => push(t1, 'role-'+state.role.id+'-'+i, t));
+
+  const ordered = [...state.topics].sort((a,b) => ((stats[b]||{count:0}).count) - ((stats[a]||{count:0}).count));
+  ordered.forEach(tid => {
+    const tp = TOPICS[tid]; if (!tp) return;
+    push(t1, 'topic-'+tid, tp.theme, stats[tid] || null);
+    if (tp.t2) push(t2, 'topic2-'+tid, tp.t2, null);
+  });
+
+  state.customThemes.forEach((t,i) => push(t1, 'custom-'+i, t));
+
+  state.details.forEach(id => {
+    const d = DETAILS.find(x => x.id === id); if (!d) return;
+    const tier = (d.id === 'technical' && state.role && state.role.promoteTechnical) ? 1 : d.tier;
+    push(tier === 1 ? t1 : t2, 'det-'+id, d.label);
+  });
+
+  state.noise.forEach(id => {
+    const n = NOISE.find(x => x.id === id); if (!n) return;
+    push(dw, 'noise-'+id, n.label);
+  });
+  state.customNoise.forEach((t,i) => push(dw, 'cnoise-'+i, t));
+
+  const seen = new Set();
+  const dd = arr => arr.filter(x => !seen.has(x.label) && seen.add(x.label));
+  return { lens: state.role ? state.role.lens : null, t1: dd(t1), t2: dd(t2), dw: dd(dw) };
+}
+
+function buildMarkdown() {
+  const p = buildProfile();
+  const stats = topicStats();
+  const L = [];
+  L.push('# Interest Profile', '',
+    'Generated by guided setup, seeded from the recent episodes of the shows you',
+    'track. This file is the bias function for the ranking stage — the model reads',
+    'it verbatim to filter and rank candidates. Edit freely.',
+    '', '---', '', '## Priority hierarchy', '',
+    'Apply this hierarchy when choosing among candidates. Items in a higher tier',
+    'beat items in a lower tier, even when both touch themes I care about.', '');
+  L.push('**TIER 1 — always lift:**');
+  L.push((p.t1.map(x => x.label).join('; ') || 'Business strategy and capital allocation') + '.', '');
+  L.push('**TIER 2 — secondary lift:**');
+  L.push((p.t2.length ? p.t2.map(x => x.label).join('; ')
+        : 'Regulatory context and technical detail with a business angle') +
+        '. Important context, but should not displace Tier 1 items.', '');
+  L.push('**TIER 3 — mention only if exceptional:**',
+    'Everything else — research insights, product feature lists, implementation',
+    'details. Skip unless the disclosure is genuinely first-of-its-kind.', '');
+  if (p.lens) L.push('The reader’s lens: **' + p.lens + '.**', '');
+  L.push('---', '', '## Themes I care about', '');
+
+  state.topics.forEach(tid => {
+    const tp = TOPICS[tid]; if (!tp || state.removed.has('topic-'+tid)) return;
+    const st = stats[tid];
+    L.push('### ' + tp.theme + '  (Tier 1)');
+    if (st) {
+      L.push('- Seeded from your shows: ' + st.count + ' recent episode' + (st.count===1?'':'s') +
+             ' across ' + st.shows.join(', '));
+      L.push('- e.g. ' + st.examples.slice(0,2).map(e => '“' + e.t + '” (' + e.show + ')').join('; '));
+    }
+    L.push('- Developments, disclosures, and named moves in this space', '');
+  });
+  state.customThemes.forEach(t => {
+    L.push('### ' + t + '  (Tier 1)', '- ' + t + ' — developments, disclosures, and named moves', '');
+  });
+  if (!state.topics.length && !state.customThemes.length) {
+    L.push('### General business & strategy  (Tier 1)',
+      '- Strategy shifts, capital allocation, and quantified disclosures across tech', '');
+  }
+  L.push('### Specific numbers (always interesting)',
+    '- Revenue, growth, margin, customer count, capex, headcount',
+    '- Anything quantitative that hasn’t been previously disclosed', '');
+  L.push('## Down-weight', '', 'These are noise — rank lower or drop entirely:');
+  const dwLines = [];
+  state.noise.forEach(id => { const n = NOISE.find(x => x.id === id); if (n) dwLines.push(n.text); });
+  state.customNoise.forEach(t => dwLines.push(t));
+  if (!dwLines.length) dwLines.push(
+    'Vague predictions without timeframes or numbers',
+    'Recycled talking points the guest has said in 5+ other interviews');
+  dwLines.forEach(t => L.push('- ' + t));
+  L.push('');
+  if (state.shows.length) {
+    L.push('---', '',
+      '_Seed shows: ' + state.shows.map(s => s.name + ' (' + s.eps.length + ' eps scanned)').join(', ') + '_', '');
+  }
+  return L.join('\n');
+}
+
+/* =========================================================
+   DOM HELPERS
+   ========================================================= */
+
+const $ = s => document.querySelector(s);
+const chat = $('#chat'), input = $('#input'), composer = $('#composer');
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const scrollDown = () => { chat.scrollTop = chat.scrollHeight; };
+
+function addBot(html) {
+  const m = document.createElement('div');
+  m.className = 'msg bot';
+  m.innerHTML = '<div class="avatar">AI</div><div class="bubble">' + html + '</div>';
+  chat.appendChild(m); scrollDown();
+  return m.querySelector('.bubble');
+}
+function addUser(text) {
+  const m = document.createElement('div');
+  m.className = 'msg user';
+  m.innerHTML = '<div class="bubble">' + esc(text) + '</div>';
+  chat.appendChild(m); scrollDown();
+}
+let typingEl = null;
+async function showTyping(ms) {
+  typingEl = document.createElement('div');
+  typingEl.className = 'msg bot typing';
+  typingEl.innerHTML = '<div class="avatar">AI</div><div class="bubble"><span class="d"></span><span class="d"></span><span class="d"></span></div>';
+  chat.appendChild(typingEl); scrollDown();
+  await sleep(ms);
+  typingEl.remove(); typingEl = null;
+}
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+/* =========================================================
+   PROGRESS + SKIP ROW + COMPOSER
+   ========================================================= */
+
+function renderProgress() {
+  const el = $('#progress');
+  if (state.step === 'done') { el.innerHTML = '<span class="plabel">Setup complete</span>'; return; }
+  const idx = STEPS.indexOf(state.step);
+  let html = '';
+  STEPS.slice(0,7).forEach((s,i) => {
+    html += '<span class="dot' + (i < idx ? ' on' : '') + (i === idx ? ' on cur' : '') + '"></span>';
+  });
+  const names = { shows:'1 of 5 — your shows', role:'2 of 5 — your role', areas:'3 of 5 — what to lift',
+                  details:'4 of 5 — what counts as signal', noise:'5 of 5 — what to drop',
+                  review:'review profile', sources:'starter sources' };
+  html += '<span class="plabel">' + (names[state.step] || '') + '</span>';
+  el.innerHTML = html;
+}
+
+function renderSkipRow() {
+  const el = $('#skip-row');
+  if (Q_STEPS.includes(state.step)) {
+    el.innerHTML = '<a id="skip-q">Skip this question</a><a id="skip-all">Skip ahead — build a minimal profile</a>';
+    $('#skip-q').onclick = () => skipQuestion();
+    $('#skip-all').onclick = () => skipAhead();
+  } else el.innerHTML = '';
+}
+
+function setComposer(placeholder, enabled = true) {
+  input.placeholder = placeholder;
+  composer.classList.toggle('disabled', !enabled);
+}
+
+/* =========================================================
+   PANEL — shows (removable), derived themes with provenance
+   ========================================================= */
+
+const knownIds = new Set();
+let openProv = null; // id of currently-expanded provenance pop
+
+function renderPanel() {
+  const p = buildProfile();
+  const body = $('#panel-body');
+  const answered = state.shows.length || state.role || state.topics.length || state.details.length ||
+                   state.noise.length || state.customThemes.length || state.customNoise.length;
+  const acceptedSrc = Object.keys(state.srcDecisions).filter(n => state.srcDecisions[n] === 'yes');
+  const count = (answered ? p.t1.length + p.t2.length + p.dw.length : 0) + acceptedSrc.length + state.shows.length;
+  $('#panel-count').textContent = count;
+
+  if (!answered) {
+    body.innerHTML =
+      '<div class="panel-empty">Nothing yet — pick the shows you follow and themes seeded from their episodes will appear here.' +
+      '<div class="ghost-row"><span class="ghost w1"></span><span class="ghost w2"></span><span class="ghost w3"></span></div></div>';
+    return;
+  }
+
+  const tag = (item, cls) => {
+    const isNew = !knownIds.has(item.id); knownIds.add(item.id);
+    const provBtn = item.prov
+      ? '<button class="pn" title="' + esc(provTitle(item.prov)) + '" data-prov="' + esc(item.id) + '">' + item.prov.count + ' eps</button>'
+      : '';
+    let h = '<span class="ptag ' + cls + (isNew ? ' new' : '') + '"' +
+      (item.prov ? ' title="' + esc(provTitle(item.prov)) + '"' : '') + '>' + esc(item.label) + provBtn +
+      '<button class="x" title="Remove" data-rm="' + esc(item.id) + '">×</button></span>';
+    if (item.prov && openProv === item.id) {
+      h += '<div class="prov-pop"><div class="pp-head">' + esc(item.label.charAt(0).toUpperCase()+item.label.slice(1)) +
+        ' — ' + esc(provText(item.prov)) + '</div><ul>' +
+        item.prov.examples.slice(0,3).map(e => '<li>“' + esc(e.t) + '” <span class="pp-show">— ' + esc(e.show) + '</span></li>').join('') +
+        '</ul></div>';
+    }
+    return h;
+  };
+
+  let html = '';
+
+  if (state.shows.length) {
+    html += '<div class="psec"><div class="psec-title src">Shows I track <span class="t-desc">' + state.shows.length + ' — seeds everything below</span></div>';
+    state.shows.forEach(s => {
+      const isNew = !knownIds.has('show-' + s.id); knownIds.add('show-' + s.id);
+      html += '<div class="p-show-row' + (isNew ? ' new' : '') + '">' +
+        '<span class="medium-badge ' + s.medium + '">' + (s.medium === 'youtube' ? 'YT' : 'Pod') + '</span>' +
+        '<span class="nm">' + esc(s.name) + '</span>' +
+        '<span class="ep">' + s.eps.length + ' eps</span>' +
+        '<button class="x" title="Stop tracking — re-derives suggestions" data-rmshow="' + esc(s.id) + '">×</button></div>';
+    });
+    html += '<div class="p-seed-note">Theme suggestions are derived from these shows’ recent episodes. Remove one and everything re-derives.</div></div>';
+  }
+
+  if (p.lens) html += '<div class="psec"><div class="psec-title lens">Lens</div><div class="p-lens">' + esc(p.lens.charAt(0).toUpperCase() + p.lens.slice(1)) + '.</div></div>';
+  if (p.t1.length) html += '<div class="psec"><div class="psec-title t1">Tier 1 <span class="t-desc">always lift</span></div><div class="ptags">' + p.t1.map(x => tag(x,'t1')).join('') + '</div></div>';
+  if (p.t2.length) html += '<div class="psec"><div class="psec-title t2">Tier 2 <span class="t-desc">secondary</span></div><div class="ptags">' + p.t2.map(x => tag(x,'t2')).join('') + '</div></div>';
+  if (p.dw.length) html += '<div class="psec"><div class="psec-title dw">Down-weight <span class="t-desc">drop or demote</span></div><div class="ptags">' + p.dw.map(x => tag(x,'dw')).join('') + '</div></div>';
+
+  if (acceptedSrc.length) {
+    html += '<div class="psec"><div class="psec-title src">Starter sources <span class="t-desc">added</span></div>';
+    acceptedSrc.forEach(name => {
+      const s = state.suggestions.find(x => x.name === name);
+      const isNew = !knownIds.has('src-' + name); knownIds.add('src-' + name);
+      html += '<div class="p-src-row' + (isNew ? ' new' : '') + '"><span class="medium-badge ' + (s ? s.medium : 'podcast') + '">' + (s && s.medium === 'youtube' ? 'YT' : 'Pod') + '</span>' + esc(name) + '</div>';
+    });
+    html += '</div>';
+  }
+  html += '<div class="p-tier3-note">Everything else is Tier 3 — mentioned only if exceptional. You can refine all of this later with thumbs-up/down feedback on brief items.</div>';
+  body.innerHTML = html;
+
+  body.querySelectorAll('[data-rm]').forEach(btn => {
+    btn.onclick = () => {
+      state.removed.add(btn.dataset.rm);
+      renderPanel(); refreshReviewCard();
+    };
+  });
+  body.querySelectorAll('[data-prov]').forEach(btn => {
+    btn.onclick = () => {
+      openProv = (openProv === btn.dataset.prov) ? null : btn.dataset.prov;
+      renderPanel();
+    };
+  });
+  body.querySelectorAll('[data-rmshow]').forEach(btn => {
+    btn.onclick = () => removeShow(btn.dataset.rmshow);
+  });
+}
+
+/* remove a show → re-derive everything live */
+function removeShow(id) {
+  const idx = state.shows.findIndex(s => s.id === id);
+  if (idx === -1) return;
+  const name = state.shows[idx].name;
+  state.shows.splice(idx, 1);
+  pruneUnsupportedTopics();
+  if (pickerRefresh) pickerRefresh();
+  if (activeRowRefresh) activeRowRefresh();
+  renderPanel(); refreshReviewCard(); refreshSources();
+  toast('Removed ' + name + ' — suggestions re-derived from ' +
+        (state.shows.length ? state.shows.length + ' remaining show' + (state.shows.length===1?'':'s') : 'nothing (no shows left)'));
+}
+
+/* panel drawer (narrow screens) */
+const panelEl = $('#panel'), backdrop = $('#panel-backdrop');
+$('#panel-toggle').onclick = () => { panelEl.classList.toggle('open'); backdrop.classList.toggle('show', panelEl.classList.contains('open')); };
+backdrop.onclick = () => { panelEl.classList.remove('open'); backdrop.classList.remove('show'); };
+function flashPanelOnNarrow() {
+  if (window.innerWidth <= 880 && !panelEl.classList.contains('open')) {
+    const b = $('#panel-toggle');
+    b.style.borderColor = 'var(--accent)'; b.style.color = 'var(--accent)';
+    setTimeout(() => { b.style.borderColor = ''; b.style.color = ''; }, 1200);
+  }
+}
+
+/* =========================================================
+   CHIP ROWS (with weight badges + provenance titles)
+   ========================================================= */
+
+let activeRow = null;          // current chip row awaiting answer
+let activeRowRefresh = null;   // rebuilds the active row's derived chips
+let freeTextHandler = null;    // what to do with typed text at this step
+let pickerRefresh = null;      // syncs picker grid with state.shows
+
+function lockRow() {
+  if (activeRow) { activeRow.classList.add('done'); activeRow = null; }
+  activeRowRefresh = null;
+}
+
+function chipRow(items, { multi }) {
+  const row = document.createElement('div');
+  row.className = 'chip-row';
+  let goBtn = null;
+
+  const makeChip = it => {
+    const b = document.createElement('button');
+    b.className = 'chip' + (it.ghost ? ' ghost' : '');
+    b.innerHTML = esc(it.label) + (it.w ? '<span class="w">' + esc(it.w) + '</span>' : '');
+    b.dataset.id = it.id;
+    b.dataset.label = it.label;
+    if (it.title) b.title = it.title;
+    return b;
+  };
+  const syncGo = () => {
+    const any = row.querySelectorAll('.chip.sel').length > 0;
+    if (any && !goBtn) {
+      goBtn = document.createElement('button');
+      goBtn.className = 'chip go'; goBtn.textContent = 'Done — continue →';
+      row.appendChild(goBtn); scrollDown();
+    } else if (!any && goBtn) { goBtn.remove(); goBtn = null; }
+  };
+
+  items.forEach(it => row.appendChild(makeChip(it)));
+
+  row.addEventListener('click', e => {
+    const b = e.target.closest('.chip'); if (!b || row.classList.contains('done')) return;
+    if (b === goBtn) { finishMulti(); return; }
+    if (!multi) { row._resolve([b.dataset.id], b.dataset.label); return; }
+    b.classList.toggle('sel');
+    syncGo();
+  });
+
+  function finishMulti(extraText) {
+    const sel = [...row.querySelectorAll('.chip.sel')];
+    row._resolve(sel.map(x => x.dataset.id), sel.map(x => x.dataset.label).join(', '), extraText);
+  }
+  row.finishWithText = t => finishMulti(t);
+
+  /* rebuild with fresh derived items, preserving still-valid selections */
+  row.setItems = newItems => {
+    const selIds = new Set([...row.querySelectorAll('.chip.sel')].map(x => x.dataset.id));
+    row.innerHTML = ''; goBtn = null;
+    newItems.forEach(it => {
+      const b = makeChip(it);
+      if (selIds.has(it.id)) b.classList.add('sel');
+      row.appendChild(b);
+    });
+    syncGo();
+  };
+  return row;
+}
+
+/* =========================================================
+   Q1 — SHOW PICKER (the seed step)
+   ========================================================= */
+
+const URL_RE = /^(https?:\/\/|www\.)|(\.xml($|\?))|(\/feed)|(\brss\b)/i;
+
+function buildPicker() {
+  const wrap = document.createElement('div');
+  wrap.className = 'picker';
+  wrap.innerHTML =
+    '<input class="pick-search" placeholder="Type to search the directory — or paste an RSS / YouTube URL">' +
+    '<div class="scan-zone"></div>' +
+    '<div class="pick-grid"></div>' +
+    '<div class="pick-foot"><span class="pick-count"></span></div>';
+  const search = wrap.querySelector('.pick-search');
+  const grid = wrap.querySelector('.pick-grid');
+  const scanZone = wrap.querySelector('.scan-zone');
+  const foot = wrap.querySelector('.pick-foot');
+  const countEl = wrap.querySelector('.pick-count');
+  let doneBtn = null;
+
+  function selectedIds() { return new Set(state.shows.map(s => s.id)); }
+
+  function renderGrid(q) {
+    const query = (q || '').trim().toLowerCase();
+    const sel = selectedIds();
+    const list = SHOWS.filter(s => !query || s.name.toLowerCase().includes(query) || s.slug.includes(query.replace(/[^a-z0-9]/g,'')));
+    grid.innerHTML = '';
+    if (!list.length) {
+      grid.innerHTML = '<div class="pick-none">No directory match for “' + esc(q) + '” — paste its RSS or YouTube URL and I’ll scan the feed.</div>';
+    }
+    list.forEach(s => {
+      const b = document.createElement('button');
+      b.className = 'pick-chip' + (sel.has(s.id) ? ' sel' : '');
+      b.innerHTML = esc(s.name) + '<span class="mb medium-badge ' + s.medium + '">' + (s.medium === 'youtube' ? 'YT' : 'Pod') + '</span>';
+      b.title = s.eps.length + ' recent episodes in the mock feed';
+      b.onclick = () => toggleShow(s);
+      grid.appendChild(b);
+    });
+    scrollDown();
+  }
+
+  function syncFoot() {
+    const n = state.shows.length;
+    countEl.textContent = n ? n + ' show' + (n === 1 ? '' : 's') + ' selected · ' +
+      state.shows.reduce((a, s) => a + s.eps.length, 0) + ' recent episodes scanned' : '';
+    if (n && !doneBtn) {
+      doneBtn = document.createElement('button');
+      doneBtn.className = 'chip go'; doneBtn.textContent = 'Done — continue →';
+      doneBtn.onclick = () => { if (wrap._resolve) wrap._resolve(); };
+      foot.appendChild(doneBtn); scrollDown();
+    } else if (!n && doneBtn) { doneBtn.remove(); doneBtn = null; }
+  }
+
+  function toggleShow(s) {
+    const idx = state.shows.findIndex(x => x.id === s.id);
+    if (idx === -1) state.shows.push(s); else state.shows.splice(idx, 1);
+    pruneUnsupportedTopics();
+    renderGrid(search.value); syncFoot(); renderPanel(); flashPanelOnNarrow();
+  }
+
+  let scanning = false;
+  function showScanButton(url) {
+    scanZone.innerHTML = '';
+    const b = document.createElement('button');
+    b.className = 'scan-btn';
+    b.textContent = '⌁ Scan feed: ' + url;
+    b.onclick = () => scanUrl(url);
+    scanZone.appendChild(b); scrollDown();
+  }
+
+  async function scanUrl(url) {
+    if (scanning) return; scanning = true;
+    scanZone.innerHTML = '<div class="scan-status"><span class="spin"></span>Scanning feed… fetching recent episodes</div>';
+    await sleep(1300);
+    const norm = url.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const match = SHOWS.find(s => norm.includes(s.slug) || norm.includes(s.id));
+    if (match) {
+      if (!state.shows.find(x => x.id === match.id)) state.shows.push(match);
+      scanZone.innerHTML = '<div class="scan-status ok">✓ That’s <strong>&nbsp;' + esc(match.name) + '&nbsp;</strong> — found ' +
+        match.eps.length + ' recent episodes. Added.</div>';
+    } else {
+      let host = url.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split(/[/?#]/)[0];
+      let name = (host.split('.')[0] || 'Custom feed').replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      const medium = /youtube|youtu\.be/i.test(url) ? 'youtube' : 'podcast';
+      const custom = { id: 'feed-' + Date.now(), name: name, medium, custom: true, sig: [], noise: [],
+        eps: Array.from({ length: 8 }, (_, i) => ({ t: 'Episode ' + (141 - i), k: [] })), slug: norm };
+      state.shows.push(custom);
+      scanZone.innerHTML = '<div class="scan-status ok">✓ Found 8 recent episodes at <strong>&nbsp;' + esc(name) +
+        '&nbsp;</strong>. Added — I’ll learn its topics after the first real poll, so it won’t seed suggestions yet.</div>';
+    }
+    scanning = false;
+    search.value = '';
+    renderGrid(''); syncFoot(); renderPanel(); flashPanelOnNarrow();
+    setTimeout(() => { scanZone.innerHTML = ''; }, 4000);
+  }
+
+  search.addEventListener('input', () => {
+    const v = search.value.trim();
+    if (URL_RE.test(v)) { grid.innerHTML = ''; showScanButton(v); }
+    else { scanZone.innerHTML = ''; renderGrid(v); }
+  });
+  search.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && URL_RE.test(search.value.trim())) scanUrl(search.value.trim());
+  });
+
+  wrap.handleQuery = text => {   // composer routes here too
+    if (URL_RE.test(text)) { scanUrl(text); return; }
+    search.value = text; renderGrid(text);
+    const q = text.toLowerCase();
+    const exact = SHOWS.find(s => s.name.toLowerCase() === q) ||
+                  SHOWS.filter(s => s.name.toLowerCase().includes(q))[0];
+    if (exact && !selectedIds().has(exact.id)) { toggleShow(exact); toast('Added ' + exact.name); }
+  };
+  wrap.refresh = () => { renderGrid(search.value); syncFoot(); };
+
+  renderGrid(''); syncFoot();
+  return wrap;
+}
+
+async function askShows() {
+  state.step = 'shows'; renderProgress(); renderSkipRow();
+  await showTyping(900);
+  const bub = addBot(
+    '<p>First — <strong>which podcasts or YouTube channels should I track?</strong></p>' +
+    '<p class="hint">I read each show’s recent episodes and seed every later suggestion from what they actually cover — so pick the shows you really listen to. Search the directory, or paste any RSS/YouTube URL.</p>');
+  const picker = buildPicker();
+  bub.appendChild(picker); scrollDown();
+  pickerRefresh = () => picker.refresh();
+
+  picker._resolve = () => {
+    picker.classList.add('done');
+    pickerRefresh = null;
+    handleShows();
+  };
+  freeTextHandler = text => picker.handleQuery(text);
+  setComposer('Search shows, or paste an RSS / YouTube URL…');
+}
+
+async function handleShows(skipped) {
+  addUser(state.shows.length ? state.shows.map(s => s.name).join(', ') : '(skipped)');
+  renderPanel(); flashPanelOnNarrow();
+  await showTyping(1000);
+  if (!state.shows.length) {
+    addBot('<p>No problem — without shows to scan I’ll suggest broadly, and your thumbs-up/down feedback will do the seeding over time. You can add shows any time.</p>');
+  } else {
+    const stats = topicStats();
+    const top = Object.keys(stats).sort((a,b) => stats[b].count - stats[a].count).slice(0,3);
+    const totalEps = state.shows.reduce((a,s) => a + s.eps.length, 0);
+    const topHtml = top.map(t => '<strong>' + esc(TOPICS[t].label.toLowerCase()) + '</strong>');
+    addBot('<p>Scanned <strong>' + totalEps + ' recent episodes</strong> across ' + state.shows.length +
+      ' show' + (state.shows.length===1?'':'s') + '.' +
+      (top.length ? ' The heaviest coverage is ' + topHtml.join(', ') + ' — I’ll seed everything that follows from that.' : '') +
+      '</p>');
+  }
+  await askRole();
+}
+
+/* =========================================================
+   Q2 — ROLE
+   ========================================================= */
+
+async function askRole() {
+  state.step = 'role'; renderProgress(); renderSkipRow();
+  await showTyping(900);
+  const bub = addBot(
+    '<p>Next — <strong>what’s your role</strong>, and what decisions should this brief inform?</p>' +
+    '<p class="hint">Tap one, or describe it in your own words below.</p>');
+  const row = chipRow(ROLES.map(r => ({ id:r.id, label:r.label })), { multi:false });
+  bub.appendChild(row); scrollDown();
+  activeRow = row;
+  row._resolve = (ids, label) => { lockRow(); handleRole(ids[0], label, null); };
+  freeTextHandler = text => { lockRow(); handleRole(null, null, text); };
+  setComposer('e.g. "I run BD at a security startup"…');
+}
+
+async function handleRole(id, label, text) {
+  let role = id ? ROLES.find(r => r.id === id) : null;
+  if (!role && text) {
+    const low = ' ' + text.toLowerCase() + ' ';
+    role = ROLES.find(r => r.kw.some(k => low.includes(k))) || null;
+  }
+  addUser(label || text);
+  if (!role) {
+    role = { id:'custom', label:'custom', t1:[],
+      lens: text ? 'decisions around: ' + text.toLowerCase().replace(/\.$/,'') : ROLES[5].lens };
+  }
+  state.role = role;
+  if (role.autoTheme && !state.customThemes.includes(role.autoTheme)) state.customThemes.push(role.autoTheme);
+  renderPanel(); flashPanelOnNarrow();
+  await showTyping(800);
+  const lensMsg = 'Got it. I’ll rank everything against <em>' + esc(role.lens) + '</em>' +
+    (role.autoTheme ? ' — and I’ve added <strong>cybersecurity</strong> as a Tier 1 theme (see the panel).' : '.');
+  addBot('<p>' + lensMsg + '</p>');
+  await askAreas();
+}
+
+/* =========================================================
+   Q3 — TOPICS, derived from the shows' episode corpus
+   ========================================================= */
+
+async function askAreas() {
+  state.step = 'areas'; renderProgress(); renderSkipRow();
+  await showTyping(850);
+  const derived = derivedTopicItems();
+  let bub, row;
+  if (derived.length) {
+    bub = addBot(
+      '<p>Here’s <strong>what your shows actually cover</strong> — pulled from their recent episode lists, heaviest first. Which of these should the brief lift?</p>' +
+      '<p class="hint">The count is how many recent episodes across your shows touch each topic — hover for which shows and example episodes. Type anything else to add it.</p>');
+    row = chipRow(derived, { multi:true });
+    activeRowRefresh = () => {
+      const items = derivedTopicItems();
+      row.setItems(items);
+    };
+  } else {
+    bub = addBot(
+      '<p><strong>Which spaces do you want covered?</strong> You didn’t pick shows, so I have nothing to seed from — here’s the broad menu instead.</p>' +
+      '<p class="hint">Once you add shows, these suggestions come from their actual episodes.</p>');
+    row = chipRow(Object.keys(TOPICS).slice(0, 12).map(t => ({ id:t, label:TOPICS[t].label })), { multi:true });
+  }
+  if (state.topics.length) row.querySelectorAll('.chip').forEach(c => { if (state.topics.includes(c.dataset.id)) c.classList.add('sel'); });
+  bub.appendChild(row); scrollDown();
+  activeRow = row;
+  row._resolve = (ids, label, extraText) => { lockRow(); handleAreas(ids, label, extraText); };
+  freeTextHandler = text => { activeRow && activeRow.finishWithText(text); };
+  setComposer('Anything else to track — free text adds anything…');
+}
+
+function matchTopics(text) {
+  const low = ' ' + text.toLowerCase() + ' ';
+  return Object.keys(TOPICS).filter(t => TOPICS[t].kw.some(k => low.includes(k)));
+}
+
+async function handleAreas(ids, chipLabel, text) {
+  const picked = [...ids];
+  let custom = null;
+  if (text && text.trim()) {
+    const m = matchTopics(text);
+    if (m.length) m.forEach(t => { if (!picked.includes(t)) { picked.push(t); state.userTopics.add(t); } });
+    else custom = text.trim().replace(/^./, c => c.toUpperCase());
+  }
+  const userMsg = [chipLabel, text && text.trim()].filter(Boolean).join(' — ');
+  addUser(userMsg || '(skipped)');
+  state.topics = picked;
+  if (custom) state.customThemes.push(custom);
+  renderPanel(); flashPanelOnNarrow();
+  await showTyping(1000);
+
+  if (!state.topics.length && !custom) {
+    addBot('<p>No problem — I’ll keep the profile broad and let your thumbs-up/down feedback sharpen it over time.</p>');
+  } else {
+    const stats = topicStats();
+    const withProv = state.topics.filter(t => stats[t]);
+    let provNote = '';
+    if (withProv.length) {
+      const t0 = withProv.sort((a,b) => stats[b].count - stats[a].count)[0];
+      provNote = ' Each carries its receipts — e.g. <strong>' + esc(TOPICS[t0].label.toLowerCase()) + '</strong> is ' +
+        esc(provText(stats[t0])) + '.';
+    }
+    const names = state.topics.map(t => '<strong>' + esc(TOPICS[t].label) + '</strong>');
+    if (custom) names.push('<strong>' + esc(custom) + '</strong>');
+    addBot('<p>' + names.join(', ') + ' — added as Tier 1 themes on the right.' + provNote + ' Prune any with the ×.</p>');
+  }
+  await askDetails();
+}
+
+/* =========================================================
+   Q4 — SIGNAL, derived from the shows' formats
+   ========================================================= */
+
+async function askDetails() {
+  state.step = 'details'; renderProgress(); renderSkipRow();
+  await showTyping(850);
+  const derived = derivedDetailItems();
+  let bub, row;
+  if (derived.length) {
+    bub = addBot(
+      '<p>When an episode is actually <strong>worth your time</strong>, what makes it so? Judging by your shows’ formats, these are the signal types they deal in — pick what counts for you.</p>' +
+      '<p class="hint">Hover a chip to see which of your shows lean on it.</p>');
+    row = chipRow(derived, { multi:true });
+    activeRowRefresh = () => row.setItems(derivedDetailItems());
+  } else {
+    bub = addBot('<p>When an episode is actually <strong>worth your time</strong>, what makes it so? Pick everything that counts as signal for you.</p>');
+    row = chipRow(DETAILS.filter(d => d.id !== 'protocols').map(d => ({ id:d.id, label:d.label })), { multi:true });
+  }
+  bub.appendChild(row); scrollDown();
+  activeRow = row;
+  row._resolve = (ids, label, extraText) => { lockRow(); handleDetails(ids, label, extraText); };
+  freeTextHandler = text => { activeRow && activeRow.finishWithText(text); };
+  setComposer('Anything else that counts as signal…');
+}
+
+async function handleDetails(ids, chipLabel, text) {
+  state.details = ids;
+  if (text && text.trim()) state.customThemes.push(text.trim().replace(/^./, c => c.toUpperCase()));
+  addUser([chipLabel, text && text.trim()].filter(Boolean).join(' — ') || '(skipped)');
+  renderPanel(); flashPanelOnNarrow();
+  await showTyping(800);
+  let note = '';
+  if (ids.includes('technical')) {
+    note = (state.role && state.role.promoteTechnical)
+      ? ' Since you’re technical, deep dives go in <strong>Tier 1</strong> rather than secondary.'
+      : ' Technical deep dives go in <strong>Tier 2</strong> — surfaced when they connect to a cost or competitive outcome.';
+  }
+  addBot('<p>' + (ids.length ? 'Noted — those get tier placements on the right.' : 'Okay — defaults it is.') + note + '</p>');
+  await askNoise();
+}
+
+/* =========================================================
+   Q5 — NOISE, derived from the shows' filler patterns
+   ========================================================= */
+
+async function askNoise() {
+  state.step = 'noise'; renderProgress(); renderSkipRow();
+  await showTyping(850);
+  const derived = derivedNoiseItems();
+  const hasProv = derived.some(d => d.w);
+  const bub = addBot(
+    '<p>Last one — <strong>what bores you?</strong> ' +
+    (hasProv
+      ? 'These are the filler patterns your shows are known for — anything you pick gets down-weighted or dropped.'
+      : 'Anything here gets down-weighted or dropped from the brief.') + '</p>' +
+    (hasProv ? '<p class="hint">Hover to see which of your shows each pattern shows up in.</p>' : ''));
+  const row = chipRow(derived, { multi:true });
+  if (hasProv) activeRowRefresh = () => row.setItems(derivedNoiseItems());
+  bub.appendChild(row); scrollDown();
+  activeRow = row;
+  row._resolve = (ids, label, extraText) => { lockRow(); handleNoise(ids, label, extraText); };
+  freeTextHandler = text => { activeRow && activeRow.finishWithText(text); };
+  setComposer('e.g. "anything about prompt engineering"…');
+}
+
+async function handleNoise(ids, chipLabel, text) {
+  state.noise = ids;
+  if (text && text.trim()) state.customNoise.push(text.trim().replace(/^./, c => c.toUpperCase()));
+  addUser([chipLabel, text && text.trim()].filter(Boolean).join(' — ') || '(skipped)');
+  renderPanel(); flashPanelOnNarrow();
+  await showTyping(900);
+  addBot('<p>' + (ids.length || (text && text.trim()) ? 'Filtered out. Ruthlessly.' : 'I’ll apply a couple of sensible defaults — vague predictions and recycled talking points get dropped.') + '</p>');
+  await goReview();
+}
+
+/* ---------- skip logic ---------- */
+function skipQuestion() {
+  if (!Q_STEPS.includes(state.step)) return;
+  lockRow();
+  if (state.step === 'shows') { pickerRefresh = null; document.querySelectorAll('.picker').forEach(p => p.classList.add('done')); }
+  const next = { shows: () => handleShows(true),
+                 role: () => handleRole('curious','(skipped)',null),
+                 areas: () => handleAreas(state.topics, '(skipped)', ''),
+                 details: () => handleDetails([], '', ''),
+                 noise: () => handleNoise([], '', '') };
+  next[state.step] && next[state.step]();
+}
+
+async function skipAhead() {
+  lockRow();
+  pickerRefresh = null; document.querySelectorAll('.picker').forEach(p => p.classList.add('done'));
+  addUser('Skip ahead — just give me a minimal profile');
+  if (!state.role) state.role = ROLES.find(r => r.id === 'curious');
+  await showTyping(700);
+  addBot('<p>Sure — here’s a minimal starting profile. Your thumbs-up/down feedback on each brief will sharpen it from here.</p>');
+  await goReview();
+}
+
+/* =========================================================
+   REVIEW
+   ========================================================= */
+
+let reviewCardEl = null;
+
+function profileCardHTML() {
+  const p = buildProfile();
+  const pills = (arr, cls) => arr.length
+    ? '<div class="pillset">' + arr.map(x =>
+        '<span class="pill ' + cls + '"' + (x.prov ? ' title="' + esc(provTitle(x.prov)) + '"' : '') + '>' + esc(x.label) +
+        (x.prov ? '<span class="pv">· ' + x.prov.count + ' eps</span>' : '') + '</span>').join('') + '</div>'
+    : '<div class="pillset"><span class="pill">—</span></div>';
+  let h = '<div class="card-body">';
+  if (p.lens) h += '<div class="lens-line">Lens: ' + esc(p.lens) + '.</div>';
+  h += '<div class="tier-block"><div class="tier-label t1">Tier 1 <span class="t-desc">always lift</span></div>' + pills(p.t1,'t1') + '</div>';
+  h += '<div class="tier-block"><div class="tier-label t2">Tier 2 <span class="t-desc">secondary lift</span></div>' + pills(p.t2,'t2') + '</div>';
+  h += '<div class="tier-block"><div class="tier-label">Tier 3 <span class="t-desc">mention only if exceptional</span></div><div class="pillset"><span class="pill">Everything else</span></div></div>';
+  const dwItems = p.dw.length ? p.dw : [{label:'Vague predictions without numbers'},{label:'Recycled talking points'}];
+  h += '<div class="tier-block"><div class="tier-label dw">Down-weight</div>' + pills(dwItems,'dw') + '</div>';
+  h += '</div>';
+  h += '<details class="md-view"><summary>Advanced: view as markdown (profile.md)</summary>' +
+       '<pre id="md-pre">' + esc(buildMarkdown()) + '</pre>' +
+       '<div class="md-actions"><button class="btn small" id="copy-md">Copy markdown</button></div></details>';
+  return h;
+}
+
+function refreshReviewCard() {
+  if (!reviewCardEl) return;
+  const open = reviewCardEl.querySelector('details.md-view')?.open;
+  reviewCardEl.querySelector('.card-inner').innerHTML = profileCardHTML();
+  if (open) reviewCardEl.querySelector('details.md-view').open = true;
+  wireCardExtras(reviewCardEl);
+}
+
+function wireCardExtras(card) {
+  const cp = card.querySelector('#copy-md');
+  if (cp) cp.onclick = () => {
+    navigator.clipboard?.writeText(buildMarkdown()).then(() => toast('Markdown copied'));
+  };
+}
+
+async function goReview() {
+  state.step = 'review'; renderProgress(); renderSkipRow();
+  await showTyping(1100);
+  const seeded = state.shows.length
+    ? ' Themes seeded from your shows carry their episode counts — hover any pill for the receipts.'
+    : '';
+  const bub = addBot('<p>Here’s your profile. This becomes <code style="font-size:12px;background:var(--bg-soft);padding:1px 5px;border-radius:3px;">profile.md</code> — the bias function every brief is ranked against.' + seeded + '</p>');
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = '<div class="card-head">Generated interest profile</div><div class="card-inner">' + profileCardHTML() + '</div>';
+  bub.appendChild(card);
+  reviewCardEl = card;
+  wireCardExtras(card);
+
+  const actions = document.createElement('div');
+  actions.className = 'card-actions';
+  actions.innerHTML = '<button class="btn primary" id="rv-ok">Looks right — suggest more shows →</button>' +
+                      '<button class="btn" id="rv-restart">Start over</button>';
+  bub.appendChild(actions); scrollDown();
+  actions.querySelector('#rv-ok').onclick = () => {
+    actions.querySelectorAll('button').forEach(b => b.disabled = true);
+    addUser('Looks right'); goSources();
+  };
+  actions.querySelector('#rv-restart').onclick = () => location.reload();
+
+  freeTextHandler = async text => {
+    state.customThemes.push(text.trim().replace(/^./, c => c.toUpperCase()));
+    addUser(text); renderPanel(); refreshReviewCard();
+    await showTyping(600);
+    addBot('<p>Added to Tier 1. Anything else, or tap a button above when ready.</p>');
+  };
+  setComposer('Add anything else to track… (or tap a button above)');
+}
+
+/* =========================================================
+   SOURCES — adjacent shows, scored by topic overlap with
+   what the user's shows actually cover
+   ========================================================= */
+
+function buildSuggestions() {
+  const stats = topicStats();
+  const selected = new Set(state.shows.map(s => s.id));
+
+  if (!Object.keys(stats).length) {
+    // no seed corpus — fall back to broad, high-signal defaults
+    return SHOWS.filter(s => ['allin','acquired','iltb'].includes(s.id) && !selected.has(s.id))
+      .map(s => ({ name: s.name, medium: s.medium, why: 'Broad, high-signal default — no shows to seed adjacency from yet' }));
+  }
+
+  const scored = SHOWS.filter(s => !selected.has(s.id)).map(show => {
+    let score = 0; const shared = {};
+    show.eps.forEach(ep => (ep.k || []).forEach(t => {
+      if (stats[t]) { score += stats[t].count; shared[t] = (shared[t] || 0) + 1; }
+    }));
+    const top = Object.keys(shared).sort((a, b) => (stats[b].count * shared[b]) - (stats[a].count * shared[a])).slice(0, 2);
+    return { show, score, top, sharedEps: Object.values(shared).reduce((a, b) => a + b, 0) };
+  }).filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 6);
+
+  return scored.map(x => {
+    const topicNames = x.top.map(t => TOPICS[t].label.toLowerCase());
+    const likeShows = [...new Set(x.top.flatMap(t => stats[t].shows))].slice(0, 2);
+    return {
+      name: x.show.name, medium: x.show.medium,
+      why: 'Heavy on ' + topicNames.join(' & ') + ' — ' + x.sharedEps + ' of its recent episodes overlap what ' +
+           likeShows.join(' and ') + ' cover for you'
+    };
+  });
+}
+
+let sourcesCtx = null;
+
+function refreshSources() {
+  if (state.step !== 'sources' || !sourcesCtx) return;
+  state.suggestions = buildSuggestions();
+  sourcesCtx.render();
+}
+
+async function goSources() {
+  state.step = 'sources'; renderProgress(); renderSkipRow();
+  state.suggestions = buildSuggestions();
+  await showTyping(1000);
+  const intro = state.shows.length
+    ? '<strong>Based on what your shows cover</strong>, these sit next door topically — each one earns its spot from overlap with your shows’ recent episodes, not a generic list. Accept the ones you want polled daily.'
+    : 'You didn’t pick shows, so here are a few broad, high-signal defaults. Accept the ones you want polled daily.';
+  const bub = addBot('<p>' + intro + '</p>');
+
+  const holder = document.createElement('div');
+  bub.appendChild(holder);
+
+  const actions = document.createElement('div');
+  actions.className = 'card-actions';
+  actions.innerHTML = '<button class="btn" id="src-done">Finish setup →</button>';
+  bub.appendChild(actions); scrollDown();
+  const doneBtn = actions.querySelector('#src-done');
+  doneBtn.onclick = () => { doneBtn.disabled = true; sourcesCtx = null; goDone(); };
+
+  let offered = false;
+  function maybeOfferFinish() {
+    const decided = Object.keys(state.srcDecisions).length;
+    if (decided >= state.suggestions.length && !offered) {
+      offered = true;
+      doneBtn.classList.add('primary');
+    }
+  }
+
+  function render() {
+    holder.innerHTML = '';
+    if (!state.suggestions.length) {
+      holder.innerHTML = '<p class="hint" style="margin-top:8px">No adjacent shows left to suggest for the current lineup.</p>';
+      return;
+    }
+    state.suggestions.forEach(s => {
+      const c = document.createElement('div');
+      c.className = 'src-card';
+      c.innerHTML =
+        '<div class="src-info"><div class="src-name">' + esc(s.name) +
+        '<span class="medium-badge ' + s.medium + '">' + (s.medium === 'youtube' ? 'YouTube' : 'Podcast') + '</span></div>' +
+        '<div class="src-why">' + esc(s.why) + '</div></div>' +
+        '<span class="src-state"></span>' +
+        '<div class="src-btns"><button class="src-btn add" title="Add">✓</button><button class="src-btn skip" title="Skip">✕</button></div>';
+      const stateEl = c.querySelector('.src-state');
+      const applyDecision = d => {
+        c.classList.add('decided', d === 'yes' ? 'accepted' : 'declined');
+        stateEl.textContent = d === 'yes' ? 'Added' : 'Skipped';
+        stateEl.className = 'src-state ' + (d === 'yes' ? 'yes' : 'no');
+      };
+      if (state.srcDecisions[s.name]) applyDecision(state.srcDecisions[s.name]);
+      const decide = yes => {
+        state.srcDecisions[s.name] = yes ? 'yes' : 'no';
+        applyDecision(yes ? 'yes' : 'no');
+        renderPanel(); maybeOfferFinish();
+      };
+      c.querySelector('.add').onclick = () => decide(true);
+      c.querySelector('.skip').onclick = () => decide(false);
+      holder.appendChild(c);
+    });
+  }
+  sourcesCtx = { render };
+  render();
+
+  freeTextHandler = async text => {
+    addUser(text);
+    await showTyping(600);
+    addBot('<p>In the full app I’d resolve "<em>' + esc(text) + '</em>" to a channel or RSS feed and add it. For this prototype, consider it queued.</p>');
+  };
+  setComposer('Or type a show / channel / RSS URL to add…');
+}
+
+/* =========================================================
+   DONE
+   ========================================================= */
+
+async function goDone() {
+  state.step = 'done'; renderProgress(); renderSkipRow();
+  const nSrc = Object.values(state.srcDecisions).filter(v => v === 'yes').length;
+  const nShows = state.shows.length;
+  const p = buildProfile();
+  await showTyping(1100);
+  const bub = addBot(
+    '<p><strong>You’re set.</strong> ' + nShows + ' show' + (nShows === 1 ? '' : 's') + ' tracked, ' +
+    p.t1.length + ' always-lift theme' + (p.t1.length === 1 ? '' : 's') + ', ' +
+    (p.dw.length || 2) + ' down-weight' + ((p.dw.length || 2) === 1 ? '' : 's') + ', and ' +
+    nSrc + ' starter source' + (nSrc === 1 ? '' : 's') + ' added on top.</p>' +
+    '<p class="hint">Your first brief lands tomorrow at 8:00 UTC. Thumbs-up/down on any item refines this profile automatically — and as your shows’ coverage shifts, so will the suggestions.</p>');
+  const actions = document.createElement('div');
+  actions.className = 'card-actions';
+  actions.innerHTML = '<button class="btn primary" id="save-btn">Save profile &amp; finish</button>' +
+                      '<button class="btn" id="done-restart">Start over</button>';
+  bub.appendChild(actions); scrollDown();
+  actions.querySelector('#save-btn').onclick = function () {
+    this.disabled = true; this.textContent = 'Saved ✓';
+    state.saved = true;
+    toast('Prototype: would write config/profile.md + add ' + (nShows + nSrc) + ' sources to sources.yaml');
+  };
+  actions.querySelector('#done-restart').onclick = () => location.reload();
+  freeTextHandler = null;
+  setComposer('Setup complete', false);
+}
+
+/* =========================================================
+   INPUT WIRING + BOOT
+   ========================================================= */
+
+function submitText() {
+  const text = input.value.trim();
+  if (!text || !freeTextHandler) return;
+  input.value = '';
+  const h = freeTextHandler;
+  if (Q_STEPS.includes(state.step) && state.step !== 'shows') freeTextHandler = null;
+  h(text);
+}
+$('#send').onclick = submitText;
+input.addEventListener('keydown', e => { if (e.key === 'Enter') submitText(); });
+$('#restart').onclick = () => location.reload();
+
+(async function boot() {
+  renderProgress(); renderPanel(); renderSkipRow();
+  setComposer('Type an answer…');
+  await sleep(400);
+  await showTyping(900);
+  addBot('<p>Hi — I put together your <strong>daily podcast brief</strong>: every morning I scan your shows and channels, pull out what actually matters to you, and email a ranked summary.</p>' +
+         '<p>Five quick questions. I start with <strong>your shows</strong>, because everything else — the topics I suggest, what counts as signal, even which new shows I recommend — gets seeded from what those shows actually cover. Watch it take shape on the ' +
+         (window.innerWidth <= 880 ? 'profile panel (top right)' : 'right') + ' as you go.</p>');
+  await askShows();
+})();
+</script>
+</body>
+</html>

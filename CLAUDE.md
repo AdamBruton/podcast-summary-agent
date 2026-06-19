@@ -362,14 +362,36 @@ reintroduce Whisper for YouTube** — different decision for a different medium.
 - **Profile + sources edits** round-trip via the yaml Document API
   (`sources-store.js`/`profile-store.js`) — preserves comments + key order.
   Never `YAML.parse() → YAML.stringify()`.
+- **Adding a channel auto-resolves the @handle** server-side in
+  `POST /api/sources/channels` (inline `resolveHandle`, a few seconds).
+  Best-effort: failure keeps the row unresolved and returns `resolve_error`;
+  the manual resolve button, `npm run resolve-channels`, and ingest-time
+  resolution remain as fallbacks.
 - **Podcasts** (`sources-store.js`): `addPodcast`/`removePodcast`/`patchPodcast`
   keyed by feed **url** (names collide with channels); mutation routes carry the
   url in the request **body** (encoded slashes break path params behind proxies).
   `listEpisodesWithCounts({medium})` filters in SQL; `GET /api/episodes?medium=…`.
 - **Feedback workflow**: thumbs per candidate → "Suggest refinements" collects
   feedback + profile → Claude proposes revised profile.md → user reviews diff
-  (`diff` npm pkg, +/− lines) → applies or discards. Profile editor itself is
-  behind an "Advanced: edit raw profile.md" `<details>`.
+  (`diff` npm pkg, +/− lines) → applies or discards. Now lives under the
+  "Advanced" `<details>` alongside the raw `profile.md` textarea.
+- **Profile board** (`profile-board-store.js`, `GET/PUT /api/profile/board`,
+  `#pb-board` in index.html): the primary profile editor. A 3-lane board
+  (Always surface=Tier 1 / Context=Tier 2 / Mute=down-weight) with ordinal
+  ranking (position = priority) and per-topic subtopics. **Board state
+  (`config/profile.board.json`) is the source of truth; `profile.md` is
+  GENERATED from it** on save (`generateProfileMd`) — the hand-authored preamble
+  (everything before `## Themes I care about`) is preserved byte-for-byte as
+  `rubric` and re-emitted. The ranker is unaffected (it reads `profile.md`
+  verbatim; nothing parses it). First open with no board.json does a one-time
+  **in-memory** import of `profile.md` (`importProfileToBoard`) shown for review —
+  nothing is written until Save, which backs up the pristine file to
+  `profile.pre-board.md` once. Un-tiered themes import to Context with a warning.
+  `board.json` is NOT seeded (derived from the seeded `profile.md` on first save).
+  Raw/refine edits call `syncBoardFromProfile()` to keep the board consistent.
+  `npm run test:profile` is the content-loss round-trip gate — run it if you
+  touch the parser/generator. The "derived from your shows" library and the
+  reaction-driven tuning feed from prototype D are deferred (need a topic-resolver).
 
 ---
 
