@@ -202,6 +202,62 @@
   .empty { color: var(--muted); font-style: italic; font-size: 13px; padding: 12px 0; }
 
   .footer { margin-top: 48px; color: var(--muted); font-size: 11px; text-align: center; }
+
+  /* ---- interest-profile board ---- */
+  .pb-board { display: grid; grid-template-columns: 1fr 232px; gap: 16px; align-items: start; }
+  .pb-lanes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .pb-lane { border: 1px solid var(--line); border-radius: 8px; background: #fff; overflow: hidden; }
+  .pb-lane > header { display: flex; align-items: center; gap: 7px; padding: 9px 11px; border-bottom: 1px solid var(--line); font-size: 13px; font-weight: 700; }
+  .pb-lane .pb-sub { font-size: 10.5px; font-weight: 400; color: var(--muted); }
+  .pb-lane .pb-count { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--muted); background: var(--bg-soft); border-radius: 9px; padding: 0 7px; min-width: 22px; text-align: center; }
+  .pb-swatch { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+  .pb-swatch.pb-t1 { background: var(--accent); } .pb-swatch.pb-t2 { background: #b45309; } .pb-swatch.pb-mute { background: #5f6672; }
+  .pb-body { padding: 8px; min-height: 90px; transition: background .12s; }
+  .pb-lane.pb-drag .pb-body, .pb-holding.pb-drag { background: var(--bg-soft); }
+  .pb-hint { border: 1.5px dashed var(--line-strong); border-radius: 7px; padding: 14px 10px; font-size: 11.5px; color: #6b6b6b; text-align: center; line-height: 1.5; }
+  .pb-card { border: 1px solid var(--line-strong); border-radius: 7px; background: #fff; padding: 7px 8px; margin-bottom: 7px; cursor: grab; }
+  .pb-card:active { cursor: grabbing; } .pb-card.pb-dragging { opacity: .45; }
+  .pb-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .pb-lane[data-lane=always] .pb-card { border-color: #c4daf8; background: #f4f8fe; }
+  .pb-lane[data-lane=context] .pb-card { border-color: #f0ddbe; background: #fdf8ef; }
+  .pb-lane[data-lane=mute] .pb-card { border-color: #d9dce1; background: #f5f6f7; color: #5f6672; }
+  .pb-card.pb-sel { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .pb-card-head { display: flex; align-items: center; gap: 6px; }
+  .pb-rank { flex: none; width: 17px; height: 17px; border-radius: 50%; font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: #fff; }
+  .pb-lane[data-lane=context] .pb-rank { background: #fff; color: #b45309; border: 1.5px solid #f0ddbe; }
+  .pb-name { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 600; line-height: 1.3; }
+  .pb-ctl { display: flex; gap: 2px; flex: none; opacity: .4; transition: opacity .12s; }
+  .pb-card:hover .pb-ctl, .pb-card:focus-within .pb-ctl, .pb-card.pb-sel .pb-ctl { opacity: 1; }
+  .pb-ctl button { font-size: 10px; line-height: 1; padding: 3px 5px; border: 1px solid rgba(0,0,0,.14); background: rgba(255,255,255,.9); border-radius: 4px; color: #555; }
+  .pb-ctl button:hover { background: #fff; color: #111; } .pb-ctl button:disabled { opacity: .3; cursor: default; }
+  .pb-ctl .pb-x:hover { color: var(--danger); border-color: #f3c5be; }
+  .pb-laneacts { display: flex; gap: 5px; margin-top: 6px; }
+  .pb-laneacts .pb-mv { margin-right: 0; }
+  .pb-subtoggle { display: inline-block; margin-top: 5px; background: none; border: none; padding: 0; font-size: 10.5px; color: var(--accent); font-weight: 600; cursor: pointer; }
+  .pb-lane[data-lane=mute] .pb-subtoggle { color: #5f6672; }
+  .pb-subs { margin-top: 5px; border-top: 1px dashed rgba(0,0,0,.1); padding-top: 5px; }
+  .pb-subs ul { list-style: none; margin: 0; padding: 0; }
+  .pb-subs li { display: flex; align-items: baseline; gap: 5px; font-size: 11px; color: #444; padding: 2px 0 2px 7px; border-left: 2px solid rgba(0,0,0,.12); margin-top: 3px; line-height: 1.4; }
+  .pb-subs li span { flex: 1; min-width: 0; }
+  .pb-subs li button { flex: none; background: none; border: none; color: #767676; font-size: 12px; line-height: 1; cursor: pointer; }
+  .pb-subs li button:hover { color: var(--danger); }
+  form.pb-subadd { display: flex; gap: 4px; margin-top: 5px; }
+  form.pb-subadd input { flex: 1; min-width: 0; font: inherit; font-size: 11px; padding: 3px 7px; border: 1px dashed var(--line-strong); border-radius: 4px; }
+  form.pb-subadd button { font-size: 11px; padding: 2px 9px; border: 1px solid var(--line-strong); background: #fff; border-radius: 4px; cursor: pointer; }
+  .pb-side { border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 11px; position: sticky; top: 14px; }
+  .pb-add { display: flex; gap: 6px; }
+  .pb-add input { flex: 1; min-width: 0; }
+  .pb-holding-h { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 12px 0 6px; }
+  .pb-holding { min-height: 40px; border-radius: 6px; }
+  .pb-holding .pb-empty { font-size: 11px; color: var(--muted); font-style: italic; }
+  .pb-mv { font-size: 10px; padding: 2px 6px; border: 1px solid var(--line-strong); background: #fff; border-radius: 4px; color: #555; margin-right: 3px; cursor: pointer; }
+  .pb-mv:hover { border-color: var(--accent); color: var(--accent); }
+  .pb-warn { font-size: 12px; line-height: 1.5; background: #fdf6ec; border: 1px solid #f0ddbe; color: #7a4a06; border-radius: 6px; padding: 9px 12px; margin-bottom: 12px; }
+  .pb-warn ul { margin: 4px 0 0; padding-left: 18px; } .pb-warn b { font-weight: 700; }
+  .pb-warn .pb-warn-x { float: right; background: none; border: none; cursor: pointer; color: #7a4a06; font-size: 15px; line-height: 1; }
+  .pb-dirty { font-size: 11px; color: #b45309; font-weight: 600; }
+  .pb-drop-ind { height: 3px; border-radius: 2px; background: var(--accent); margin: 3px 1px; pointer-events: none; }
+  @media (max-width: 760px) { .pb-board { grid-template-columns: 1fr; } .pb-lanes { grid-template-columns: 1fr; } .pb-side { position: static; } }
 </style>
 </head>
 <body>
@@ -269,38 +325,75 @@
   </section>
 
   <section>
-    <h2>Tune the interest profile</h2>
-    <p class="lede" style="margin: 4px 0 8px;">
-      Give thumbs ratings on candidates in the Episode rankings section below.
-      Then click <strong>Suggest refinements</strong> — Claude reads your feedback,
-      identifies false positives (selected but shouldn't have been) and false
-      negatives (dropped but should have been included), and proposes profile
-      edits. You review the suggestion and apply or discard.
+    <h2>Interest profile</h2>
+    <p class="lede" style="margin: 4px 0 10px;">
+      Rank the themes that bias your daily brief. Each lane is a priority tier; order within a lane
+      is the priority (<strong>#1 leads</strong>). Drag cards, or use the ↑/↓ controls. Saving
+      regenerates <code>config/profile.md</code> — the file the ranker reads — and keeps a one-time
+      backup at <code>profile.pre-board.md</code>.
     </p>
-    <div class="row-actions">
-      <button class="primary" id="refine-run">Suggest refinements from feedback</button>
-      <span class="feedback-counts" id="feedback-counts"></span>
-    </div>
-    <div class="err" id="refine-err"></div>
-
-    <div id="refine-panel" hidden>
-      <h3>Suggested revision</h3>
-      <div id="refine-summary"></div>
-      <div id="refine-diff"></div>
-      <details class="edit-revision">
-        <summary>Edit this revision before applying</summary>
-        <textarea class="profile" id="refine-revised" spellcheck="false"
-                  style="min-height: 240px;"></textarea>
-      </details>
-      <div class="row-actions">
-        <button class="primary" id="refine-apply">Apply this revision</button>
-        <button id="refine-discard">Discard</button>
-        <span class="ok-msg" id="refine-status"></span>
+    <div class="pb-warn" id="pb-warn" hidden></div>
+    <div class="pb-board" id="pb-board">
+      <div class="pb-lanes">
+        <section class="pb-lane" data-lane="always">
+          <header><span class="pb-swatch pb-t1"></span> Always surface <span class="pb-sub">Tier 1 · ranked</span><span class="pb-count" data-count="always">0</span></header>
+          <div class="pb-body" data-drop="always"></div>
+        </section>
+        <section class="pb-lane" data-lane="context">
+          <header><span class="pb-swatch pb-t2"></span> Context <span class="pb-sub">Tier 2</span><span class="pb-count" data-count="context">0</span></header>
+          <div class="pb-body" data-drop="context"></div>
+        </section>
+        <section class="pb-lane" data-lane="mute">
+          <header><span class="pb-swatch pb-mute"></span> Mute <span class="pb-sub">down-weight</span><span class="pb-count" data-count="mute">0</span></header>
+          <div class="pb-body" data-drop="mute"></div>
+        </section>
       </div>
+      <aside class="pb-side">
+        <div class="pb-add">
+          <input type="text" id="pb-add-input" placeholder="Add a theme…" autocomplete="off">
+          <button class="primary" id="pb-add-btn" type="button">Add</button>
+        </div>
+        <div class="pb-holding-h">Unplaced</div>
+        <div class="pb-holding" id="pb-holding" data-drop="holding"></div>
+      </aside>
     </div>
+    <div class="row-actions" style="margin-top: 12px;">
+      <button class="primary" id="pb-save">Save profile</button>
+      <span class="ok-msg" id="pb-status"></span>
+      <span class="pb-dirty" id="pb-dirty" hidden>● unsaved changes</span>
+    </div>
+    <div class="err" id="pb-err"></div>
 
-    <details class="profile-raw">
-      <summary>Advanced: edit raw profile.md</summary>
+    <details class="profile-raw" style="margin-top: 18px;">
+      <summary>Advanced: refine from feedback, or edit raw profile.md</summary>
+      <p class="lede" style="margin: 8px 0;">
+        Thumbs-rate candidates in <strong>Episode rankings</strong> below, then
+        <strong>Suggest refinements</strong> — Claude proposes profile edits from your feedback.
+        Applying a suggestion (or a raw edit) re-syncs the board above.
+      </p>
+      <div class="row-actions">
+        <button class="primary" id="refine-run">Suggest refinements from feedback</button>
+        <span class="feedback-counts" id="feedback-counts"></span>
+      </div>
+      <div class="err" id="refine-err"></div>
+
+      <div id="refine-panel" hidden>
+        <h3>Suggested revision</h3>
+        <div id="refine-summary"></div>
+        <div id="refine-diff"></div>
+        <details class="edit-revision">
+          <summary>Edit this revision before applying</summary>
+          <textarea class="profile" id="refine-revised" spellcheck="false"
+                    style="min-height: 240px;"></textarea>
+        </details>
+        <div class="row-actions">
+          <button class="primary" id="refine-apply">Apply this revision</button>
+          <button id="refine-discard">Discard</button>
+          <span class="ok-msg" id="refine-status"></span>
+        </div>
+      </div>
+
+      <h3 style="font-size: 13px; margin: 16px 0 6px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);">Raw profile.md</h3>
       <textarea class="profile" id="profile-content" spellcheck="false"></textarea>
       <div class="row-actions">
         <button class="primary" id="profile-save">Save raw profile</button>
@@ -416,6 +509,7 @@ async function load() {
   renderPodcasts(data.podcasts || []);
   renderIndividuals(data.individuals);
   // Profile + episodes are loaded independently; failures don't block sources.
+  loadBoard().catch(e => setErr('pb-err', e.message));
   loadProfile().catch(e => setErr('profile-err', e.message));
   loadEpisodes().catch(e => setErr('episodes-err', e.message));
   loadBackups().catch(e => setErr('admin-err', e.message));
@@ -427,6 +521,253 @@ async function loadProfile() {
   el.value = content;
   el.dataset.original = content;   // baseline for revert
 }
+
+/* ============================ interest-profile board ============================
+   Structured editor over the profile. Lanes map to tiers (always=Tier 1,
+   context=Tier 2, mute=down-weight); order within a lane is the priority. The
+   board is the source of truth; Save regenerates config/profile.md server-side. */
+
+let BOARD = null;
+const _pbExpanded = new Set();   // topicIds whose subtopics are shown
+let _pbSel = null;               // selected topicId for keyboard reorder
+let _pbDirty = false;
+const PB_LANES = ['always', 'context', 'mute'];
+const PB_OTHER = { always: ['context', 'mute'], context: ['always', 'mute'], mute: ['always', 'context'] };
+const PB_SHORT = { always: 'T1', context: 'T2', mute: 'Mute' };
+function pbCssEsc(s) { return (window.CSS && CSS.escape) ? CSS.escape(s) : String(s).replace(/"/g, '\\"'); }
+
+async function loadBoard() {
+  const r = await api('GET', '/api/profile/board');
+  BOARD = r.board;
+  _pbDirty = false;
+  const d = document.getElementById('pb-dirty'); if (d) d.hidden = true;
+  renderBoard();
+  renderBoardWarnings(r.source === 'imported' ? (r.warnings || []) : []);
+}
+
+function pbLaneOf(id) { for (const l of PB_LANES) if (BOARD.lanes[l].includes(id)) return l; return null; }
+function pbUnplaced() {
+  const placed = new Set([...BOARD.lanes.always, ...BOARD.lanes.context, ...BOARD.lanes.mute]);
+  return Object.keys(BOARD.topics).filter(id => !placed.has(id));
+}
+function pbRemoveFromLane(id) { const l = pbLaneOf(id); if (l) BOARD.lanes[l].splice(BOARD.lanes[l].indexOf(id), 1); }
+function pbPlaceAt(id, lane, idx) {
+  pbRemoveFromLane(id);
+  const a = BOARD.lanes[lane];
+  if (idx == null || idx < 0 || idx > a.length) idx = a.length;
+  a.splice(idx, 0, id);
+}
+function pbMarkDirty() {
+  _pbDirty = true;
+  const d = document.getElementById('pb-dirty'); if (d) d.hidden = false;
+  const s = document.getElementById('pb-status'); if (s) s.textContent = '';
+}
+function pbNudge(id, dir) {
+  const lane = pbLaneOf(id); if (!lane) return;
+  const a = BOARD.lanes[lane]; const i = a.indexOf(id); const j = i + dir;
+  if (j < 0 || j >= a.length) return;
+  a.splice(i, 1); a.splice(j, 0, id);
+  _pbSel = id; pbMarkDirty(); renderBoard();
+}
+
+function pbCardHtml(id, lane, i) {
+  const t = BOARD.topics[id]; if (!t) return '';
+  const subs = t.subtopics || [];
+  const open = _pbExpanded.has(id);
+  const isMute = lane === 'mute';
+  const rank = isMute ? '' : `<span class="pb-rank">${i + 1}</span>`;
+  const upDown = isMute ? '' :
+    `<button type="button" data-up title="Move up" aria-label="Move ${esc(t.name)} up" ${i === 0 ? 'disabled' : ''}>↑</button>
+     <button type="button" data-down title="Move down" aria-label="Move ${esc(t.name)} down">↓</button>`;
+  const subRows = subs.map((s, si) =>
+    `<li><span>${esc(s.text)}</span><button type="button" data-rmsub="${si}" title="Remove detail" aria-label="Remove detail">×</button></li>`).join('');
+  return `<div class="pb-card${_pbSel === id ? ' pb-sel' : ''}" draggable="true" data-topic="${esc(id)}" tabindex="0" role="group" aria-label="${esc(t.name)}${isMute ? ', muted' : `, rank ${i + 1} in ${lane}`}">
+    <div class="pb-card-head">${rank}<span class="pb-name">${esc(t.name)}</span>
+      <span class="pb-ctl">${upDown}<button type="button" class="pb-x" data-rm title="Remove from board" aria-label="Remove ${esc(t.name)} from board">×</button></span>
+    </div>
+    ${_pbSel === id ? `<div class="pb-laneacts">${PB_OTHER[lane].map(l => `<button type="button" class="pb-mv" data-mv="${l}" title="Move to ${l}">→ ${PB_SHORT[l]}</button>`).join('')}</div>` : ''}
+    <button type="button" class="pb-subtoggle" data-subtoggle>${open ? '▾' : '▸'} details (${subs.length})</button>
+    ${open ? `<div class="pb-subs"><ul>${subRows}</ul>
+      <form class="pb-subadd"><input type="text" placeholder="Add detail…" autocomplete="off"><button type="submit">+</button></form></div>` : ''}
+  </div>`;
+}
+function pbHoldingCardHtml(id) {
+  const t = BOARD.topics[id]; if (!t) return '';
+  const moves = PB_LANES.map(l => `<button type="button" class="pb-mv" data-mv="${l}" title="Place in ${l}">→ ${PB_SHORT[l]}</button>`).join('');
+  return `<div class="pb-card" draggable="true" data-topic="${esc(id)}" tabindex="0" role="group" aria-label="${esc(t.name)}, unplaced">
+    <div class="pb-card-head"><span class="pb-name">${esc(t.name)}</span>
+      <span class="pb-ctl"><button type="button" class="pb-x" data-rm-topic title="Delete topic" aria-label="Delete ${esc(t.name)}">×</button></span></div>
+    <div style="margin-top:5px;">${moves}</div>
+  </div>`;
+}
+
+function renderBoard() {
+  if (!BOARD) return;
+  const k = pbCaptureFocus();
+  for (const lane of PB_LANES) {
+    const body = document.querySelector(`#pb-board [data-drop="${lane}"]`);
+    const ids = BOARD.lanes[lane];
+    document.querySelector(`#pb-board [data-count="${lane}"]`).textContent = ids.length;
+    const hint = lane === 'always' ? 'Drag must-surface themes here. #1 leads the brief.'
+      : lane === 'context' ? 'Tracked, but never beats Tier 1.' : 'Noise to down-weight.';
+    body.innerHTML = ids.length ? ids.map((id, i) => pbCardHtml(id, lane, i)).join('') : `<div class="pb-hint">${hint}</div>`;
+  }
+  const hold = pbUnplaced();
+  const he = document.getElementById('pb-holding');
+  he.innerHTML = hold.length ? hold.map(pbHoldingCardHtml).join('')
+    : `<div class="pb-empty">Nothing unplaced — removed or newly-added themes wait here.</div>`;
+  pbRestoreFocus(k);
+}
+function renderBoardWarnings(warnings) {
+  const el = document.getElementById('pb-warn');
+  if (!warnings || !warnings.length) { el.hidden = true; el.innerHTML = ''; return; }
+  el.hidden = false;
+  el.innerHTML = `<button class="pb-warn-x" id="pb-warn-x" title="Dismiss" type="button">×</button>
+    <b>Imported your current profile.md.</b> ${warnings.length} theme${warnings.length > 1 ? 's' : ''} had no tier and went to <b>Context</b> —
+    drag any must-haves up to <b>Always surface</b>, then <b>Save</b>. Nothing is written until you save.
+    <ul>${warnings.slice(0, 8).map(w => `<li>${esc(w.replace(/ — .*$/, ''))}</li>`).join('')}</ul>`;
+}
+
+// focus preservation across the innerHTML re-render
+function pbCaptureFocus() {
+  const a = document.activeElement;
+  const root = document.getElementById('pb-board');
+  if (!a || !root || !root.contains(a)) return null;
+  const card = a.closest('[data-topic]'); if (!card) return null;
+  let attr = null;
+  for (const x of ['data-up', 'data-down', 'data-rm', 'data-subtoggle']) if (a.hasAttribute(x)) attr = x;
+  return { topic: card.dataset.topic, attr, onCard: a === card };
+}
+function pbRestoreFocus(k) {
+  if (!k) return;
+  const card = document.querySelector(`#pb-board [data-topic="${pbCssEsc(k.topic)}"]`);
+  if (!card) return;
+  if (k.onCard) { card.focus(); return; }
+  if (k.attr) { const b = card.querySelector(`[${k.attr}]`); (b && !b.disabled ? b : card).focus(); }
+}
+
+function pbAddTopic() {
+  const inp = document.getElementById('pb-add-input');
+  const name = (inp.value || '').trim();
+  if (!name) return;
+  const base = 't-custom-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50);
+  let id = base, n = 2;
+  while (BOARD.topics[id]) id = base + '-' + (n++);
+  BOARD.topics[id] = { id, name, blurb: '', subtopics: [] };
+  BOARD.lanes.always.push(id);   // new themes default to Tier 1; user can move
+  inp.value = '';
+  pbMarkDirty(); renderBoard();
+}
+
+async function pbSave() {
+  const btn = document.getElementById('pb-save');
+  const status = document.getElementById('pb-status');
+  setErr('pb-err', '');
+  btn.disabled = true; const orig = btn.textContent; btn.textContent = 'Saving…';
+  try {
+    const payload = {
+      version: BOARD.version || 1,
+      rubric: BOARD.rubric,
+      themesIntro: BOARD.themesIntro || '',
+      downWeightIntro: BOARD.downWeightIntro || '',
+      lanes: BOARD.lanes,
+      topics: BOARD.topics,
+    };
+    const r = await api('PUT', '/api/profile/board', { board: payload });
+    _pbDirty = false;
+    document.getElementById('pb-dirty').hidden = true;
+    document.getElementById('pb-warn').hidden = true;
+    status.textContent = `Saved — profile.md regenerated (${r.bytes} bytes)${r.backedUp ? ' · original backed up' : ''}. Takes effect on the next brief.`;
+    loadProfile().catch(() => {});   // refresh the raw-editor view
+  } catch (e) { setErr('pb-err', e.message); }
+  finally { btn.disabled = false; btn.textContent = orig; }
+}
+
+(function initBoard() {
+  const root = document.getElementById('pb-board');
+  if (!root) return;
+
+  root.addEventListener('click', e => {
+    const card = e.target.closest('[data-topic]');
+    const btn = e.target.closest('button');
+    if (btn && card) {
+      const id = card.dataset.topic;
+      if (btn.hasAttribute('data-up'))       { pbNudge(id, -1); return; }
+      if (btn.hasAttribute('data-down'))     { pbNudge(id, +1); return; }
+      if (btn.hasAttribute('data-rm'))       { pbRemoveFromLane(id); _pbSel = null; pbMarkDirty(); renderBoard(); return; }
+      if (btn.hasAttribute('data-rm-topic')) { pbRemoveFromLane(id); delete BOARD.topics[id]; pbMarkDirty(); renderBoard(); return; }
+      if (btn.hasAttribute('data-mv'))       { pbPlaceAt(id, btn.dataset.mv, null); pbMarkDirty(); renderBoard(); return; }
+      if (btn.hasAttribute('data-subtoggle')){ _pbExpanded.has(id) ? _pbExpanded.delete(id) : _pbExpanded.add(id); renderBoard(); return; }
+      if (btn.hasAttribute('data-rmsub'))    { (BOARD.topics[id].subtopics || []).splice(Number(btn.dataset.rmsub), 1); pbMarkDirty(); renderBoard(); return; }
+    }
+    if (card && !btn) { _pbSel = _pbSel === card.dataset.topic ? null : card.dataset.topic; renderBoard(); }
+  });
+
+  root.addEventListener('submit', e => {
+    const form = e.target.closest('form.pb-subadd'); if (!form) return;
+    e.preventDefault();
+    const id = form.closest('[data-topic]').dataset.topic;
+    const inp = form.querySelector('input'); const text = (inp.value || '').trim();
+    if (!text) return;
+    const subs = BOARD.topics[id].subtopics || (BOARD.topics[id].subtopics = []);
+    if (!subs.some(s => s.text.toLowerCase() === text.toLowerCase())) subs.push({ text, auto: false });
+    _pbExpanded.add(id); pbMarkDirty(); renderBoard();
+  });
+
+  root.addEventListener('keydown', e => {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    const card = e.target.closest('.pb-card[data-topic]'); if (!card) return;
+    if (!pbLaneOf(card.dataset.topic)) return;   // only ranked (placed) cards reorder
+    e.preventDefault();
+    pbNudge(card.dataset.topic, e.key === 'ArrowUp' ? -1 : +1);
+  });
+
+  // drag & drop with an ordinal drop indicator
+  let dragId = null;
+  const ind = document.createElement('div'); ind.className = 'pb-drop-ind';
+  const dropTarget = (zone, y) => {
+    const cards = [...zone.querySelectorAll('.pb-card:not(.pb-dragging)')];
+    for (let i = 0; i < cards.length; i++) {
+      const r = cards[i].getBoundingClientRect();
+      if (y < r.top + r.height / 2) return { idx: i, before: cards[i] };
+    }
+    return { idx: cards.length, before: null };
+  };
+  root.addEventListener('dragstart', e => {
+    const c = e.target.closest('[data-topic]'); if (!c) return;
+    dragId = c.dataset.topic; c.classList.add('pb-dragging');
+    e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragId);
+  });
+  root.addEventListener('dragend', e => {
+    const c = e.target.closest('[data-topic]'); if (c) c.classList.remove('pb-dragging');
+    dragId = null; ind.remove();
+    root.querySelectorAll('.pb-drag').forEach(z => z.classList.remove('pb-drag'));
+  });
+  for (const zone of root.querySelectorAll('[data-drop]')) {
+    zone.addEventListener('dragover', e => {
+      e.preventDefault(); e.dataTransfer.dropEffect = 'move'; zone.classList.add('pb-drag');
+      if (zone.dataset.drop === 'holding') return;
+      const { before } = dropTarget(zone, e.clientY); zone.insertBefore(ind, before);
+    });
+    zone.addEventListener('dragleave', e => {
+      if (!zone.contains(e.relatedTarget)) { zone.classList.remove('pb-drag'); if (zone.contains(ind)) ind.remove(); }
+    });
+    zone.addEventListener('drop', e => {
+      e.preventDefault(); zone.classList.remove('pb-drag');
+      const id = e.dataTransfer.getData('text/plain') || dragId; const lane = zone.dataset.drop;
+      ind.remove();
+      if (!id) return;
+      if (lane === 'holding') pbRemoveFromLane(id);
+      else { const { idx } = dropTarget(zone, e.clientY); pbPlaceAt(id, lane, idx); }
+      pbMarkDirty(); renderBoard();
+    });
+  }
+
+  document.getElementById('pb-add-btn').addEventListener('click', pbAddTopic);
+  document.getElementById('pb-add-input').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); pbAddTopic(); } });
+  document.getElementById('pb-save').addEventListener('click', pbSave);
+  document.addEventListener('click', e => { if (e.target && e.target.id === 'pb-warn-x') document.getElementById('pb-warn').hidden = true; });
+})();
 
 // Render a diff (array of {value, added?, removed?}) as colored lines.
 // Each chunk's `value` may contain multiple lines; we split so styling
@@ -653,6 +994,7 @@ document.addEventListener('click', async (ev) => {
       const r = await api('PUT', '/api/profile', { content: el.value });
       el.dataset.original = el.value;
       status.textContent = `✓ Saved (${r.bytes} bytes). Effective on next rank pass.`;
+      loadBoard().catch(() => {});   // re-sync the board from the raw edit
       setTimeout(() => { status.textContent = ''; }, 5000);
     } catch (e) {
       setErr('profile-err', e.message);
@@ -718,10 +1060,11 @@ document.addEventListener('click', async (ev) => {
       const r = await api('PUT', '/api/profile', { content });
       document.getElementById('refine-status').textContent =
         `✓ Applied (${r.bytes} bytes). Effective on next rank pass.`;
-      // Sync the raw textarea too.
+      // Sync the raw textarea + board too.
       const raw = document.getElementById('profile-content');
       raw.value = content;
       raw.dataset.original = content;
+      loadBoard().catch(() => {});
       setTimeout(() => {
         document.getElementById('refine-panel').hidden = true;
         document.getElementById('refine-status').textContent = '';

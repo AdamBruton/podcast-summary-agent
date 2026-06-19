@@ -17,7 +17,8 @@
     "backup": "node scripts/backup-db.js",
     "upload-state-db": "node scripts/upload-state-db.js",
     "ingest-podcasts": "node scripts/ingest-podcasts.js",
-    "web": "node src/web/server.js"
+    "web": "node src/web/server.js",
+    "test:profile": "node scripts/test-profile-roundtrip.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",

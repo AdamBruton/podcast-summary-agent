@@ -17,6 +17,7 @@ import {
   addIndividual, removeIndividual,
 } from '../lib/sources-store.js';
 import { readProfile, writeProfile } from '../lib/profile-store.js';
+import { loadOrImportBoard, writeBoard, syncBoardFromProfile } from '../lib/profile-board-store.js';
 import {
   listEpisodesWithCounts, getEpisodeDetail,
   setFeedback, getAllFeedbackWithContext,
@@ -145,7 +146,24 @@ app.get('/api/profile', wrap(() => ({ content: readProfile() })));
 
 app.put('/api/profile', wrap(req => {
   if (typeof req.body?.content !== 'string') throw new Error('content (string) is required');
-  return writeProfile(req.body.content);
+  const res = writeProfile(req.body.content);
+  // Keep the structured board in sync after a raw/refine edit (non-fatal).
+  try { syncBoardFromProfile(); } catch (err) { log.warn('board resync after raw profile save failed', { err: err.message }); }
+  return res;
+}));
+
+// Structured "board" view of the profile. GET returns the persisted board, or a
+// one-time IN-MEMORY import of the current profile.md when no board exists yet
+// (writes nothing — opening the board changes nothing on disk). PUT regenerates
+// profile.md from the board (backing up the pristine file to profile.pre-board.md
+// once) and persists board state to config/profile.board.json. The ranker keeps
+// reading profile.md verbatim, so this never touches the ranking contract.
+app.get('/api/profile/board', wrap(() => loadOrImportBoard()));
+
+app.put('/api/profile/board', wrap(req => {
+  const board = req.body?.board;
+  if (!board || typeof board !== 'object') throw new Error('board (object) is required');
+  return writeBoard(board);
 }));
 
 // --- Episode inspector -----------------------------------------------------
