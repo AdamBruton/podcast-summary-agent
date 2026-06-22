@@ -29,6 +29,7 @@ import { runEpisode, runDaily } from '../pipeline.js';
 import { complete, parseJsonResponse, MODELS } from '../lib/claude.js';
 import { loadPrompt, DB_PATH } from '../lib/config.js';
 import { backupDatabase, snapshotForRestore, BACKUPS_DIR } from '../lib/backup.js';
+import { sendEmail, emailConfigured } from '../lib/mailer.js';
 import { log } from '../lib/log.js';
 import { diffLines } from 'diff';
 
@@ -458,6 +459,53 @@ function scheduleDailyRun() {
   }, ms);
 }
 
+// Notify when a daily run produces no email. The brief itself is the
+// success signal — but a run that FAILS or has NOTHING to send is otherwise
+// silent, and silence is indistinguishable from "everything's fine but quiet."
+// These alerts make absent mail an explicit signal instead. (A dead process
+// or a scheduler that never fires can't be caught from in-process — that's the
+// residual gap; see CLAUDE.md "Open work".) Best-effort: the alert goes via the
+// same email provider as the brief, so if that provider is the thing that's
+// down, the send will fail too — swallow it rather than masking the real error.
+async function notifyDailyOutcome({ kind, trigger, error, stats }) {
+  if (!emailConfigured()) {
+    log.warn('daily-outcome alert skipped: email not configured', { kind });
+    return;
+  }
+  const dateStr = new Date().toISOString().slice(0, 10);
+  let subject, body;
+  if (kind === 'failed') {
+    subject = `⚠️ Podcast Intel — daily brief FAILED (${dateStr})`;
+    body = [
+      `The ${trigger} daily run failed before a brief could be sent.`,
+      ``,
+      `Error: ${error?.message || 'unknown'}`,
+      ``,
+      `No content is lost — unfinished episodes keep their resumable status and`,
+      `the next daily run retries them. Check the service logs for the full stack.`,
+    ].join('\n');
+  } else { // 'empty'
+    subject = `Podcast Intel — no brief today (${dateStr})`;
+    body = [
+      `The ${trigger} daily run completed but had nothing to send.`,
+      ``,
+      `Pending episodes: ${stats?.pending ?? '?'}`,
+      `Delivered:        ${stats?.processed ?? 0}`,
+      `Failed (retry):   ${stats?.failed ?? 0}`,
+      ``,
+      stats?.failed
+        ? `Some episodes failed this run and will be retried on the next one.`
+        : `No new content qualified for a brief today.`,
+    ].join('\n');
+  }
+  try {
+    const { to } = await sendEmail({ subject, text: body });
+    log.ok('daily-outcome alert sent', { kind, to });
+  } catch (err) {
+    log.error('daily-outcome alert failed to send', { kind, err: err.message });
+  }
+}
+
 async function runDailyInBackground(trigger) {
   if (dailyRunning) {
     log.warn('daily run already in progress, ignoring new trigger', { trigger });
@@ -467,10 +515,18 @@ async function runDailyInBackground(trigger) {
   const startedAt = Date.now();
   log.info('daily run starting', { trigger });
   try {
-    await runDaily({});
-    log.ok('daily run finished', { trigger, ms: Date.now() - startedAt });
+    const result = await runDaily({});
+    log.ok('daily run finished', {
+      trigger, ms: Date.now() - startedAt,
+      processed: result?.processed, failed: result?.failed,
+    });
+    // A delivered brief is its own signal; only the no-send path needs an alert.
+    if (result?.empty) {
+      await notifyDailyOutcome({ kind: 'empty', trigger, stats: result });
+    }
   } catch (err) {
     log.error('daily run failed', { trigger, err: err.message, stack: err.stack });
+    await notifyDailyOutcome({ kind: 'failed', trigger, error: err });
   } finally {
     dailyRunning = false;
   }
