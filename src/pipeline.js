@@ -133,11 +133,32 @@ export async function runDaily({ dryRun, lookbackDays = 2 } = {}) {
     log.info(`processing ${pending.length} pending episode(s)`);
 
     const ready = [];
+    const failed = [];
     for (const ep of pending) {
-      if (await processEpisode(ep, run_id)) {
-        ready.push(getEpisode(ep.video_id));
-        processed++;
+      // Isolate each episode. A transient failure in one (e.g. an Anthropic
+      // "Premature close" mid-extract) must not abort the whole loop and
+      // strand every other episode — that single throw used to sink the entire
+      // brief, so a blip on the first episode meant no email at all that night.
+      // Log it and move on. We deliberately DON'T mark it 'skipped': that's
+      // permanent, and these are transient infra errors. The episode keeps its
+      // resumable status (it never reached 'extracted'/'ranked'), so the next
+      // daily run retries it.
+      try {
+        if (await processEpisode(ep, run_id)) {
+          ready.push(getEpisode(ep.video_id));
+          processed++;
+        }
+      } catch (err) {
+        failed.push(ep.video_id);
+        log.error('episode failed; continuing with the rest', {
+          video_id: ep.video_id,
+          title: ep.title,
+          err: err.message,
+        });
       }
+    }
+    if (failed.length) {
+      log.warn(`${failed.length} episode(s) failed and will retry next run`, { video_ids: failed });
     }
 
     const html = await stage('compose', () => composeBrief(ready));
