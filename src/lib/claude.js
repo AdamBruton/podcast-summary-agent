@@ -43,6 +43,36 @@ function client() {
   return _client;
 }
 
+// Transient failures worth retrying. The Anthropic SDK already retries these
+// during request *setup* (default maxRetries: 2), but a connection that drops
+// while the response BODY streams back — the "Premature close" / ECONNRESET
+// class — surfaces AFTER the SDK's retry boundary and bubbles up unretried.
+// That single unretried error on the first extract is what sank the daily
+// brief two nights running. We add our own retry around the whole call to
+// catch it.
+const MAX_ATTEMPTS = 4;
+const BASE_BACKOFF_MS = 1000;
+const RETRYABLE_STATUS = new Set([408, 409, 429, 500, 502, 503, 504, 529]);
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// True for network/overload errors that a retry might clear; false for
+// deterministic failures (400 bad request, 401 auth, etc.) where retrying
+// just burns time and money.
+function isTransientError(err) {
+  if (!err) return false;
+  // SDK errors carry the HTTP status on `.status`; connection errors are
+  // APIConnectionError/APIConnectionTimeoutError (status undefined). Match by
+  // class name (the SDK doesn't always set `.name`, so check the constructor
+  // too). The body-stream break escapes as a raw node-fetch FetchError, so we
+  // also match the message — both on the error and on a wrapped `cause`.
+  if (typeof err.status === 'number' && RETRYABLE_STATUS.has(err.status)) return true;
+  const name = err.name || err.constructor?.name || '';
+  if (/APIConnection(Timeout)?Error/.test(name)) return true;
+  const re = /connection error|premature close|econnreset|socket hang up|terminated|network|fetch failed|etimedout|epipe/i;
+  return re.test(String(err.message || '')) || re.test(String(err.cause?.message || ''));
+}
+
 function calcCost(model, usage) {
   const p = MODEL_PRICING[model];
   if (!p) return 0;
@@ -77,14 +107,41 @@ export async function complete({
   telemetry = {},
 }) {
   const c = client();
-  const resp = await c.messages.create({
+  const params = {
     model,
     max_tokens,
     system: system
       ? [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }]
       : undefined,
     messages,
-  });
+  };
+
+  // Stream rather than wait for a single buffered response. A non-streaming
+  // call holds the HTTP connection idle while the model generates the whole
+  // answer; on long requests (extract chunks are ~240k chars) that idle
+  // connection gets reset mid-body — the "Premature close" that silently
+  // killed the brief. Streaming keeps bytes flowing so the connection isn't
+  // dropped; finalMessage() returns the same shape as create() (content +
+  // usage), so cost/telemetry below is unchanged. The retry loop salvages the
+  // rare drop that still slips through.
+  let resp;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      resp = await c.messages.stream(params).finalMessage();
+      break;
+    } catch (err) {
+      if (attempt === MAX_ATTEMPTS || !isTransientError(err)) throw err;
+      const backoff = BASE_BACKOFF_MS * 2 ** (attempt - 1) + Math.floor(Math.random() * 250);
+      log.warn('claude call failed; retrying', {
+        stage: telemetry.stage || '?',
+        attempt,
+        of: MAX_ATTEMPTS,
+        backoff_ms: backoff,
+        err: err.message,
+      });
+      await sleep(backoff);
+    }
+  }
 
   const text = resp.content
     .filter(b => b.type === 'text')
