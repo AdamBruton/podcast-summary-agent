@@ -105,6 +105,7 @@ export async function runDaily({ dryRun, lookbackDays = 2 } = {}) {
   const mode = dryRun ? 'dry-run-daily' : 'daily';
   const run_id = startRun(mode);
   let processed = 0, ok = false, briefResult = null;
+  let pendingCount = 0, failedCount = 0;
   try {
     // Snapshot the DB before any new writes for the day. Non-fatal: a failed
     // backup must not block the brief from going out. Email-attached weekly
@@ -130,14 +131,37 @@ export async function runDaily({ dryRun, lookbackDays = 2 } = {}) {
 
     // Pick up everything ingested-but-not-finished (handles resume of prior partials).
     const pending = resumableEpisodes();
+    pendingCount = pending.length;
     log.info(`processing ${pending.length} pending episode(s)`);
 
     const ready = [];
+    const failed = [];
     for (const ep of pending) {
-      if (await processEpisode(ep, run_id)) {
-        ready.push(getEpisode(ep.video_id));
-        processed++;
+      // Isolate each episode. A transient failure in one (e.g. an Anthropic
+      // "Premature close" mid-extract) must not abort the whole loop and
+      // strand every other episode — that single throw used to sink the entire
+      // brief, so a blip on the first episode meant no email at all that night.
+      // Log it and move on. We deliberately DON'T mark it 'skipped': that's
+      // permanent, and these are transient infra errors. The episode keeps its
+      // resumable status (it never reached 'extracted'/'ranked'), so the next
+      // daily run retries it.
+      try {
+        if (await processEpisode(ep, run_id)) {
+          ready.push(getEpisode(ep.video_id));
+          processed++;
+        }
+      } catch (err) {
+        failed.push(ep.video_id);
+        log.error('episode failed; continuing with the rest', {
+          video_id: ep.video_id,
+          title: ep.title,
+          err: err.message,
+        });
       }
+    }
+    failedCount = failed.length;
+    if (failed.length) {
+      log.warn(`${failed.length} episode(s) failed and will retry next run`, { video_ids: failed });
     }
 
     const html = await stage('compose', () => composeBrief(ready));
@@ -150,5 +174,9 @@ export async function runDaily({ dryRun, lookbackDays = 2 } = {}) {
     endRun(run_id, { ok, episodes_processed: processed, total_usd: usd });
     log.ok('run complete', { run_id, processed, total_usd: usd.toFixed(4) });
   }
-  return briefResult;
+  // Surface run stats alongside the deliver result so the caller (the daily
+  // scheduler) can alert when a run sent nothing. `briefResult` carries
+  // `empty:true` when deliver had zero episodes. cli.js only reads `.path`, so
+  // the extra fields are backward-compatible.
+  return { ...briefResult, processed, pending: pendingCount, failed: failedCount };
 }

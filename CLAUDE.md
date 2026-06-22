@@ -518,9 +518,16 @@ parallelism if mornings get slow.
   via web UI ("Database backup & restore" → "Restore from file") or
   `npm run upload-state-db` with `ADMIN_UPLOAD_URL` + `CF_ACCESS_CLIENT_ID/SECRET`.
   Snapshots prod DB, swaps upload, resets singleton — no restart.
-- **No failure alerting for the daily cron.** If the brief errors (rate limit,
-  API outage, transcript-io down) nothing fires. Possible: catch non-zero exit →
-  webhook, or always include episode count in subject so absent mail is a signal.
+- **Daily-cron alerting (partial).** `runDailyInBackground` (server.js) now emails
+  `MAIL_TO` via `notifyDailyOutcome` when a run **fails** (caught exception) or sends
+  **nothing** (`deliver` returned `empty:true`) — so a delivered brief, a "no brief
+  today" note, or a "FAILED" note is the expected outcome of every *completed* run,
+  and true silence means a real problem. Best-effort (shares the Resend transport, so
+  a provider outage that broke the run also breaks the alert). **Residual gap:** a
+  dead process or a scheduler that never re-arms can't self-alert — that needs an
+  external heartbeat/uptime check. Partial-success runs (some episodes failed but a
+  brief went out) are NOT alerted on purpose — the brief is the signal and failures
+  auto-retry next run; they're in the logs (`N episode(s) failed and will retry`).
 - **6 disabled sources need handle fixes** in sources.yaml (`enabled:false`):
   Sharp Tech, Logan Bartlett, Google DeepMind, Fireworks AI, Baseten, Cloudflare.
 - **Minor gaps**: dropped candidates have no LLM rejection reason (extend rank.md,
