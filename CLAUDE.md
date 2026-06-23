@@ -467,6 +467,12 @@ emits a lightly **corrected** quote per selected item (`corrected_quote` /
 - **Railway volumes are single-attach** — two services can't share a filesystem.
   Keep all work in one service.
 - **Cloudflare Access OTPs are single-use** — "doesn't work" = already redeemed.
+- **Pin the Docker base image by digest.** `FROM node:22-bookworm-slim` (floating)
+  silently drifted the Node runtime on a 2026-06-19 rebuild and the new Node 22.x
+  dropped long-lived streaming connections to api.anthropic.com mid-response
+  (`ERR_STREAM_PREMATURE_CLOSE` → 100% of `extract` calls failed, brief dead for
+  days, no code change). The `Dockerfile` now pins `@sha256:…`; bump it
+  deliberately, never via an unpinned tag.
 
 ---
 
