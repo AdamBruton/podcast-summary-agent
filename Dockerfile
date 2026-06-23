@@ -14,7 +14,15 @@
 # in the image. The runtime CONFIG_DIR + DATA_DIR are computed from the
 # RAILWAY_VOLUME_MOUNT_PATH env var (see src/lib/config.js).
 
-FROM node:22-bookworm-slim
+# PIN the base image by digest — do NOT revert this to a floating
+# `node:22-bookworm-slim` tag. On 2026-06-19 an unpinned rebuild silently
+# drifted the Node runtime (sha256:7af03b14… → sha256:d9f85009…); the newer
+# Node 22.x tore down long-lived streaming HTTPS connections to
+# api.anthropic.com mid-response (ERR_STREAM_PREMATURE_CLOSE), failing 100% of
+# `extract` calls and killing the daily brief for days with no code change. This
+# digest is the last build that delivered briefs. Bump it DELIBERATELY (and watch
+# one daily run) when you want a newer Node — never via an unpinned tag.
+FROM node:22-bookworm-slim@sha256:7af03b14a13c8cdd38e45058fd957bf00a72bbe17feac43b1c15a689c029c732
 
 # System deps. --no-install-recommends keeps the image lean.
 RUN apt-get update && apt-get install -y --no-install-recommends \
