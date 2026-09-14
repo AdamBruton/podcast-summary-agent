@@ -11,20 +11,35 @@
 //
 // Backup runs are intentionally non-fatal: if email is down or the volume
 // is full, the daily brief should still go out. Callers wrap in try/catch.
+//
+// Volume safety (added after the 2026-09-14 "database or disk is full" outage):
+// a snapshot needs roughly the DB's size in free space while the uncompressed
+// copy and the gzip coexist, so we check the volume first and refuse loudly
+// instead of pushing it to 100%; and a snapshot that dies mid-way cleans up
+// after itself rather than leaving an uncompressed copy that rotation never
+// touched (that leftover, every morning, is how a tight volume became full).
 
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { pipeline } from 'node:stream/promises';
-import { DATA_DIR, DB_PATH } from './config.js';
+import { DB_PATH } from './config.js';
 import { sendEmail, emailConfigured } from './mailer.js';
 import { db } from './db.js';
 import { log } from './log.js';
+import {
+  BACKUPS_DIR, BACKUP_KEEP_LAST_N, classifyBackups, volumeStats, fmtBytes,
+} from './disk.js';
 
-export const BACKUPS_DIR = path.join(DATA_DIR, 'backups');
+export { BACKUPS_DIR };
 
 // Keep this many gzipped snapshots on disk. Old ones (by mtime) are deleted.
-const KEEP_LAST_N = 14;
+// Override with BACKUP_KEEP_LAST (see disk.js).
+const KEEP_LAST_N = BACKUP_KEEP_LAST_N;
+
+// Headroom the volume must keep AFTER a snapshot is written. The daily run
+// still has to append transcripts/candidates to state.db afterwards.
+const MIN_FREE_AFTER_BACKUP = 64 * 1024 * 1024;
 
 // UTC day-of-week (0 = Sunday) on which to email the weekly off-site copy.
 // Daily cron runs at 11:00 UTC, so this stays in sync regardless of TZ.
@@ -41,20 +56,29 @@ function tsStamp() {
 // Produces a clean snapshot. Returns the path to the gzipped file.
 export async function backupDatabase({ emailIfDue = false } = {}) {
   fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+  assertRoomForSnapshot();
   const snapshotPath = path.join(BACKUPS_DIR, `state-${tsStamp()}.db`);
-
-  // VACUUM INTO can't be parameter-bound; embed the path literal. Escape
-  // single quotes defensively (DATA_DIR comes from env so could theoretically
-  // contain anything).
-  const escaped = snapshotPath.replace(/'/g, "''");
-  db().exec(`VACUUM INTO '${escaped}'`);
-
   const gzipPath = `${snapshotPath}.gz`;
-  await pipeline(
-    fs.createReadStream(snapshotPath),
-    zlib.createGzip({ level: 9 }),
-    fs.createWriteStream(gzipPath),
-  );
+
+  try {
+    // VACUUM INTO can't be parameter-bound; embed the path literal. Escape
+    // single quotes defensively (DATA_DIR comes from env so could theoretically
+    // contain anything).
+    const escaped = snapshotPath.replace(/'/g, "''");
+    db().exec(`VACUUM INTO '${escaped}'`);
+
+    await pipeline(
+      fs.createReadStream(snapshotPath),
+      zlib.createGzip({ level: 9 }),
+      fs.createWriteStream(gzipPath),
+    );
+  } catch (err) {
+    // Don't leave a half-written snapshot (or a truncated .gz) on the volume.
+    for (const p of [snapshotPath, gzipPath]) {
+      try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch { /* best effort */ }
+    }
+    throw err;
+  }
   fs.unlinkSync(snapshotPath);
 
   const bytes = fs.statSync(gzipPath).size;
@@ -70,14 +94,27 @@ export async function backupDatabase({ emailIfDue = false } = {}) {
   return { path: gzipPath, bytes };
 }
 
+// Refuse to snapshot when the volume can't hold it. While the snapshot is
+// being made, the uncompressed copy (≈ state.db) and the growing .gz coexist;
+// we also insist on headroom for the rest of the day's writes. Throwing (not
+// silently skipping) keeps the failure visible in the run log / admin UI.
+function assertRoomForSnapshot() {
+  const vol = volumeStats(BACKUPS_DIR);
+  if (!vol) return; // statfs unavailable — proceed as before
+  let dbBytes = 0;
+  try { dbBytes = fs.statSync(DB_PATH).size; } catch { return; }
+  const need = dbBytes + Math.ceil(dbBytes / 2) + MIN_FREE_AFTER_BACKUP;
+  if (vol.free_bytes < need) {
+    throw new Error(
+      `backup skipped: volume has ${fmtBytes(vol.free_bytes)} free but a snapshot of ` +
+      `state.db (${fmtBytes(dbBytes)}) needs ~${fmtBytes(need)}. ` +
+      `Free space via the web UI "Disk usage" panel or \`node scripts/disk-usage.js --cleanup\`.`
+    );
+  }
+}
+
 function rotateBackups() {
-  const files = fs.readdirSync(BACKUPS_DIR)
-    .filter(f => /^state-.*\.db\.gz$/.test(f))
-    .map(f => {
-      const full = path.join(BACKUPS_DIR, f);
-      return { name: f, full, mtime: fs.statSync(full).mtimeMs };
-    })
-    .sort((a, b) => b.mtime - a.mtime);
+  const files = classifyBackups().rotated; // newest first
   for (const f of files.slice(KEEP_LAST_N)) {
     try { fs.unlinkSync(f.full); log.info('rotated old backup', { name: f.name }); }
     catch (err) { log.warn('failed to delete old backup', { name: f.name, err: err.message }); }

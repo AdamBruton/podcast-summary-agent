@@ -15,10 +15,12 @@
     "discover": "node scripts/discover.js",
     "discovery:audit": "node scripts/discovery-audit.js",
     "backup": "node scripts/backup-db.js",
+    "disk": "node scripts/disk-usage.js",
     "upload-state-db": "node scripts/upload-state-db.js",
     "ingest-podcasts": "node scripts/ingest-podcasts.js",
     "web": "node src/web/server.js",
-    "test:profile": "node scripts/test-profile-roundtrip.js"
+    "test:profile": "node scripts/test-profile-roundtrip.js",
+    "test:disk": "node scripts/test-disk-housekeeping.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",

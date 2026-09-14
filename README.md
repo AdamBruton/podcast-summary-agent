@@ -276,6 +276,7 @@ node src/cli.js --episode "<url>"      # ad-hoc, single video
 npm run resolve-channels               # populate channel_id from @handle
 npm run discovery:audit                # inspect recent discovery decisions
 npm run backup                         # snapshot state.db to data/backups/
+npm run disk                           # volume usage report; --cleanup reclaims
 ```
 
 For everything else — architecture, schema invariants, cost notes, known

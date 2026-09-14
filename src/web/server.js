@@ -29,6 +29,7 @@ import { runEpisode, runDaily } from '../pipeline.js';
 import { complete, parseJsonResponse, MODELS } from '../lib/claude.js';
 import { loadPrompt, DB_PATH } from '../lib/config.js';
 import { backupDatabase, snapshotForRestore, BACKUPS_DIR } from '../lib/backup.js';
+import { diskReport, cleanupDisk, formatDiskSummary } from '../lib/disk.js';
 import { sendEmail, emailConfigured } from '../lib/mailer.js';
 import { log } from '../lib/log.js';
 import { diffLines } from 'diff';
@@ -418,6 +419,29 @@ app.post('/api/admin/restore-db',
   })
 );
 
+// --- Admin: disk usage & housekeeping ---------------------------------------
+//
+// Where the volume's bytes are, and a way to get them back without
+// `railway ssh`. Added after the daily run died with "database or disk is
+// full". Same Cloudflare Access protection as the backup endpoints.
+
+app.get('/api/admin/disk', wrap(() => diskReport()));
+
+// Body (all optional): { partials, legacyFiles, keepBackups, preRestore,
+// pruneTranscriptDays, vacuum } — see cleanupDisk() in lib/disk.js.
+app.post('/api/admin/disk/cleanup', wrap(req => {
+  const b = req.body || {};
+  const num = v => (v === '' || v == null ? null : Number(v));
+  return cleanupDisk({
+    partials:            b.partials !== false,
+    legacyFiles:         b.legacyFiles !== false,
+    keepBackups:         Number.isFinite(num(b.keepBackups)) ? num(b.keepBackups) : null,
+    preRestore:          b.preRestore === true,
+    pruneTranscriptDays: Number.isFinite(num(b.pruneTranscriptDays)) ? num(b.pruneTranscriptDays) : null,
+    vacuum:              b.vacuum === true,
+  });
+}));
+
 // --- Daily-brief scheduler --------------------------------------------------
 //
 // Replaces the separate Railway "cron" service that previously ran
@@ -476,6 +500,11 @@ async function notifyDailyOutcome({ kind, trigger, error, stats }) {
   let subject, body;
   if (kind === 'failed') {
     subject = `⚠️ Podcast Intel — daily brief FAILED (${dateStr})`;
+    // A volume snapshot makes "disk is full"-class failures diagnosable from
+    // the inbox; for any other error it's cheap context.
+    let disk = '';
+    try { disk = formatDiskSummary(diskReport()); }
+    catch (err) { disk = `(disk report unavailable: ${err.message})`; }
     body = [
       `The ${trigger} daily run failed before a brief could be sent.`,
       ``,
@@ -483,6 +512,11 @@ async function notifyDailyOutcome({ kind, trigger, error, stats }) {
       ``,
       `No content is lost — unfinished episodes keep their resumable status and`,
       `the next daily run retries them. Check the service logs for the full stack.`,
+      ``,
+      `Disk usage at the time of the alert:`,
+      disk,
+      ``,
+      `If the volume is full: web UI → "Disk usage & housekeeping" → Free up space.`,
     ].join('\n');
   } else { // 'empty'
     subject = `Podcast Intel — no brief today (${dateStr})`;
