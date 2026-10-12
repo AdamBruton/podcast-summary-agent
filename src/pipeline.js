@@ -14,6 +14,7 @@ import { rankEpisode } from './stages/4-rank.js';
 import { composeBrief } from './stages/5-compose.js';
 import { deliver } from './stages/6-deliver.js';
 import { backupDatabase } from './lib/backup.js';
+import { housekeepDaily } from './lib/disk.js';
 import { log, stage } from './lib/log.js';
 
 // Statuses that mean "ingested but not finished" — these get picked back up
@@ -107,6 +108,16 @@ export async function runDaily({ dryRun, lookbackDays = 2 } = {}) {
   let processed = 0, ok = false, briefResult = null;
   let pendingCount = 0, failedCount = 0;
   try {
+    // Volume housekeeping first: clear leftovers a previous failed run/backup
+    // left behind, apply transcript retention, truncate the WAL, and log where
+    // the bytes are. Runs BEFORE the backup so the snapshot doesn't carry
+    // transcripts we're about to drop, and so a tight volume gets whatever
+    // space can be reclaimed before we ask it for more. Non-fatal.
+    await stage('housekeeping', async () => {
+      try { housekeepDaily(); }
+      catch (err) { log.warn('housekeeping failed (continuing)', { err: err.message }); }
+    });
+
     // Snapshot the DB before any new writes for the day. Non-fatal: a failed
     // backup must not block the brief from going out. Email-attached weekly
     // off-site copy is gated inside backupDatabase by UTC day-of-week.

@@ -66,7 +66,8 @@ src/
     transcript-io.js    youtube-transcript.io client (YouTube captions)
     modal-transcribe.js WhisperX-on-Modal client (podcast audio)
     mailer.js           Resend email transport (shared by deliver + backup)
-    backup.js           DB snapshot/restore (VACUUM INTO)
+    backup.js           DB snapshot/restore (VACUUM INTO) + volume pre-flight
+    disk.js             volume usage report, housekeeping, reclamation (disk full!)
   stages/
     1-ingest.js         channel polling + ad-hoc URL ingest + ingestPodcastsDaily()
     1b-discover.js      search → mechanical filter → LLM curate → promote
@@ -87,7 +88,8 @@ config/
   sources.yaml          channels + podcasts + individuals/companies; web UI edits this
   profile.md            interest profile (tier hierarchy + themes); web UI edits this
 scripts/                ingest-podcasts, resolve-channels, recompose, rerank, discover,
-                        discovery-audit, inspect-window, inspect-bundles, test-*, etc.
+                        discovery-audit, inspect-window, inspect-bundles, disk-usage,
+                        test-*, etc.
 data/                   gitignored. state.db, transcripts/, briefs/, cookies.txt, backups/
 ```
 
@@ -147,7 +149,8 @@ rankings first because `rankings.candidate_id` is a regular FK, not CASCADE.
 
 ```
 runDaily()                                 runEpisode({url, markDeliveredOnSend})
-   ├─ backupDatabase()  (try/catch)            ├─ ingestEpisode(url)
+   ├─ housekeepDaily()  (try/catch)            ├─ ingestEpisode(url)
+   ├─ backupDatabase()  (try/catch)            │
    ├─ ingestDaily()                            ├─ transcribeEpisode()
    ├─ ingestPodcastsDaily()  (non-fatal)       ├─ extractEpisode()
    ├─ discoverIndividuals()                    ├─ rankEpisode()
@@ -335,10 +338,16 @@ reintroduce Whisper for YouTube** — different decision for a different medium.
 - **Snapshots**: `backupDatabase()` in `backup.js` → gzipped
   `<DATA_DIR>/backups/state-<ts>.db.gz` via `VACUUM INTO` (clean single file
   regardless of WAL state).
-- **Schedule**: at the START of `runDaily`, try/catch (a failed backup must not
-  block the brief).
-- **Rotation**: keep last 14 snapshots by mtime. Pre-restore snapshots
-  (`state.pre-restore-<ts>.db`, uncompressed) are NOT rotated.
+- **Schedule**: at the START of `runDaily` (after housekeeping), try/catch (a
+  failed backup must not block the brief).
+- **Volume pre-flight**: `backupDatabase` throws `backup skipped: …` when the
+  volume can't hold ~1.5× state.db + 64 MB headroom (`fs.statfsSync`). A
+  snapshot that fails mid-way deletes its own partial `.db`/`.gz`. Both added
+  after the 2026-09-14 outage — see "Volume housekeeping" below.
+- **Rotation**: keep last 14 snapshots by mtime (`BACKUP_KEEP_LAST` env
+  overrides). Pre-restore snapshots (`state.pre-restore-<ts>.db`, uncompressed)
+  are NOT rotated — but they're full DB copies; the Disk usage panel can delete
+  them on request.
 - **Off-site**: Sunday UTC, daily snapshot also emailed via Resend (≤20 MB;
   ~3 KB now). Silently skipped if email env unset.
 - **Restore** (`POST /api/admin/restore-db`): accepts `application/octet-stream`,
@@ -349,6 +358,49 @@ reintroduce Whisper for YouTube** — different decision for a different medium.
   after `process.exit(0)` (the old exit-and-restart approach stranded the service).
 - **Cloudflare Access** protects admin endpoints in prod. If you ever bind
   0.0.0.0 outside Railway, gate `/api/admin/*` behind a token first.
+
+---
+
+## Volume housekeeping (`src/lib/disk.js`)
+
+**Why:** 2026-09-14 the daily run died with SQLite `database or disk is full`.
+Everything persistent shares the ONE Railway volume — state.db (+WAL), 14
+rotated backups, config, plus whatever older pipeline versions left in
+`transcripts/` (yt-dlp `.vtt` captions and audio downloads from the Whisper
+era; nothing reads that dir now). Nothing bounded or reported the total, and a
+backup failing on a tight volume left an uncompressed `state-<ts>.db` behind
+that rotation's `\.db\.gz` regex never matched — so every morning made it worse.
+
+- **Biggest steady-state consumer is `transcripts.cues_json`** (~0.2-0.5 MB per
+  episode, kept forever). It is only needed until extract runs; rank/compose/
+  inspector work from candidates+rankings. **Retention:** `housekeepDaily()`
+  deletes transcripts of `delivered`/`skipped` episodes with `ingested_at` older
+  than `TRANSCRIPT_RETENTION_DAYS` (default 90; `0` disables). Candidates,
+  rankings, feedback untouched. An ad-hoc re-run of an old URL just re-fetches
+  (transcript-io call / Modal GPU job). Freed pages are reused by SQLite — the
+  file stops growing but only shrinks on VACUUM.
+- **`housekeepDaily()`** runs first in `runDaily` (try/catch): removes
+  failed-backup leftovers (`state-*.db` without a finished `.gz`, orphan `.gz`,
+  `state.db.incoming`), empties legacy `transcripts/`, applies retention,
+  `wal_checkpoint(TRUNCATE)`, logs a one-line usage summary, warns when free
+  < 100 MB or ≥ 90 % used.
+- **`diskReport()`** = volume statfs + DB file/WAL/freelist + per-table bytes
+  (`SUM(LENGTH(text))` proxy) + backups classified (rotated / partial /
+  pre-restore) + legacy dir + every top-level entry of DATA_DIR (so an unknown
+  hog is visible). `formatDiskSummary()` is appended to the "daily brief
+  FAILED" email, so a disk-full failure is diagnosable from the inbox.
+- **Surfaces:** web UI "Disk usage & housekeeping" section (`GET
+  /api/admin/disk`, `POST /api/admin/disk/cleanup`) and `npm run disk`
+  (`node scripts/disk-usage.js [--cleanup] [--keep-backups N] [--prune-days N]
+  [--pre-restore] [--vacuum]`). Cleanup steps are opt-in; the always-safe set is
+  partials + legacy files.
+- **VACUUM is never automatic.** In WAL mode the rewritten image passes through
+  the WAL on the same volume, so it needs ~1× state.db free — on a full volume it
+  fails exactly like the run did. `vacuumDb()` checks headroom (1.2× + 16 MB)
+  and reports `skipped` otherwise. Order of operations on a full volume: delete
+  files (backups/legacy) → prune → VACUUM.
+- **Railway volume size** is set in the dashboard (Volume → settings); growing
+  it is the other lever if the report shows the DB itself is legitimately big.
 
 ---
 
@@ -467,6 +519,11 @@ emits a lightly **corrected** quote per selected item (`corrected_quote` /
 - **Railway volumes are single-attach** — two services can't share a filesystem.
   Keep all work in one service.
 - **Cloudflare Access OTPs are single-use** — "doesn't work" = already redeemed.
+- **The volume fills up silently.** state.db keeps every transcript forever and
+  a failed backup used to leave an uncompressed copy behind. Symptom: daily run
+  fails with `database or disk is full`. Fix: web UI → Disk usage → Free up
+  space (or grow the Railway volume). Retention + pre-flight now prevent it;
+  see "Volume housekeeping".
 - **Pin the Docker base image by digest.** `FROM node:22-bookworm-slim` (floating)
   silently drifted the Node runtime on a 2026-06-19 rebuild and the new Node 22.x
   dropped long-lived streaming connections to api.anthropic.com mid-response
@@ -529,7 +586,8 @@ parallelism if mornings get slow.
   **nothing** (`deliver` returned `empty:true`) — so a delivered brief, a "no brief
   today" note, or a "FAILED" note is the expected outcome of every *completed* run,
   and true silence means a real problem. Best-effort (shares the Resend transport, so
-  a provider outage that broke the run also breaks the alert). **Residual gap:** a
+  a provider outage that broke the run also breaks the alert). The FAILED note
+  now includes a disk-usage summary (see "Volume housekeeping"). **Residual gap:** a
   dead process or a scheduler that never re-arms can't self-alert — that needs an
   external heartbeat/uptime check. Partial-success runs (some episodes failed but a
   brief went out) are NOT alerted on purpose — the brief is the signal and failures
@@ -565,8 +623,10 @@ npm run resolve-channels                       # populate channel_id from @handl
 node scripts/rerank.js [<video_id>]            # re-rank without re-extract
 node scripts/recompose.js [--send]             # re-render brief from current state
 
-# Backup / restore
+# Backup / restore / disk
 npm run backup [-- --email]                    # local snapshot (also UI button)
+npm run disk                                   # where the volume's bytes are
+npm run disk -- --cleanup [--vacuum]           # reclaim (also UI "Free up space")
 $env:ADMIN_UPLOAD_URL="https://<deploy>/api/admin/restore-db"
 $env:CF_ACCESS_CLIENT_ID="..."; $env:CF_ACCESS_CLIENT_SECRET="..."
 npm run upload-state-db                        # push local data/state.db to prod

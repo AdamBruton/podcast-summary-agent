@@ -448,6 +448,50 @@
     <div id="admin-backups-list" style="margin-top: 12px;"></div>
   </section>
 
+  <section>
+    <h2>Disk usage &amp; housekeeping <span id="disk-badge" style="color:#999"></span></h2>
+    <p class="lede" style="margin: 4px 0 8px;">
+      Everything persistent shares one volume: <code>state.db</code>, the rotated
+      backups, config, and any files older pipeline versions left behind. The
+      daily run reports this at start, clears failed-backup leftovers, and drops
+      transcripts of delivered episodes older than the retention window. Use
+      <em>Free up space</em> when the volume is tight (the daily brief fails with
+      <code>database or disk is full</code> otherwise).
+    </p>
+    <div id="disk-report"><p class="empty">Loading disk usage…</p></div>
+    <details id="disk-cleanup" style="margin-top: 12px;">
+      <summary style="cursor: pointer; font-size: 12px; color: var(--muted);">Free up space</summary>
+      <div style="margin-top: 12px; padding: 12px; background: var(--bg-soft); border-radius: 4px; font-size: 13px;">
+        <label style="display:block; margin-bottom: 6px;">
+          <input type="checkbox" id="disk-opt-partials" checked />
+          Remove failed-backup leftovers and legacy <code>transcripts/</code> files (always safe)
+        </label>
+        <label style="display:block; margin-bottom: 6px;">
+          <input type="checkbox" id="disk-opt-prune" checked />
+          Prune transcripts of delivered/skipped episodes older than
+          <input type="number" id="disk-opt-prune-days" min="1" style="width: 64px;" /> days
+          <span style="color: var(--muted);">(candidates, rankings and feedback are kept; an ad-hoc re-run re-fetches)</span>
+        </label>
+        <label style="display:block; margin-bottom: 6px;">
+          <input type="checkbox" id="disk-opt-trim" />
+          Keep only the newest
+          <input type="number" id="disk-opt-trim-n" min="0" style="width: 64px;" /> backups
+        </label>
+        <label style="display:block; margin-bottom: 6px;">
+          <input type="checkbox" id="disk-opt-prerestore" />
+          Delete pre-restore snapshots (<code>state.pre-restore-*.db</code>)
+        </label>
+        <label style="display:block; margin-bottom: 10px;">
+          <input type="checkbox" id="disk-opt-vacuum" />
+          Compact <code>state.db</code> (VACUUM — shrinks the file after pruning; skipped automatically if the volume lacks headroom)
+        </label>
+        <button class="danger" id="disk-cleanup-run">Free up space</button>
+      </div>
+    </details>
+    <div class="ok-msg" id="disk-status"></div>
+    <div class="err" id="disk-err"></div>
+  </section>
+
   <div class="footer">
     podcast-summary-agent · serving <code>config/sources.yaml</code>
   </div>
@@ -513,6 +557,7 @@ async function load() {
   loadProfile().catch(e => setErr('profile-err', e.message));
   loadEpisodes().catch(e => setErr('episodes-err', e.message));
   loadBackups().catch(e => setErr('admin-err', e.message));
+  loadDisk().catch(e => setErr('disk-err', e.message));
 }
 
 async function loadProfile() {
@@ -1240,6 +1285,54 @@ document.addEventListener('click', async (ev) => {
     return;
   }
 
+  if (t.id === 'disk-cleanup-run') {
+    setErr('disk-err', '');
+    const status = document.getElementById('disk-status');
+    status.textContent = '';
+    const opt = id => document.getElementById(id);
+    const body = {
+      partials:    opt('disk-opt-partials').checked,
+      legacyFiles: opt('disk-opt-partials').checked,
+      preRestore:  opt('disk-opt-prerestore').checked,
+      vacuum:      opt('disk-opt-vacuum').checked,
+    };
+    if (opt('disk-opt-prune').checked) body.pruneTranscriptDays = Number(opt('disk-opt-prune-days').value);
+    if (opt('disk-opt-trim').checked)  body.keepBackups = Number(opt('disk-opt-trim-n').value);
+    const summary = [
+      body.partials ? '• failed-backup leftovers + legacy files' : null,
+      body.pruneTranscriptDays ? `• transcripts of delivered episodes older than ${body.pruneTranscriptDays} days` : null,
+      body.keepBackups != null ? `• all but the newest ${body.keepBackups} backups` : null,
+      body.preRestore ? '• pre-restore snapshots' : null,
+      body.vacuum ? '• then VACUUM state.db' : null,
+    ].filter(Boolean).join('\n');
+    if (!summary) { setErr('disk-err', 'nothing selected'); return; }
+    if (!confirm(`Delete the following from the volume?\n\n${summary}\n\nThis can't be undone.`)) return;
+    t.disabled = true;
+    const orig = t.textContent;
+    t.textContent = 'Cleaning…';
+    try {
+      const r = await api('POST', '/api/admin/disk/cleanup', body);
+      const lines = r.actions.map(a => {
+        if (a.error) return `✗ ${a.action}: ${a.error}`;
+        if (a.skipped) return `– ${a.action}: ${a.skipped}`;
+        const n = a.files != null ? `${a.files} file(s)` : a.rows != null ? `${a.rows} row(s)` : '';
+        const bytes = a.freed_bytes ?? a.bytes;
+        return `✓ ${a.action}${n ? `: ${n}` : ''}${bytes ? ` (${fmtBytes(bytes)})` : ''}`;
+      });
+      status.innerHTML = `<b>Freed ~${fmtBytes(r.freed_bytes)}</b>` +
+        (r.report?.volume ? ` · ${fmtBytes(r.report.volume.free_bytes)} free now` : '') +
+        `<br><span class="mono" style="font-size:12px; white-space:pre-line;">${esc(lines.join('\n'))}</span>`;
+      await loadDisk();
+      await loadBackups();
+    } catch (e) {
+      setErr('disk-err', e.message);
+    } finally {
+      t.disabled = false;
+      t.textContent = orig;
+    }
+    return;
+  }
+
   if (t.id === 'admin-restore-submit') {
     setErr('admin-err', '');
     const status = document.getElementById('admin-status');
@@ -1282,6 +1375,75 @@ document.addEventListener('click', async (ev) => {
     return;
   }
 });
+
+function fmtBytes(n) {
+  if (n == null || !Number.isFinite(n)) return '?';
+  if (n < 1024) return `${n} B`;
+  if (n < 1048576) return `${(n / 1024).toFixed(0)} KB`;
+  if (n < 1073741824) return `${(n / 1048576).toFixed(1)} MB`;
+  return `${(n / 1073741824).toFixed(2)} GB`;
+}
+
+async function loadDisk() {
+  const wrap = document.getElementById('disk-report');
+  const badge = document.getElementById('disk-badge');
+  try {
+    const r = await api('GET', '/api/admin/disk');
+    const v = r.volume;
+    const pct = v?.used_pct ?? null;
+    const barColor = pct == null ? '#ccc' : pct >= 90 ? 'var(--danger)' : pct >= 75 ? '#e69500' : 'var(--accent)';
+    badge.textContent = v ? `${fmtBytes(v.free_bytes)} free` : '';
+    badge.style.color = r.low_space ? 'var(--danger)' : '#999';
+
+    const row = (label, value, note) =>
+      `<tr><td>${label}</td><td class="mono" style="text-align:right;">${value}</td><td class="mono">${note || ''}</td></tr>`;
+    const rows = [];
+    if (v) {
+      rows.push(row('Volume', `${fmtBytes(v.used_bytes)} / ${fmtBytes(v.total_bytes)}`,
+        `<div style="height:6px; background:#e5e5e5; border-radius:3px; overflow:hidden; min-width:120px;">` +
+        `<div style="height:100%; width:${pct}%; background:${barColor};"></div></div>` +
+        `${pct}% used · ${fmtBytes(v.free_bytes)} free${r.low_space ? ' · <b style="color:var(--danger)">nearly full</b>' : ''}`));
+    } else {
+      rows.push(row('Volume', '?', 'statfs unavailable on this platform'));
+    }
+    rows.push(row('state.db', fmtBytes(r.db.main_bytes),
+      `WAL ${fmtBytes(r.db.wal_bytes)}` + (r.db.pages ? ` · ${fmtBytes(r.db.pages.free_bytes)} free inside the file (VACUUM reclaims)` : '')));
+    for (const t of r.tables) {
+      if (!t.bytes && t.table !== 'transcripts') continue;
+      let note = `${t.rows.toLocaleString()} rows`;
+      if (t.table === 'transcripts' && r.prunable_transcripts.rows) {
+        note += ` · ${r.prunable_transcripts.rows} prunable (>${r.transcript_retention_days}d, ~${fmtBytes(r.prunable_transcripts.bytes)})`;
+      }
+      rows.push(row(`&nbsp;&nbsp;${esc(t.table)}`, `~${fmtBytes(t.bytes)}`, note));
+    }
+    const b = r.backups;
+    let bnote = `${b.rotated.files} rotated (keep ${b.keep_last_n})`;
+    if (b.partial.files) bnote += ` · <b style="color:var(--danger)">${b.partial.files} failed-backup leftover(s), ${fmtBytes(b.partial.bytes)}</b>`;
+    if (b.pre_restore.files) bnote += ` · ${b.pre_restore.files} pre-restore, ${fmtBytes(b.pre_restore.bytes)}`;
+    rows.push(row('backups/', fmtBytes(b.total_bytes), bnote));
+    if (r.legacy_transcript_files.files) {
+      rows.push(row('transcripts/ (legacy)', fmtBytes(r.legacy_transcript_files.bytes),
+        `<b style="color:var(--danger)">${r.legacy_transcript_files.files} unused file(s)</b> — removable`));
+    }
+    if (r.db.incoming_bytes) rows.push(row('state.db.incoming', fmtBytes(r.db.incoming_bytes), 'stranded restore upload — removable'));
+    if (r.briefs.files) rows.push(row('briefs/', fmtBytes(r.briefs.bytes), `${r.briefs.files} dry-run HTML file(s)`));
+    rows.push(row('config/', fmtBytes(r.config.bytes), `${r.config.files} file(s)`));
+    const known = new Set(['state.db', 'state.db-wal', 'state.db-shm', 'state.db.incoming', 'backups/', 'transcripts/', 'briefs/', 'config/']);
+    for (const e of r.top_level) {
+      if (known.has(e.name) || e.bytes < 1048576) continue;
+      rows.push(row(esc(e.name), fmtBytes(e.bytes), `${e.files} file(s) — not managed by the app`));
+    }
+    wrap.innerHTML = `<table><tbody>${rows.join('')}</tbody></table>
+      <p class="empty" style="margin-top: 4px;">${esc(r.data_dir)} · as of ${esc(r.generated_at.replace('T', ' ').slice(0, 19))} UTC</p>`;
+
+    const days = document.getElementById('disk-opt-prune-days');
+    if (!days.value) days.value = r.transcript_retention_days || 90;
+    const trimN = document.getElementById('disk-opt-trim-n');
+    if (!trimN.value) trimN.value = b.keep_last_n;
+  } catch (e) {
+    wrap.innerHTML = `<p class="empty">Failed to load disk usage: ${esc(e.message)}</p>`;
+  }
+}
 
 async function loadBackups() {
   const wrap = document.getElementById('admin-backups-list');
